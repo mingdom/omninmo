@@ -5,6 +5,7 @@ SHELL := /bin/bash
 PYTHON := python3
 PIP := pip3
 SCRIPTS_DIR := scripts
+TESTS_DIR := tests
 
 # Default target
 .PHONY: help
@@ -14,8 +15,9 @@ help:
 	@echo "  env         - Set up a virtual environment"
 	@echo "  install     - Install dependencies"
 	@echo "  test        - Run all tests"
-	@echo "  test-app    - Test the application components"
-	@echo "  test-watchlist - Test the watch list functionality"
+	@echo "  test-core   - Test the core application components"
+	@echo "  test-model  - Test the model functionality"
+	@echo "  test-imports - Test the imports"
 	@echo "  train       - Train the model (now uses XGBoost by default)"
 	@echo "  train-rf    - Train the Random Forest model (legacy)"
 	@echo "  train-xgb   - Train the XGBoost model"
@@ -32,7 +34,6 @@ help:
 	@echo "  maintain-weekly  - Run weekly model retraining"
 	@echo "  maintain-monthly - Run monthly model evaluation"
 	@echo "  compare-models - Compare Random Forest and XGBoost models"
-	@echo "  test-model     - Run a simple test of the XGBoost model"
 	@echo "  verify-model   - Verify the current model type and configuration"
 
 # Set up virtual environment
@@ -50,20 +51,26 @@ install:
 # Run tests
 .PHONY: test
 test:
-	@echo "Running tests..."
-	@$(PYTHON) $(SCRIPTS_DIR)/run_tests.py
+	@echo "Running all tests..."
+	@$(PYTHON) $(TESTS_DIR)/run_tests.py
 
-# Test the application components
-.PHONY: test-app
-test-app:
-	@echo "Testing application components..."
-	@$(PYTHON) $(SCRIPTS_DIR)/test_app.py
+# Test the core application components
+.PHONY: test-core
+test-core:
+	@echo "Testing core application components..."
+	@$(PYTHON) -m unittest $(TESTS_DIR)/test_core.py
 
-# Test the watch list functionality
-.PHONY: test-watchlist
-test-watchlist:
-	@echo "Testing watch list functionality..."
-	@$(PYTHON) $(SCRIPTS_DIR)/test_watchlist.py
+# Test the model functionality
+.PHONY: test-model
+test-model:
+	@echo "Testing model functionality..."
+	@$(PYTHON) -m unittest $(TESTS_DIR)/test_model_functionality.TestModelFunctionality
+
+# Test imports
+.PHONY: test-imports
+test-imports:
+	@echo "Testing imports..."
+	@$(PYTHON) -m unittest $(TESTS_DIR)/test_imports.py
 
 # Clear the data cache
 .PHONY: clear-cache
@@ -136,6 +143,7 @@ pipeline:
 executable:
 	@echo "Making all scripts executable..."
 	@bash $(SCRIPTS_DIR)/make_executable.sh
+	@chmod +x $(TESTS_DIR)/run_tests.py
 
 # Model maintenance targets
 .PHONY: maintain
@@ -168,27 +176,9 @@ compare-models:
 	@echo "Summary:"
 	@cat model_comparison/comparison_timestamp.txt
 
-# Simple model test target
-.PHONY: test-model
-test-model:
-	@echo "Running simple model test..."
-	$(PYTHON) $(SCRIPTS_DIR)/simple_model_test.py
-	@echo "Test complete."
-
 # Verify model target
 .PHONY: verify-model
 verify-model:
 	@echo "Verifying model type and configuration..."
 	$(PYTHON) $(SCRIPTS_DIR)/verify_model.py
-	@echo "Verification complete."
-
-# Additional targets for specific test cases
-.PHONY: test-imports
-test-imports:
-	@echo "Testing imports..."
-	@$(PYTHON) $(SCRIPTS_DIR)/test_imports.py
-
-.PHONY: test-trainer
-test-trainer:
-	@echo "Testing trainer..."
-	@$(PYTHON) $(SCRIPTS_DIR)/test_trainer.py 
+	@echo "Verification complete." 
