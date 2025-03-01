@@ -30,7 +30,9 @@ def main():
     # List of test scripts to run
     test_scripts = [
         os.path.join(scripts_dir, 'test_imports.py'),
-        os.path.join(scripts_dir, 'test_trainer.py')
+        os.path.join(scripts_dir, 'test_trainer.py'),
+        os.path.join(scripts_dir, 'test_app.py'),
+        os.path.join(scripts_dir, 'test_watchlist.py')
     ]
     
     # Run each test script
