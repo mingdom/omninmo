@@ -27,6 +27,7 @@ try:
     from src.data.stock_data_fetcher import StockDataFetcher
     from src.utils.feature_engineer import FeatureEngineer
     from src.models.stock_rating_predictor import StockRatingPredictor
+    from src.models.xgboost_predictor import XGBoostRatingPredictor
 except ImportError:
     logger.warning("Attempting relative imports...")
     try:
@@ -34,11 +35,12 @@ except ImportError:
         from ..data.stock_data_fetcher import StockDataFetcher
         from ..utils.feature_engineer import FeatureEngineer
         from ..models.stock_rating_predictor import StockRatingPredictor
+        from ..models.xgboost_predictor import XGBoostRatingPredictor
     except ImportError as e:
         logger.error(f"Failed to import required modules: {e}")
         raise
 
-def train_model(tickers, model_path, period="5y", interval="1d", forward_days=20, force_sample=False):
+def train_model(tickers, model_path, period="5y", interval="1d", forward_days=20, force_sample=False, use_xgboost=True):
     """
     Train a model on historical data for a set of tickers.
 
@@ -49,14 +51,22 @@ def train_model(tickers, model_path, period="5y", interval="1d", forward_days=20
         interval (str): Data interval (default: '1d')
         forward_days (int): Number of days to look ahead for returns
         force_sample (bool): Force the use of sample data instead of fetching from API
+        use_xgboost (bool): Whether to use XGBoost (default) or Random Forest model
 
     Returns:
-        StockRatingPredictor: Trained model
+        StockRatingPredictor or XGBoostRatingPredictor: Trained model
     """
     # Initialize components
     fetcher = StockDataFetcher(cache_dir="cache")
     feature_engineer = FeatureEngineer()
-    predictor = StockRatingPredictor()
+    
+    # Initialize the appropriate model
+    if use_xgboost:
+        predictor = XGBoostRatingPredictor()
+        logger.info("Using XGBoost model for training")
+    else:
+        predictor = StockRatingPredictor()
+        logger.info("Using Random Forest model for training")
 
     # Collect data and features for all tickers
     all_features = []
@@ -111,7 +121,12 @@ def train_model(tickers, model_path, period="5y", interval="1d", forward_days=20
     y_combined = pd.concat(all_targets, axis=0)
     
     # Train the model
-    predictor.train(X_combined, y_combined)
+    if use_xgboost:
+        training_results = predictor.train(X_combined, y_combined)
+        if training_results:
+            print(f"Training accuracy: {training_results['accuracy']:.4f}")
+    else:
+        predictor.train(X_combined, y_combined)
     
     # Save the model
     os.makedirs(os.path.dirname(os.path.abspath(model_path)), exist_ok=True)
@@ -120,7 +135,7 @@ def train_model(tickers, model_path, period="5y", interval="1d", forward_days=20
     
     return predictor
 
-def train_on_default_tickers(model_path='models/stock_predictor.pkl', period='2y', tickers=None, force_sample=False):
+def train_on_default_tickers(model_path='models/stock_predictor.pkl', period='2y', tickers=None, force_sample=False, use_xgboost=True):
     """
     Train the stock rating predictor model on default tickers.
     
@@ -129,11 +144,13 @@ def train_on_default_tickers(model_path='models/stock_predictor.pkl', period='2y
         period (str): Time period for historical data (e.g., '1y', '2y')
         tickers (list): List of ticker symbols to use for training. If None, uses DEFAULT_TICKERS
         force_sample (bool): Force the use of sample data instead of fetching from API
+        use_xgboost (bool): Whether to use XGBoost (default) or Random Forest model
     
     Returns:
-        StockRatingPredictor: Trained model instance
+        StockRatingPredictor or XGBoostRatingPredictor: Trained model instance
     """
-    logger.info("Starting model training on default tickers")
+    model_type = "XGBoost" if use_xgboost else "Random Forest"
+    logger.info(f"Starting {model_type} model training on default tickers")
     
     # Use default tickers if none provided
     if tickers is None:
@@ -144,11 +161,11 @@ def train_on_default_tickers(model_path='models/stock_predictor.pkl', period='2y
     
     try:
         # Call the main training function
-        model = train_model(tickers, model_path, period=period, force_sample=force_sample)
-        logger.info(f"Model trained and saved to {model_path}")
+        model = train_model(tickers, model_path, period=period, force_sample=force_sample, use_xgboost=use_xgboost)
+        logger.info(f"{model_type} model trained and saved to {model_path}")
         return model
     except Exception as e:
-        logger.error(f"Error during model training: {e}")
+        logger.error(f"Error during {model_type} model training: {e}")
         return None
 
 def load_model(model_path='models/stock_predictor.pkl'):
@@ -159,7 +176,7 @@ def load_model(model_path='models/stock_predictor.pkl'):
         model_path (str): Path to the saved model
     
     Returns:
-        StockRatingPredictor: Loaded model instance
+        StockRatingPredictor or XGBoostRatingPredictor: Loaded model instance
     """
     try:
         with open(model_path, 'rb') as f:
@@ -178,7 +195,7 @@ def evaluate_model(model, test_tickers, period="1y", interval="1d"):
     Evaluate a trained model on a set of test tickers.
 
     Args:
-        model (StockRatingPredictor): Trained model
+        model (StockRatingPredictor or XGBoostRatingPredictor): Trained model
         test_tickers (list): List of ticker symbols for testing
         period (str): Period to fetch data for (default: '1y')
         interval (str): Data interval (default: '1d')

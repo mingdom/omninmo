@@ -1,0 +1,4 @@
+Comparison run at: 2025-02-28 16:19:18
+Random Forest accuracy: 0.4306
+XGBoost accuracy: 0.3819
+Improvement: -11.29%
