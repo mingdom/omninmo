@@ -17,7 +17,8 @@ def main():
     """Run the Streamlit application."""
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Run the omninmo Streamlit application.')
-    parser.add_argument('--sample-data', action='store_true', help='Use sample data instead of fetching from API')
+    parser.add_argument('--sample-data', action='store_true', 
+                       help='Use generated sample data instead of fetching from Yahoo Finance API (useful when API has issues)')
     args = parser.parse_args()
     
     # Get the absolute path to the project root
