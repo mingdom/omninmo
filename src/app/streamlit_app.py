@@ -26,6 +26,7 @@ sys.path.insert(0, project_root)
 # Import project modules
 try:
     from src.data.stock_data_fetcher import StockDataFetcher
+    from src.data.fmp_data_fetcher import FMPDataFetcher
     from src.utils.feature_engineer import FeatureEngineer
     from src.utils.trainer import load_model
 except ImportError as e:
@@ -118,7 +119,14 @@ st.markdown("""
 def get_data_fetcher():
     cache_dir = os.path.join(project_root, "cache")
     os.makedirs(cache_dir, exist_ok=True)
-    return StockDataFetcher(cache_dir=cache_dir)
+    
+    # Use FMP data fetcher by default, fall back to Yahoo Finance if needed
+    try:
+        logger.info("Initializing FMP data fetcher")
+        return FMPDataFetcher(cache_dir=cache_dir)
+    except Exception as e:
+        logger.warning(f"Failed to initialize FMP data fetcher: {e}. Falling back to Yahoo Finance.")
+        return StockDataFetcher(cache_dir=cache_dir)
 
 @st.cache_resource
 def get_feature_engineer():

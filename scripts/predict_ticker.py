@@ -1,132 +1,158 @@
-#!/usr/bin/env python3
 """
-Script for quick command-line stock predictions.
+Script to predict the rating for a single stock ticker.
 """
 
 import os
 import sys
 import argparse
-import logging
+from datetime import datetime
 import pandas as pd
 
-# Add the project root to the Python path to enable imports
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from src.data.fetcher import StockDataFetcher
+from src.data.features import FeatureEngineer
+from src.models.predictor import StockRatingPredictor
+from src.utils.analysis import generate_summary
 
-# Set up logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
 
-# Import project modules
-try:
-    from src.data.stock_data_fetcher import StockDataFetcher
-    from src.utils.feature_engineer import FeatureEngineer
-    from src.utils.trainer import load_model
-except ImportError as e:
-    logger.error(f"Failed to import required modules: {e}")
-    sys.exit(1)
-
-def predict_ticker(ticker, model_path='models/stock_predictor.pkl', period='1y'):
+def predict_ticker(ticker, period="1y", interval="1d", model_path=None):
     """
-    Predict the rating for a given ticker.
-    
+    Predict the rating for a single stock ticker.
+
     Args:
         ticker (str): Stock ticker symbol
-        model_path (str): Path to the trained model
-        period (str): Time period for historical data
-    
+        period (str): Period to fetch data for
+        interval (str): Data interval
+        model_path (str, optional): Path to the model file
+
     Returns:
-        tuple: (rating, confidence, indicators)
+        tuple: (rating, summary, df) where rating is the predicted rating,
+               summary is a dictionary with summary information,
+               and df is the DataFrame with stock data
     """
-    # Load the model
-    model = load_model(model_path)
-    if model is None:
-        logger.error(f"Failed to load model from {model_path}")
-        return None, 0, None
-    
+    # Get the directory of this script
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+
+    # Set default model path if not provided
+    if model_path is None:
+        model_path = os.path.join(script_dir, "models", "stock_rating_model.joblib")
+
+    # Check if model exists
+    if not os.path.exists(model_path):
+        raise FileNotFoundError(
+            f"Model not found at {model_path}. Please train the model first."
+        )
+
     # Initialize components
-    data_fetcher = StockDataFetcher()
+    fetcher = StockDataFetcher()
     feature_engineer = FeatureEngineer()
-    
-    try:
-        # Fetch historical data
-        stock_data = data_fetcher.fetch_data(ticker, period=period)
-        
-        if stock_data is None or stock_data.empty:
-            logger.error(f"No data available for {ticker}")
-            return None, 0, None
-            
-        # Engineer features
-        features = feature_engineer.calculate_indicators(stock_data)
-        
-        if features is None or features.empty:
-            logger.error(f"Failed to calculate features for {ticker}")
-            return None, 0, None
-        
-        # Get the most recent features for prediction
-        recent_features = features.iloc[[-1]]
-        
-        # Make prediction
-        rating, confidence = model.predict(recent_features)
-        
-        # Extract key indicators
-        indicators = {
-            "RSI": features.iloc[-1]['RSI'],
-            "MACD": features.iloc[-1]['MACD'],
-            "Price to 50-day MA": features.iloc[-1]['Price_to_SMA_50'],
-            "Price to 200-day MA": features.iloc[-1]['Price_to_SMA_200'],
-            "Bollinger Band Width": features.iloc[-1]['BB_Width']
-        }
-        
-        return rating, confidence, indicators
-        
-    except Exception as e:
-        logger.error(f"Error predicting {ticker}: {e}")
-        return None, 0, None
+    predictor = StockRatingPredictor(model_path=model_path)
+
+    # Fetch data
+    print(f"Fetching data for {ticker}...")
+    df = fetcher.fetch_stock_data(ticker, period=period, interval=interval)
+
+    if df is None or df.empty:
+        raise ValueError(f"No data found for {ticker}")
+
+    # Add technical indicators
+    print("Calculating technical indicators...")
+    df_with_indicators = feature_engineer.add_technical_indicators(df)
+
+    if df_with_indicators is None or df_with_indicators.empty:
+        raise ValueError(f"Could not calculate technical indicators for {ticker}")
+
+    # Prepare features
+    X, _ = feature_engineer.prepare_features(df_with_indicators)
+
+    if X is None or len(X) == 0:
+        raise ValueError(f"Could not generate features for {ticker}")
+
+    # Make prediction
+    print("Predicting rating...")
+    ratings = predictor.predict(X)
+
+    # Get the most recent rating
+    latest_rating = ratings[-1] if ratings else None
+
+    if latest_rating is None:
+        raise ValueError(f"Could not predict rating for {ticker}")
+
+    # Generate summary
+    summary = generate_summary(df, ticker, latest_rating)
+
+    return latest_rating, summary, df
+
 
 def main():
-    """Main function to parse arguments and make predictions."""
-    parser = argparse.ArgumentParser(description='Predict stock rating for a ticker.')
-    parser.add_argument('ticker', type=str, help='Stock ticker symbol')
-    parser.add_argument('--model-path', type=str, default='models/stock_predictor.pkl',
-                        help='Path to the trained model')
-    parser.add_argument('--period', type=str, default='1y',
-                        help='Time period for historical data (e.g., 1y, 2y)')
-    
-    args = parser.parse_args()
-    
-    print(f"Analyzing {args.ticker}...")
-    
-    # Make prediction
-    rating, confidence, indicators = predict_ticker(
-        args.ticker,
-        model_path=args.model_path,
-        period=args.period
+    """
+    Main function for the script.
+    """
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(
+        description="Predict the rating for a stock ticker."
     )
-    
-    if rating is None:
-        print(f"Failed to predict rating for {args.ticker}")
-        sys.exit(1)
-    
-    # Print results
-    print(f"\nomninmo Rating: {rating} (Confidence: {confidence:.2%})")
-    
-    if indicators:
-        print("\nKey Indicators:")
-        for name, value in indicators.items():
-            print(f"- {name}: {value:.2f}")
-    
-    # Add interpretation
-    print("\nInterpretation:")
-    if rating == "Strong Buy":
-        print("- Technical indicators suggest strong positive momentum")
-    elif rating == "Buy":
-        print("- Technical indicators suggest positive momentum")
-    elif rating == "Hold":
-        print("- Technical indicators suggest neutral momentum")
-    elif rating == "Sell":
-        print("- Technical indicators suggest negative momentum")
-    elif rating == "Strong Sell":
-        print("- Technical indicators suggest strong negative momentum")
+    parser.add_argument("ticker", help="Stock ticker symbol (e.g., NVDA, AAPL)")
+    parser.add_argument(
+        "--period", "-p", default="1y", help="Period to fetch data for (default: 1y)"
+    )
+    parser.add_argument(
+        "--interval", "-i", default="1d", help="Data interval (default: 1d)"
+    )
+    parser.add_argument("--model", "-m", help="Path to the model file")
 
-if __name__ == '__main__':
-    main() 
+    args = parser.parse_args()
+
+    # Convert ticker to uppercase
+    ticker = args.ticker.upper()
+
+    try:
+        # Predict rating
+        rating, summary, df = predict_ticker(
+            ticker=ticker,
+            period=args.period,
+            interval=args.interval,
+            model_path=args.model,
+        )
+
+        # Display results
+        print("\n" + "=" * 50)
+        print(
+            f"Prediction for {ticker} as of {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        )
+        print("=" * 50)
+
+        # Rating
+        print(f"\nomninmo Rating: {rating}")
+
+        # Current price and change
+        print(f"\nPrice Information:")
+        print(f"Current Price: ${summary['current_price']:.2f}")
+        if summary["change_1d"] is not None:
+            change_sign = "+" if summary["change_1d"] >= 0 else ""
+            print(f"1-Day Change: {change_sign}{summary['change_1d']*100:.2f}%")
+
+        # Returns
+        print(f"\nReturns:")
+        for period in ["1d", "5d", "20d", "60d", "120d", "252d"]:
+            if period in summary and summary[period] is not None:
+                change_sign = "+" if summary[period] >= 0 else ""
+                print(f"{period}: {change_sign}{summary[period]:.2f}%")
+
+        # Risk metrics
+        print(f"\nRisk Metrics:")
+        if summary["volatility"] is not None:
+            print(f"Volatility (Ann.): {summary['volatility']*100:.2f}%")
+        if summary["sharpe_ratio"] is not None:
+            print(f"Sharpe Ratio: {summary['sharpe_ratio']:.2f}")
+        if summary["max_drawdown"] is not None:
+            print(f"Max Drawdown: {summary['max_drawdown']:.2f}%")
+
+        print("\nFor more detailed analysis, run the Streamlit app: python run_app.py")
+
+    except Exception as e:
+        print(f"Error: {e}")
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

@@ -159,6 +159,13 @@ class FeatureEngineer:
             # Drop the original OHLCV columns as they're not used as features
             features = df.drop(['Open', 'High', 'Low', 'Close', 'Volume'], axis=1, errors='ignore')
             
+            # Fill NaN values with appropriate values
+            # For moving averages and other indicators, forward fill then backward fill
+            features = features.ffill().bfill()
+            
+            # If there are still NaN values (e.g., at the beginning of the series), fill with zeros
+            features = features.fillna(0)
+            
             # Drop rows with all NaN values
             features = features.dropna(how='all')
             
@@ -183,18 +190,21 @@ class FeatureEngineer:
             return None
         
         try:
+            # Fill NaN values before normalization
+            features_filled = features.ffill().bfill().fillna(0)
+            
             # Calculate mean and standard deviation
-            mean = features.mean()
-            std = features.std()
+            mean = features_filled.mean()
+            std = features_filled.std()
             
             # Avoid division by zero
             std = std.replace(0, 1)
             
             # Normalize features
-            normalized = (features - mean) / std
+            normalized = (features_filled - mean) / std
             
-            # Replace infinite values with NaN and then drop rows with NaN
-            normalized = normalized.replace([np.inf, -np.inf], np.nan)
+            # Replace infinite values with 0
+            normalized = normalized.replace([np.inf, -np.inf], 0)
             
             return normalized
             

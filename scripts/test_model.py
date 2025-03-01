@@ -1,147 +1,138 @@
-#!/usr/bin/env python3
 """
-Script to test the stock rating prediction model.
+Script to test the stock rating prediction model on a set of tickers.
 """
 
 import os
 import sys
-import argparse
-import logging
 import pandas as pd
-from sklearn.metrics import classification_report
+from src.models.predictor import StockRatingPredictor
+from src.utils.trainer import evaluate_model
 
-# Add the project root to the Python path to enable imports
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
-# Set up logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
-
-# Import project modules
-try:
-    from src.data.stock_data_fetcher import StockDataFetcher
-    from src.utils.feature_engineer import FeatureEngineer
-    from src.utils.trainer import load_model
-except ImportError as e:
-    logger.error(f"Failed to import required modules: {e}")
-    sys.exit(1)
-
-def test_model(model_path='models/stock_predictor.pkl', test_tickers=None, period='1y'):
-    """
-    Test the stock rating prediction model on the provided tickers.
-    
-    Args:
-        model_path (str): Path to the trained model
-        test_tickers (list): List of ticker symbols to test on
-        period (str): Time period for historical data
-    
-    Returns:
-        dict: Dictionary containing test results
-    """
-    # Default test tickers if none provided
-    if test_tickers is None:
-        test_tickers = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META']
-    
-    # Load the model
-    model = load_model(model_path)
-    if model is None:
-        logger.error(f"Failed to load model from {model_path}")
-        return None
-    
-    # Initialize components
-    data_fetcher = StockDataFetcher()
-    feature_engineer = FeatureEngineer()
-    
-    # Collect test data
-    all_features = []
-    all_labels = []
-    
-    logger.info(f"Testing model on {len(test_tickers)} tickers")
-    
-    for ticker in test_tickers:
-        try:
-            # Fetch historical data
-            stock_data = data_fetcher.fetch_data(ticker, period=period)
-            
-            if stock_data is None or stock_data.empty:
-                logger.warning(f"No data available for {ticker}, skipping")
-                continue
-                
-            # Engineer features
-            features = feature_engineer.calculate_indicators(stock_data)
-            
-            if features is None or features.empty:
-                logger.warning(f"Failed to calculate features for {ticker}, skipping")
-                continue
-            
-            # Generate labels (this is simplified - in a real scenario, you'd have actual labels)
-            # For demonstration, we'll use a simple rule-based approach
-            returns = stock_data['Close'].pct_change(20)  # 20-day returns
-            labels = pd.cut(returns, 
-                           bins=[-float('inf'), -0.1, -0.03, 0.03, 0.1, float('inf')],
-                           labels=['Strong Sell', 'Sell', 'Hold', 'Buy', 'Strong Buy'])
-            
-            # Remove NaN values
-            valid_idx = ~(features.isna().any(axis=1) | labels.isna())
-            filtered_features = features[valid_idx]
-            filtered_labels = labels[valid_idx]
-            
-            all_features.append(filtered_features)
-            all_labels.append(filtered_labels)
-            
-            logger.info(f"Successfully processed {ticker}: {len(filtered_features)} valid samples")
-            
-            # Test on the most recent data point
-            if not filtered_features.empty:
-                recent_features = filtered_features.iloc[[-1]]
-                rating, confidence = model.predict(recent_features)
-                logger.info(f"{ticker} prediction: {rating} (Confidence: {confidence:.2%})")
-            
-        except Exception as e:
-            logger.error(f"Error processing {ticker}: {e}")
-    
-    if not all_features or not all_labels:
-        logger.error("No valid test data collected")
-        return None
-    
-    # Combine all data
-    X = pd.concat(all_features, axis=0)
-    y = pd.concat(all_labels, axis=0)
-    
-    # Evaluate the model
-    results = model.evaluate(X, y)
-    
-    if results:
-        logger.info(f"Test accuracy: {results['accuracy']:.4f}")
-        logger.info("Classification Report:")
-        for label, metrics in results['classification_report'].items():
-            if isinstance(metrics, dict):
-                logger.info(f"{label}: precision={metrics['precision']:.2f}, recall={metrics['recall']:.2f}, f1-score={metrics['f1-score']:.2f}")
-    
-    return results
 
 def main():
-    """Main function to parse arguments and test the model."""
-    parser = argparse.ArgumentParser(description='Test the stock rating prediction model.')
-    parser.add_argument('--model-path', type=str, default='models/stock_predictor.pkl',
-                        help='Path to the trained model')
-    parser.add_argument('--tickers', type=str, nargs='+',
-                        help='List of ticker symbols to test on')
-    parser.add_argument('--period', type=str, default='1y',
-                        help='Time period for historical data (e.g., 1y, 2y)')
-    
-    args = parser.parse_args()
-    
-    # Test the model
-    results = test_model(
-        model_path=args.model_path,
-        test_tickers=args.tickers,
-        period=args.period
-    )
-    
-    if results is None:
-        logger.error("Model testing failed")
+    """
+    Test the stock rating prediction model on a set of tickers.
+    """
+    # Get the directory of this script
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+
+    # Set the model path
+    model_path = os.path.join(script_dir, "models", "stock_rating_model.joblib")
+
+    # Check if model exists
+    if not os.path.exists(model_path):
+        print(f"Model not found at {model_path}")
+        print("Please train the model first using: python train_model.py")
         sys.exit(1)
 
-if __name__ == '__main__':
-    main() 
+    # Load the model
+    print(f"Loading model from {model_path}...")
+    try:
+        model = StockRatingPredictor(model_path=model_path)
+    except Exception as e:
+        print(f"Error loading model: {e}")
+        sys.exit(1)
+
+    # Define test tickers
+    # You can modify this list to test on different tickers
+    test_tickers = [
+        # Technology
+        "AAPL",
+        "MSFT",
+        "GOOGL",
+        "AMZN",
+        "META",
+        # Finance
+        "JPM",
+        "BAC",
+        "GS",
+        # Healthcare
+        "JNJ",
+        "PFE",
+        "MRK",
+        # Consumer
+        "PG",
+        "KO",
+        "WMT",
+        # Industrial
+        "GE",
+        "BA",
+        "CAT",
+        # Energy
+        "XOM",
+        "CVX",
+        "COP",
+        # ETFs
+        "SPY",
+        "QQQ",
+        "DIA",
+    ]
+
+    # Ask user if they want to use custom tickers
+    use_custom = input("Do you want to use custom tickers? (y/n): ").lower()
+    if use_custom == "y":
+        custom_input = input(
+            "Enter tickers separated by commas (e.g., AAPL,MSFT,GOOGL): "
+        )
+        if custom_input.strip():
+            test_tickers = [
+                ticker.strip().upper() for ticker in custom_input.split(",")
+            ]
+
+    print(f"Testing model on {len(test_tickers)} tickers: {', '.join(test_tickers)}")
+
+    # Evaluate the model
+    try:
+        results = evaluate_model(model, test_tickers, period="1y", interval="1d")
+
+        # Display results
+        if results is not None and not results.empty:
+            # Sort by ticker
+            results = results.sort_values("ticker")
+
+            # Display results
+            pd.set_option("display.max_rows", None)
+            pd.set_option("display.width", 120)
+
+            print("\nPrediction Results:")
+            print("===================")
+
+            # Format the results for display
+            display_df = results[["ticker", "rating", "current_price"]].copy()
+
+            # Add future return if available
+            if "future_return_20d" in results.columns:
+                display_df["future_return_20d"] = results["future_return_20d"].apply(
+                    lambda x: f"{x*100:.2f}%" if pd.notnull(x) else "N/A"
+                )
+
+            # Add prediction correctness if available
+            if "prediction_correct" in results.columns:
+                display_df["prediction_correct"] = results["prediction_correct"].apply(
+                    lambda x: "✓" if x == True else "✗" if x == False else "N/A"
+                )
+
+            print(display_df.to_string(index=False))
+
+            # Calculate statistics
+            if "prediction_correct" in results.columns:
+                correct = results["prediction_correct"].sum()
+                total = results["prediction_correct"].count()
+                accuracy = correct / total if total > 0 else 0
+
+                print(f"\nAccuracy: {correct}/{total} ({accuracy:.2%})")
+
+            # Save results to CSV
+            csv_path = os.path.join(script_dir, "model_test_results.csv")
+            results.to_csv(csv_path, index=False)
+            print(f"\nDetailed results saved to {csv_path}")
+        else:
+            print("No results returned from evaluation.")
+
+    except Exception as e:
+        print(f"Error during model evaluation: {e}")
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
