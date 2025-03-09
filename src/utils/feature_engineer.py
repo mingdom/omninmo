@@ -5,10 +5,29 @@ Feature engineering module for calculating technical indicators.
 import pandas as pd
 import numpy as np
 import logging
+import logging.handlers
+from pathlib import Path
 
-# Set up logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+# Setup logging configuration
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)  # Set default level to DEBUG
+
+# Create logs directory if it doesn't exist
+Path("logs").mkdir(exist_ok=True)
+
+# Setup file handler
+file_handler = logging.handlers.RotatingFileHandler(
+    'logs/feature_engineer.log',
+    maxBytes=10485760,  # 10MB
+    backupCount=5
+)
+
+# Set formatter
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+file_handler.setFormatter(formatter)
+
+# Add handler to logger
+logger.addHandler(file_handler)
 
 class FeatureEngineer:
     """
@@ -17,7 +36,64 @@ class FeatureEngineer:
     
     def __init__(self):
         """Initialize the FeatureEngineer."""
-        pass
+        logger.debug("Initializing FeatureEngineer")
+    
+    def add_indicators(self, data):
+        """
+        Add technical indicators to the DataFrame.
+        
+        Args:
+            data (pandas.DataFrame): DataFrame with OHLCV data
+            
+        Returns:
+            pandas.DataFrame: DataFrame with added technical indicators
+        """
+        if data is None or data.empty:
+            logger.warning("No data provided for adding indicators")
+            return None
+            
+        logger.debug(f"Adding indicators to data with shape {data.shape}")
+        return self.calculate_indicators(data)
+    
+    def add_return_features(self, data):
+        """
+        Add future return calculations to the DataFrame.
+        
+        Args:
+            data (pandas.DataFrame): DataFrame with price data
+            
+        Returns:
+            pandas.DataFrame: DataFrame with future return features
+        """
+        if data is None or data.empty:
+            logger.warning("No data provided for adding return features")
+            return None
+        
+        try:
+            logger.debug(f"Adding return features to data with shape {data.shape}")
+            
+            # Make a copy to avoid modifying the original
+            df = data.copy()
+            
+            # Check if we need to get the Close price from the original data
+            # This happens when we've already calculated indicators and dropped OHLCV columns
+            if 'Close' not in df.columns:
+                logger.debug("Close column not found, cannot calculate future returns")
+                logger.debug(f"Available columns: {df.columns.tolist()}")
+                return df
+            
+            # Calculate future return (20 days ahead)
+            df['future_return'] = df['Close'].pct_change(periods=-20)
+            
+            # Drop the last 20 rows since they don't have future returns
+            df = df.iloc[:-20]
+            
+            logger.debug(f"Added future return feature, new shape: {df.shape}")
+            return df
+            
+        except Exception as e:
+            logger.error(f"Error adding return features: {str(e)}", exc_info=True)
+            return None
     
     def calculate_indicators(self, data):
         """
@@ -34,53 +110,28 @@ class FeatureEngineer:
             return None
         
         try:
-            # Create a copy to avoid modifying the original data
+            logger.debug(f"Calculating indicators for data with shape {data.shape}")
+            
+            # Make a copy to avoid modifying the original dataframe
             df = data.copy()
             
-            # Check if required columns exist
-            required_columns = ['Open', 'High', 'Low', 'Close', 'Volume']
-            missing_columns = [col for col in required_columns if col not in df.columns]
-            if missing_columns:
-                logger.error(f"Missing required columns: {missing_columns}")
-                return None
-            
-            # Simple Moving Averages
-            df['SMA_5'] = df['Close'].rolling(window=5).mean()
-            df['SMA_10'] = df['Close'].rolling(window=10).mean()
+            # Moving Averages
             df['SMA_20'] = df['Close'].rolling(window=20).mean()
+            df['SMA_50'] = df['Close'].rolling(window=50).mean()
+            df['SMA_200'] = df['Close'].rolling(window=200).mean()
             
-            # Only calculate longer-term MAs if we have enough data
-            if len(df) >= 50:
-                df['SMA_50'] = df['Close'].rolling(window=50).mean()
-            else:
-                df['SMA_50'] = np.nan
-                
-            if len(df) >= 200:
-                df['SMA_200'] = df['Close'].rolling(window=200).mean()
-            else:
-                df['SMA_200'] = np.nan
+            logger.debug("Calculated SMA indicators")
             
             # Exponential Moving Averages
-            df['EMA_5'] = df['Close'].ewm(span=5, adjust=False).mean()
-            df['EMA_10'] = df['Close'].ewm(span=10, adjust=False).mean()
-            df['EMA_20'] = df['Close'].ewm(span=20, adjust=False).mean()
-            
-            if len(df) >= 50:
-                df['EMA_50'] = df['Close'].ewm(span=50, adjust=False).mean()
-            else:
-                df['EMA_50'] = np.nan
-                
-            if len(df) >= 200:
-                df['EMA_200'] = df['Close'].ewm(span=200, adjust=False).mean()
-            else:
-                df['EMA_200'] = np.nan
-            
-            # Moving Average Convergence Divergence (MACD)
             df['EMA_12'] = df['Close'].ewm(span=12, adjust=False).mean()
             df['EMA_26'] = df['Close'].ewm(span=26, adjust=False).mean()
+            
+            # MACD (Moving Average Convergence Divergence)
             df['MACD'] = df['EMA_12'] - df['EMA_26']
             df['MACD_Signal'] = df['MACD'].ewm(span=9, adjust=False).mean()
             df['MACD_Hist'] = df['MACD'] - df['MACD_Signal']
+            
+            logger.debug("Calculated MACD indicators")
             
             # Relative Strength Index (RSI)
             delta = df['Close'].diff()
@@ -95,6 +146,8 @@ class FeatureEngineer:
             # Replace infinity and NaN with NaN
             df['RSI'] = df['RSI'].replace([np.inf, -np.inf], np.nan)
             
+            logger.debug("Calculated RSI indicator")
+            
             # Bollinger Bands
             df['BB_Middle'] = df['Close'].rolling(window=20).mean()
             df['BB_Std'] = df['Close'].rolling(window=20).std()
@@ -108,6 +161,8 @@ class FeatureEngineer:
             # Replace infinity and NaN with NaN
             df['BB_Width'] = df['BB_Width'].replace([np.inf, -np.inf], np.nan)
             
+            logger.debug("Calculated Bollinger Bands indicators")
+            
             # Average True Range (ATR)
             high_low = df['High'] - df['Low']
             high_close = np.abs(df['High'] - df['Close'].shift())
@@ -115,6 +170,8 @@ class FeatureEngineer:
             ranges = pd.concat([high_low, high_close, low_close], axis=1)
             true_range = np.max(ranges, axis=1)
             df['ATR'] = true_range.rolling(14).mean()
+            
+            logger.debug("Calculated ATR indicator")
             
             # Volume indicators
             df['Volume_SMA_5'] = df['Volume'].rolling(window=5).mean()
@@ -127,10 +184,14 @@ class FeatureEngineer:
             # Replace infinity and NaN with NaN
             df['Volume_Ratio'] = df['Volume_Ratio'].replace([np.inf, -np.inf], np.nan)
             
+            logger.debug("Calculated volume indicators")
+            
             # Price momentum
             df['ROC_5'] = df['Close'].pct_change(periods=5) * 100
             df['ROC_10'] = df['Close'].pct_change(periods=10) * 100
             df['ROC_20'] = df['Close'].pct_change(periods=20) * 100
+            
+            logger.debug("Calculated price momentum indicators")
             
             # Price relative to moving averages
             # Only calculate if we have the moving averages
@@ -148,6 +209,8 @@ class FeatureEngineer:
             else:
                 df['Price_to_SMA_200'] = np.nan
             
+            logger.debug("Calculated price relative to moving averages")
+            
             # Golden/Death Cross
             if not df['SMA_50'].isna().all() and not df['SMA_200'].isna().all():
                 with np.errstate(divide='ignore', invalid='ignore'):
@@ -155,6 +218,8 @@ class FeatureEngineer:
                 df['SMA_50_200_Ratio'] = df['SMA_50_200_Ratio'].replace([np.inf, -np.inf], np.nan)
             else:
                 df['SMA_50_200_Ratio'] = np.nan
+            
+            logger.debug("Calculated Golden/Death Cross indicator")
             
             # Drop the original OHLCV columns as they're not used as features
             features = df.drop(['Open', 'High', 'Low', 'Close', 'Volume'], axis=1, errors='ignore')
@@ -169,11 +234,11 @@ class FeatureEngineer:
             # Drop rows with all NaN values
             features = features.dropna(how='all')
             
-            logger.info(f"Calculated {features.shape[1]} technical indicators")
+            logger.info(f"Calculated {features.shape[1]} technical indicators, data shape: {features.shape}")
             return features
             
         except Exception as e:
-            logger.error(f"Error calculating indicators: {e}")
+            logger.error(f"Error calculating indicators: {str(e)}", exc_info=True)
             return None
     
     def normalize_features(self, features):
@@ -187,9 +252,12 @@ class FeatureEngineer:
             pandas.DataFrame: DataFrame containing normalized features
         """
         if features is None or features.empty:
+            logger.warning("No features provided for normalization")
             return None
         
         try:
+            logger.debug(f"Normalizing features with shape {features.shape}")
+            
             # Fill NaN values before normalization
             features_filled = features.ffill().bfill().fillna(0)
             
@@ -206,8 +274,9 @@ class FeatureEngineer:
             # Replace infinite values with 0
             normalized = normalized.replace([np.inf, -np.inf], 0)
             
+            logger.debug(f"Normalized features, shape: {normalized.shape}")
             return normalized
             
         except Exception as e:
-            logger.error(f"Error normalizing features: {e}")
+            logger.error(f"Error normalizing features: {str(e)}", exc_info=True)
             return None 

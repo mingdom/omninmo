@@ -10,10 +10,11 @@ This document provides a technical deep dive into the omninmo stock prediction s
 4. [Prediction System](#prediction-system)
 5. [Sample Data Generation](#sample-data-generation)
 6. [Training Process](#training-process)
-7. [Deployment Architecture](#deployment-architecture)
-8. [Model Maintenance](#model-maintenance)
-9. [Model Improvement Strategies](#model-improvement-strategies)
-10. [Troubleshooting](#troubleshooting)
+7. [Logging System](#logging-system)
+8. [Deployment Architecture](#deployment-architecture)
+9. [Model Maintenance](#model-maintenance)
+10. [Model Improvement Strategies](#model-improvement-strategies)
+11. [Troubleshooting](#troubleshooting)
 
 ## Model Architecture
 
@@ -189,6 +190,94 @@ The model is evaluated using:
 - **Accuracy**: Percentage of correct predictions
 - **Classification Report**: Precision, recall, and F1-score for each rating class
 - **Feature Importance**: Ranking of most predictive features
+
+## Logging System
+
+The omninmo application implements a comprehensive logging system to facilitate debugging, monitoring, and troubleshooting. The logging system is built using Python's standard `logging` module with enhancements for file rotation and structured output.
+
+### Logging Architecture
+
+- **Module-Level Loggers**: Each module has its own logger instance, allowing for granular control of log levels
+- **Rotating File Handlers**: Log files automatically rotate when they reach a certain size (10MB by default)
+- **Consistent Formatting**: All logs follow a consistent format: `timestamp - module - level - message`
+- **Multiple Log Files**: Different components log to separate files:
+  - `trainer.log`: Model training logs
+  - `feature_engineer.log`: Feature engineering logs
+  - `xgboost_predictor.log`: Model prediction logs
+  - `fmp_data_fetcher.log`: Data fetching logs
+
+### Log Levels
+
+The system uses standard Python logging levels:
+
+1. **DEBUG** (10): Detailed information for debugging purposes
+   - Data shapes and dimensions
+   - Feature values and distributions
+   - Processing steps and intermediate results
+   
+2. **INFO** (20): Confirmation that things are working as expected
+   - Model training started/completed
+   - Data fetching completed
+   - Application startup/shutdown
+   
+3. **WARNING** (30): Indication that something unexpected happened
+   - Missing data for certain dates
+   - Fallback to sample data
+   - Non-critical API issues
+   
+4. **ERROR** (40): Error conditions that prevent a function from working
+   - API connection failures
+   - Model training failures
+   - File I/O errors
+   
+5. **CRITICAL** (50): Critical errors that prevent the application from running
+   - Database connection failures
+   - Missing critical files
+   - Unrecoverable system errors
+
+### Command-Line Control
+
+The logging level can be controlled via command-line arguments:
+
+```bash
+# Run with DEBUG level logging (most verbose)
+python scripts/train_model.py -l DEBUG
+
+# Run with INFO level logging (default)
+python scripts/train_model.py -l INFO
+
+# Run with WARNING level logging (less verbose)
+python scripts/train_model.py -l WARNING
+```
+
+### Implementation Details
+
+Each module configures its logger with both console and file handlers:
+
+```python
+# Setup logging configuration
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)  # Module's internal level
+
+# Create logs directory if it doesn't exist
+Path("logs").mkdir(exist_ok=True)
+
+# Setup file handler with rotation
+file_handler = logging.handlers.RotatingFileHandler(
+    'logs/module_name.log',
+    maxBytes=10485760,  # 10MB
+    backupCount=5
+)
+
+# Set formatter
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+file_handler.setFormatter(formatter)
+
+# Add handler to logger
+logger.addHandler(file_handler)
+```
+
+The root logger's level is set based on the command-line argument, which propagates to all module loggers unless they explicitly override it.
 
 ## Deployment Architecture
 

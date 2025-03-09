@@ -3,21 +3,49 @@
 
 echo "Installing dependencies for omninmo..."
 
-# Check if pip3 is installed
-if ! command -v pip3 &> /dev/null; then
-    echo "Error: pip3 is not installed. Please install pip3 first."
-    exit 1
-fi
-
 # Get the directory of this script
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
 # Get the project root directory
 PROJECT_ROOT="$( cd "$SCRIPT_DIR/.." &> /dev/null && pwd )"
 
-# Install dependencies from requirements.txt
-echo "Installing Python dependencies from requirements.txt..."
-pip3 install -r "$PROJECT_ROOT/requirements.txt"
+# Check if we're in a virtual environment
+if [ -z "$VIRTUAL_ENV" ]; then
+    echo "Error: Not in a virtual environment. Please activate the virtual environment first."
+    exit 1
+fi
+
+# Function to check if a package is installed
+is_package_installed() {
+    python3 -m pip show "$1" &> /dev/null
+}
+
+# Install packages with proper flags to avoid system conflicts
+install_package() {
+    echo "Installing $1..."
+    python3 -m pip install --no-cache-dir "$1" --no-warn-script-location
+}
+
+# Install matplotlib separately first with specific flags
+echo "Installing matplotlib..."
+if ! is_package_installed "matplotlib"; then
+    CFLAGS="-I/opt/homebrew/include -I/opt/homebrew/include/freetype2" \
+    LDFLAGS="-L/opt/homebrew/lib" \
+    python3 -m pip install --no-cache-dir matplotlib --no-warn-script-location
+fi
+
+# Install other dependencies from requirements.txt
+echo "Installing remaining Python dependencies from requirements.txt..."
+while IFS= read -r package || [ -n "$package" ]; do
+    # Skip empty lines and comments
+    if [[ -z "$package" || "$package" =~ ^# ]]; then
+        continue
+    fi
+    # Skip matplotlib as we've already installed it
+    if [[ "$package" != matplotlib* ]]; then
+        install_package "$package"
+    fi
+done < "$PROJECT_ROOT/requirements.txt"
 
 # Make all Python scripts executable
 echo "Making Python scripts executable..."

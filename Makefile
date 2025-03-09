@@ -3,7 +3,7 @@
 # Variables
 SHELL := /bin/bash
 PYTHON := python3
-PIP := pip3
+VENV_DIR := venv
 SCRIPTS_DIR := scripts
 TESTS_DIR := tests
 
@@ -12,15 +12,10 @@ TESTS_DIR := tests
 help:
 	@echo "Available targets:"
 	@echo "  help        - Show this help message"
-	@echo "  env         - Set up a virtual environment"
+	@echo "  env         - Set up and activate a virtual environment"
 	@echo "  install     - Install dependencies"
 	@echo "  test        - Run all tests"
-	@echo "  test-core   - Test the core application components"
-	@echo "  test-model  - Test the model functionality"
-	@echo "  test-imports - Test the imports"
 	@echo "  train       - Train the model (now uses XGBoost by default)"
-	@echo "  train-rf    - Train the Random Forest model (legacy)"
-	@echo "  train-xgb   - Train the XGBoost model"
 	@echo "  train-sample - Train the model using sample data (uses XGBoost)"
 	@echo "  run         - Run the Streamlit app (uses real data by default)"
 	@echo "  run-sample  - Run the Streamlit app with generated sample data (use when Yahoo Finance API has issues)"
@@ -34,43 +29,28 @@ help:
 	@echo "  maintain-weekly  - Run weekly model retraining"
 	@echo "  maintain-monthly - Run monthly model evaluation"
 	@echo "  compare-models - Compare Random Forest and XGBoost models"
-	@echo "  verify-model   - Verify the current model type and configuration"
 
 # Set up virtual environment
 .PHONY: env
 env:
 	@echo "Setting up virtual environment..."
 	@bash $(SCRIPTS_DIR)/setup-venv.sh
+	@echo "Activating virtual environment..."
+	@echo "NOTE: To use the virtual environment in your current shell, run: source activate-venv.sh"
+	@echo "The virtual environment will be automatically activated for all make commands."
 
 # Install dependencies
 .PHONY: install
 install:
 	@echo "Installing dependencies..."
-	@bash $(SCRIPTS_DIR)/install-reqs.sh
-
-# Run tests
-.PHONY: test
-test:
-	@echo "Running all tests..."
-	@$(PYTHON) $(TESTS_DIR)/run_tests.py
-
-# Test the core application components
-.PHONY: test-core
-test-core:
-	@echo "Testing core application components..."
-	@$(PYTHON) -m unittest $(TESTS_DIR)/test_core.py
-
-# Test the model functionality
-.PHONY: test-model
-test-model:
-	@echo "Testing model functionality..."
-	@$(PYTHON) -m unittest $(TESTS_DIR)/test_model_functionality.TestModelFunctionality
-
-# Test imports
-.PHONY: test-imports
-test-imports:
-	@echo "Testing imports..."
-	@$(PYTHON) -m unittest $(TESTS_DIR)/test_imports.py
+	@if [ ! -d "$(VENV_DIR)" ]; then \
+		echo "Virtual environment not found. Please run 'make env' first."; \
+		exit 1; \
+	fi
+	@source $(VENV_DIR)/bin/activate && \
+	$(PYTHON) -m pip install --upgrade pip && \
+	bash $(SCRIPTS_DIR)/install-reqs.sh
+	@echo "Installation complete!"
 
 # Clear the data cache
 .PHONY: clear-cache
@@ -84,37 +64,29 @@ clear-cache:
 .PHONY: train
 train: clear-cache
 	@echo "Training the XGBoost model (default)..."
-	@$(PYTHON) $(SCRIPTS_DIR)/train_xgboost_model.py
-
-# Train the Random Forest model (legacy)
-.PHONY: train-rf
-train-rf: clear-cache
-	@echo "Training the Random Forest model (legacy)..."
-	@$(PYTHON) $(SCRIPTS_DIR)/train_model.py --model-path models/random_forest_predictor.pkl
-
-# Train the XGBoost model
-.PHONY: train-xgb
-train-xgb: clear-cache
-	@echo "Training the XGBoost model..."
-	@$(PYTHON) $(SCRIPTS_DIR)/train_xgboost_model.py
+	@source $(VENV_DIR)/bin/activate && \
+	$(PYTHON) $(SCRIPTS_DIR)/train_xgboost_model.py
 
 # Train the model using sample data
 .PHONY: train-sample
 train-sample: clear-cache
 	@echo "Training the XGBoost model using sample data..."
-	@$(PYTHON) $(SCRIPTS_DIR)/train_xgboost_model.py --force-sample
+	@source $(VENV_DIR)/bin/activate && \
+	$(PYTHON) $(SCRIPTS_DIR)/train_xgboost_model.py --force-sample
 
 # Run the Streamlit app
 .PHONY: run
 run:
 	@echo "Running the Streamlit app..."
-	@$(PYTHON) $(SCRIPTS_DIR)/run_app.py
+	@source $(VENV_DIR)/bin/activate && \
+	$(PYTHON) $(SCRIPTS_DIR)/run_app.py
 
 # Run the Streamlit app with sample data
 .PHONY: run-sample
 run-sample:
 	@echo "Running the Streamlit app with sample data..."
-	@$(PYTHON) $(SCRIPTS_DIR)/run_app.py --sample-data
+	@source $(VENV_DIR)/bin/activate && \
+	$(PYTHON) $(SCRIPTS_DIR)/run_app.py --sample-data
 
 # Predict rating for a ticker
 .PHONY: predict
@@ -124,7 +96,8 @@ predict:
 		exit 1; \
 	fi
 	@echo "Predicting rating for $(TICKER)..."
-	@$(PYTHON) $(SCRIPTS_DIR)/predict_ticker.py $(TICKER)
+	@source $(VENV_DIR)/bin/activate && \
+	$(PYTHON) $(SCRIPTS_DIR)/predict_ticker.py $(TICKER)
 
 # Clean up generated files
 .PHONY: clean
@@ -136,7 +109,8 @@ clean:
 .PHONY: pipeline
 pipeline:
 	@echo "Running the full pipeline..."
-	@bash $(SCRIPTS_DIR)/run-pipeline.sh
+	@source $(VENV_DIR)/bin/activate && \
+	bash $(SCRIPTS_DIR)/run-pipeline.sh
 
 # Make all scripts executable
 .PHONY: executable
@@ -152,22 +126,27 @@ maintain:
 		echo "Error: MODE parameter is required. Use 'make maintain MODE=daily|weekly|monthly'"; \
 		exit 1; \
 	fi
+	@source $(VENV_DIR)/bin/activate && \
 	$(PYTHON) $(SCRIPTS_DIR)/maintain_model.py --mode $(MODE)
 
 maintain-daily:
+	@source $(VENV_DIR)/bin/activate && \
 	$(PYTHON) $(SCRIPTS_DIR)/maintain_model.py --mode daily
 
 maintain-weekly:
+	@source $(VENV_DIR)/bin/activate && \
 	$(PYTHON) $(SCRIPTS_DIR)/maintain_model.py --mode weekly
 
 maintain-monthly:
+	@source $(VENV_DIR)/bin/activate && \
 	$(PYTHON) $(SCRIPTS_DIR)/maintain_model.py --mode monthly
 
 # Model comparison target
 .PHONY: compare-models
 compare-models:
 	@echo "Comparing Random Forest and XGBoost models..."
-	@if [ -n "$(TICKERS)" ]; then \
+	@source $(VENV_DIR)/bin/activate && \
+	if [ -n "$(TICKERS)" ]; then \
 		$(PYTHON) $(SCRIPTS_DIR)/compare_models.py --tickers $(TICKERS) --period $(PERIOD); \
 	else \
 		$(PYTHON) $(SCRIPTS_DIR)/compare_models.py; \
@@ -176,9 +155,14 @@ compare-models:
 	@echo "Summary:"
 	@cat model_comparison/comparison_timestamp.txt
 
-# Verify model target
-.PHONY: verify-model
-verify-model:
-	@echo "Verifying model type and configuration..."
-	$(PYTHON) $(SCRIPTS_DIR)/verify_model.py
-	@echo "Verification complete." 
+# Run tests
+.PHONY: test
+test:
+	@echo "Running tests..."
+	@if [ ! -d "$(VENV_DIR)" ]; then \
+		echo "Virtual environment not found. Please run 'make env' first."; \
+		exit 1; \
+	fi
+	@if [ -f activate-venv.sh ]; then source activate-venv.sh; fi
+	@$(PYTHON) -m pytest $(TESTS_DIR) -v
+	@echo "Tests completed." 
