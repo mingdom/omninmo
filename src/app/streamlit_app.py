@@ -14,6 +14,7 @@ from datetime import datetime
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
+from pathlib import Path
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -27,7 +28,9 @@ sys.path.insert(0, project_root)
 try:
     from src.data.fmp_data_fetcher import FMPDataFetcher
     from src.utils.feature_engineer import FeatureEngineer
-    from src.utils.trainer import load_model
+    from src.utils.trainer import load_model, train_on_default_tickers
+    from src.models.xgboost_predictor import XGBoostRatingPredictor
+    from src.utils.model_utils import get_latest_model_path
 except ImportError as e:
     st.error(f"Failed to import required modules: {e}")
     st.stop()
@@ -133,8 +136,8 @@ def get_feature_engineer():
 
 @st.cache_resource
 def get_model():
-    model_path = os.path.join(project_root, "models", "stock_predictor.pkl")
-    model = load_model(model_path=model_path)
+    model_path = get_latest_model_path()
+    model = XGBoostRatingPredictor.load(model_path)
     if model is None:
         st.warning("Model not found. Please train the model first using 'make train'.")
     return model

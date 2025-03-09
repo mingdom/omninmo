@@ -1,0 +1,157 @@
+# omninmo Configuration File
+
+# Model Configuration
+model:
+  xgboost:
+    learning_rate: 0.1
+    max_depth: 6
+    n_estimators: 100
+    random_state: 42
+    test_size: 0.2
+  training:
+    forward_days: 20
+    period: "5y"
+    interval: "1d"
+    default_tickers:
+      - AAPL
+      - MSFT
+      - AMZN
+      - GOOGL
+      - META
+      - TSLA
+      - NVDA
+      - JPM
+      - V
+      - JNJ
+      - WMT
+      - PG
+      - DIS
+      - NFLX
+      - INTC
+
+# Rating Configuration
+rating:
+  map:
+    0: "Strong Sell"
+    1: "Sell"
+    2: "Hold"
+    3: "Buy"
+    4: "Strong Buy"
+  colors:
+    strong_buy: "#1E8449"  # Dark Green
+    buy: "#82E0AA"        # Light Green
+    hold: "#F4D03F"       # Yellow
+    sell: "#F5B041"       # Orange
+    strong_sell: "#C0392B" # Red
+
+# App Configuration
+app:
+  title: "omninmo - Stock Prediction"
+  icon: "📈"
+  layout: "wide"
+  initial_sidebar_state: "expanded"
+  cache:
+    ttl: 3600  # Cache time to live in seconds
+  watchlist:
+    default:
+      - GOOGL
+      - AMZN
+      - AAPL
+      - META
+      - NVDA
+      - CRWD
+      - FTNT
+      - UBER
+      - LRCX
+      - LULU
+      - BKNG
+      - AXP
+      - V
+      - AMAT
+      - PANW
+      - QCOM
+      - ZS
+      - APP
+      - HPE
+      - PLTR
+      - AI
+      - BABA
+      - PDD
+      - ANET
+      - SNOW
+      - WDAY
+      - CRM
+      - IONQ
+      - MELI
+      - BKNG
+      - APP
+      - SPY
+      - QQQ
+  parallel_processing:
+    max_workers: 5
+
+# Data Configuration
+data:
+  fmp:
+    api_key: ${FMP_API_KEY}  # Will be loaded from environment variable
+    cache_dir: "cache"
+  sample_data:
+    default_prices:
+      AAPL: 175.0
+      MSFT: 380.0
+      AMZN: 180.0
+      GOOGL: 150.0
+      META: 480.0
+      TSLA: 180.0
+      NVDA: 800.0
+      JPM: 190.0
+      V: 280.0
+      JNJ: 150.0
+      WMT: 60.0
+      PG: 160.0
+      DIS: 110.0
+      NFLX: 600.0
+      INTC: 40.0
+    default_volatility:
+      AAPL: 0.015
+      MSFT: 0.018
+      AMZN: 0.022
+      GOOGL: 0.020
+      META: 0.025
+      TSLA: 0.035
+      NVDA: 0.030
+      JPM: 0.015
+      V: 0.012
+      JNJ: 0.010
+      WMT: 0.008
+      PG: 0.007
+      DIS: 0.018
+      NFLX: 0.028
+      INTC: 0.020
+
+# Logging Configuration
+logging:
+  level: DEBUG
+  file:
+    max_bytes: 10485760  # 10MB
+    backup_count: 5
+    directory: "logs"
+  handlers:
+    trainer: "trainer.log"
+    feature_engineer: "feature_engineer.log"
+    xgboost_predictor: "xgboost_predictor.log"
+    fmp_data_fetcher: "fmp_data_fetcher.log"
+
+# Chart Configuration
+charts:
+  candlestick:
+    height: 600
+    template: "plotly_white"
+  technical:
+    moving_averages:
+      - 50
+      - 200
+    colors:
+      ma_50: "orange"
+      ma_200: "red"
+      volume: "rgba(0, 0, 255, 0.5)" 

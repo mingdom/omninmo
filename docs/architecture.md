@@ -20,6 +20,7 @@ The data module is responsible for retrieving stock data from external sources:
 - **StockDataFetcher** - Uses `yfinance` to fetch historical stock data
 - Handles data cleaning and preprocessing
 - Provides a consistent interface for accessing stock data regardless of the source
+- Implements intelligent caching to minimize API calls (see [Cache Documentation](cache.md))
 
 ### Feature Engineering Module
 
@@ -28,6 +29,7 @@ The feature engineering module transforms raw stock data into features suitable 
 - **FeatureEngineer** - Calculates technical indicators (e.g., moving averages, RSI, MACD)
 - Performs feature normalization and scaling
 - Handles missing data and outliers
+- Uses Streamlit caching for performance optimization
 
 ### Prediction Module
 
@@ -36,6 +38,7 @@ The prediction module contains the machine learning models for stock rating pred
 - **StockRatingPredictor** - Uses RandomForest algorithm to predict stock ratings
 - Supports model training, evaluation, and prediction
 - Provides confidence scores for predictions
+- Implements model versioning and persistence
 
 ### Application Interface
 
@@ -44,6 +47,7 @@ The application interface is built using Streamlit:
 - Interactive user interface for entering stock tickers
 - Visualization of stock data and predictions using Plotly
 - Color-coded rating display system
+- Leverages Streamlit's caching system for responsiveness
 
 ## Data Flow
 

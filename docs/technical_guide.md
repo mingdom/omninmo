@@ -12,7 +12,7 @@ This document provides a technical deep dive into the omninmo stock prediction s
 6. [Training Process](#training-process)
 7. [Logging System](#logging-system)
 8. [Deployment Architecture](#deployment-architecture)
-9. [Model Maintenance](#model-maintenance)
+9. [Model Management](#model-management)
 10. [Model Improvement Strategies](#model-improvement-strategies)
 11. [Troubleshooting](#troubleshooting)
 
@@ -299,96 +299,35 @@ The omninmo application consists of:
 4. Model generates a rating prediction
 5. Results are displayed with visualizations
 
-## Model Maintenance
+## Model Management
 
-### Keeping the Model Up-to-Date
+The model is managed through versioned files with timestamps, allowing for easy tracking and rollback if needed. All models are stored in the `models/` directory.
 
-The stock market is dynamic and constantly evolving, which means our prediction model needs regular updates to maintain its accuracy. Here's how we keep the omninmo model up-to-date:
+### Training a New Model
 
-#### Automated Retraining Schedule
+To train a new model:
 
-1. **Daily Incremental Updates**:
-   - The model can be retrained daily with the most recent market data
-   - Run `make train` as part of a scheduled job (e.g., using cron)
-   - This ensures the model incorporates the latest market patterns
+```bash
+make train
+```
 
-2. **Weekly Full Retraining**:
-   - A complete retraining on the full dataset should be performed weekly
-   - This helps capture medium-term market trends
-   - Command: `make train PERIOD=1y` to use a 1-year training window
+This will:
+1. Train a new model using the latest data
+2. Save it with a timestamp (e.g., `stock_predictor_20240321_143000.pkl`)
+3. Update the `latest_model.pkl` symlink to point to the new model
+4. Automatically archive old models based on retention policy
 
-3. **Monthly Evaluation**:
-   - Evaluate model performance against recent market behavior
-   - Adjust hyperparameters if necessary
-   - Consider expanding the ticker set if market conditions change
+### Model Versioning
 
-#### Implementation Strategy
+Models are automatically versioned with timestamps and managed through a symlink system:
+- New models are saved with datetime stamps
+- `latest_model.pkl` symlink always points to the most recent model
+- Old models are kept in `models/archive/`
+- Automatic cleanup retains:
+  - At least 5 most recent models
+  - Models less than 30 days old
 
-To implement this maintenance schedule:
-
-1. **Create a maintenance script**:
-   ```python
-   # scripts/maintain_model.py
-   import os
-   import sys
-   import argparse
-   from datetime import datetime
-   
-   # Add project root to path
-   project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-   sys.path.insert(0, project_root)
-   
-   from src.utils.trainer import train_on_default_tickers, evaluate_model
-   
-   def main():
-       parser = argparse.ArgumentParser(description='Maintain the stock prediction model')
-       parser.add_argument('--mode', choices=['daily', 'weekly', 'monthly'], 
-                          default='daily', help='Maintenance mode')
-       args = parser.parse_args()
-       
-       if args.mode == 'daily':
-           # Daily incremental update
-           print("Performing daily model update...")
-           train_on_default_tickers(period='30d')
-       elif args.mode == 'weekly':
-           # Weekly full retraining
-           print("Performing weekly full retraining...")
-           train_on_default_tickers(period='1y')
-       elif args.mode == 'monthly':
-           # Monthly evaluation
-           print("Performing monthly model evaluation...")
-           # Implement evaluation logic here
-           
-       print(f"Model maintenance ({args.mode}) completed at {datetime.now()}")
-       
-   if __name__ == "__main__":
-       main()
-   ```
-
-2. **Set up cron jobs** (on Unix-based systems):
-   ```bash
-   # Daily update at 1:00 AM
-   0 1 * * * cd /path/to/omninmo && source ./activate-venv.sh && python scripts/maintain_model.py --mode daily
-   
-   # Weekly update on Sunday at 2:00 AM
-   0 2 * * 0 cd /path/to/omninmo && source ./activate-venv.sh && python scripts/maintain_model.py --mode weekly
-   
-   # Monthly evaluation on the 1st of each month at 3:00 AM
-   0 3 1 * * cd /path/to/omninmo && source ./activate-venv.sh && python scripts/maintain_model.py --mode monthly
-   ```
-
-3. **Version control for models**:
-   - Store dated versions of models
-   - Implement a rollback mechanism if a new model performs poorly
-   - Example naming: `stock_predictor_YYYY_MM_DD.pkl`
-
-#### Data Freshness Monitoring
-
-To ensure the model uses fresh data:
-
-1. **Cache invalidation**: Automatically invalidate cached data older than 24 hours
-2. **API health checks**: Monitor the Yahoo Finance API for availability issues
-3. **Data quality validation**: Verify incoming data meets quality standards before training
+This system allows for easy rollback to previous versions if needed while preventing disk space issues from accumulating old models.
 
 ## Model Improvement Strategies
 

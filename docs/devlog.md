@@ -121,3 +121,88 @@ We deleted all the tests for now because they are out of date and not worth main
 - Updated all code references to use FMPDataFetcher for data fetching
 - Added python-dotenv dependency for environment variable management
 - dming: Deleted compare_models (deprecated)
+
+## 2025-03-10: Implemented Configuration System
+
+- Added centralized configuration management:
+  - Created `config.yaml` in root directory for all configurable values
+  - Implemented `Config` class in `src/utils/config.py` for configuration management
+  - Added environment variable resolution in configuration values
+  - Moved hardcoded values to configuration:
+    - Model parameters (XGBoost settings, training parameters)
+    - Rating system configuration
+    - App settings (watchlist, UI configuration)
+    - Data fetching settings
+    - Logging configuration
+    - Chart settings
+  - Added PyYAML dependency for YAML file handling
+  - Implemented singleton pattern for configuration access
+  - Added dot notation access for configuration values
+
+These changes improve maintainability and make the application more configurable without code changes.
+
+## 2024-03-21: Implemented Model Versioning System
+
+Added a new model versioning system with the following features:
+- Models are now saved with datetime-stamped filenames (e.g., `stock_predictor_20240321_143000.pkl`)
+- A symlink `latest_model.pkl` always points to the most recently trained model
+- Old models are automatically archived in `models/archive/`
+- Cleanup functionality to remove old models while keeping:
+  - At least 5 most recent models
+  - Models less than 30 days old
+- Updated all model loading code to use the symlink system
+- Added proper error handling and logging throughout
+
+Changes made to:
+- Created new `src/utils/model_utils.py` for versioning functionality
+- Updated training scripts to use versioned saving
+- Modified app code to load from symlink
+- Enhanced model maintenance script with archiving and cleanup
+
+Benefits:
+- Easy rollback to previous models if needed
+- Clear history of model versions
+- Automatic cleanup of old models
+- Transparent "latest model" access via symlink
+
+## 2024-03-21: Consolidated Training Scripts
+
+- Removed redundant `train_model.py` and consolidated all training functionality into `train_xgboost_model.py`
+- Renamed `train_xgboost_model.py` to `train_model.py` for simplicity
+- This change reflects our focus on XGBoost as the sole model implementation
+- No functionality changes, just code organization improvement
+
+## 2024-03-21: Removed Automated Model Maintenance
+
+- Removed `maintain_model.py` and related functionality:
+  - Deleted automated model maintenance script
+  - Removed Makefile targets for daily/weekly/monthly maintenance
+  - Simplified model management to focus on deliberate, manual training
+  - Reduced complexity by removing automated retraining
+  - All core versioning functionality remains in `model_utils.py`
+
+Reasons for removal:
+- Stock prediction models benefit from human oversight during training
+- Core functionality (versioning, cleanup) already exists in `model_utils.py`
+- Automated retraining could be risky without proper validation
+- Follows our tenet of preferring simplicity over complexity
+
+## 2025-03-22: Added Comprehensive Model Training Documentation
+
+- Created detailed documentation of the current model training process in `docs/model.md`:
+  - Documented the entire training pipeline from data fetching to model saving
+  - Described feature engineering process and technical indicators used
+  - Explained target variable creation and rating classification system
+  - Detailed XGBoost model configuration and training approach
+  - Documented model versioning system and logging infrastructure
+  - Added a section on potential improvements to the training process
+
+This documentation provides a clear overview of how models are trained in the project and identifies areas for future enhancement.
+
+## Latest Changes
+
+### Cache Documentation Added
+- Created comprehensive cache documentation in `docs/cache.md`
+- Documented all caching mechanisms: data cache, Streamlit cache, config cache, and model storage
+- Updated architecture documentation to reference caching system
+- Added details about cache invalidation and best practices
