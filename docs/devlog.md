@@ -111,3 +111,13 @@ We deleted all the tests for now because they are out of date and not worth main
 - Fixed stratification issue in XGBoostRatingPredictor when training with small sample sizes
 - Updated test data to use consistent class labels (0, 1, 2)
 - All 24 tests now passing successfully
+
+## 2024-03-09
+- Fixed XGBoost model training by:
+  - Added label encoding to handle string labels
+  - Updated train method to return a dictionary with accuracy and classification report
+  - Fixed error handling in model training
+- Migrated from StockDataFetcher to FMPDataFetcher across all modules
+- Updated all code references to use FMPDataFetcher for data fetching
+- Added python-dotenv dependency for environment variable management
+- dming: Deleted compare_models (deprecated)

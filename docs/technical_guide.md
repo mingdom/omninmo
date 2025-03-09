@@ -504,12 +504,6 @@ Key components of the implementation:
 3. **Feature importance analysis**: Calculates and stores feature importance for analysis.
 4. **Comprehensive evaluation**: Includes methods for model evaluation and performance reporting.
 
-To compare the XGBoost model with the current Random Forest model:
-
-```bash
-python scripts/compare_models.py
-```
-
 This script:
 - Prepares a dataset from historical stock data
 - Trains both models on the same data

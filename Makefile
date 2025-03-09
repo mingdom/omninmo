@@ -28,7 +28,6 @@ help:
 	@echo "  maintain-daily   - Run daily model update"
 	@echo "  maintain-weekly  - Run weekly model retraining"
 	@echo "  maintain-monthly - Run monthly model evaluation"
-	@echo "  compare-models - Compare Random Forest and XGBoost models"
 
 # Set up virtual environment
 .PHONY: env
@@ -140,20 +139,6 @@ maintain-weekly:
 maintain-monthly:
 	@source $(VENV_DIR)/bin/activate && \
 	$(PYTHON) $(SCRIPTS_DIR)/maintain_model.py --mode monthly
-
-# Model comparison target
-.PHONY: compare-models
-compare-models:
-	@echo "Comparing Random Forest and XGBoost models..."
-	@source $(VENV_DIR)/bin/activate && \
-	if [ -n "$(TICKERS)" ]; then \
-		$(PYTHON) $(SCRIPTS_DIR)/compare_models.py --tickers $(TICKERS) --period $(PERIOD); \
-	else \
-		$(PYTHON) $(SCRIPTS_DIR)/compare_models.py; \
-	fi
-	@echo "Comparison complete. Results saved to model_comparison directory."
-	@echo "Summary:"
-	@cat model_comparison/comparison_timestamp.txt
 
 # Run tests
 .PHONY: test

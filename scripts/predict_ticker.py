@@ -8,7 +8,7 @@ import argparse
 from datetime import datetime
 import pandas as pd
 
-from src.data.fetcher import StockDataFetcher
+from src.data.fmp_data_fetcher import FMPDataFetcher
 from src.data.features import FeatureEngineer
 from src.models.predictor import StockRatingPredictor
 from src.utils.analysis import generate_summary
@@ -43,7 +43,7 @@ def predict_ticker(ticker, period="1y", interval="1d", model_path=None):
         )
 
     # Initialize components
-    fetcher = StockDataFetcher()
+    fetcher = FMPDataFetcher()
     feature_engineer = FeatureEngineer()
     predictor = StockRatingPredictor(model_path=model_path)
 

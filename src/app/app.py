@@ -18,7 +18,7 @@ import os
 # Add the project root directory to the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
-from src.data.fetcher import StockDataFetcher
+from src.data.fmp_data_fetcher import FMPDataFetcher
 from src.data.features import FeatureEngineer
 from src.models.predictor import StockRatingPredictor
 from src.utils.analysis import (
@@ -99,7 +99,7 @@ def get_stock_data(ticker, period="1y", interval="1d"):
                df_with_indicators is the data with technical indicators,
                and info is the company information
     """
-    fetcher = StockDataFetcher()
+    fetcher = FMPDataFetcher()
     feature_engineer = FeatureEngineer()
 
     # Fetch data
