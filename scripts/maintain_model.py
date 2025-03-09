@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 # Import project modules
 try:
     from src.utils.trainer import train_on_default_tickers, load_model, evaluate_model
-    from src.data.stock_data_fetcher import StockDataFetcher
+    from src.data.fmp_data_fetcher import FMPDataFetcher
 except ImportError as e:
     logger.error(f"Failed to import required modules: {e}")
     sys.exit(1)
@@ -125,7 +125,7 @@ def monthly_evaluation():
     ]
     
     # Fetch test data
-    fetcher = StockDataFetcher(cache_dir=os.path.join(project_root, 'cache'))
+    fetcher = FMPDataFetcher(cache_dir=os.path.join(project_root, 'cache'))
     feature_engineer = None  # Will be imported in evaluate_model
     
     try:

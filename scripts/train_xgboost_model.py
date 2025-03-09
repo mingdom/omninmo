@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 # Import project modules
 try:
-    from src.data.stock_data_fetcher import StockDataFetcher
+    from src.data.fmp_data_fetcher import FMPDataFetcher
     from src.utils.feature_engineer import FeatureEngineer
     from src.models.xgboost_predictor import XGBoostRatingPredictor
     from src.utils.trainer import DEFAULT_TICKERS
@@ -42,7 +42,7 @@ def train_xgboost_model(tickers, model_path, period="5y", interval="1d", forward
         XGBoostRatingPredictor: Trained model
     """
     # Initialize components
-    fetcher = StockDataFetcher(cache_dir="cache")
+    fetcher = FMPDataFetcher(cache_dir="cache")
     feature_engineer = FeatureEngineer()
     predictor = XGBoostRatingPredictor()
 

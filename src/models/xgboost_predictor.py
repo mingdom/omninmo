@@ -13,6 +13,7 @@ import pickle
 import xgboost as xgb
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report, accuracy_score
+from sklearn.preprocessing import LabelEncoder
 
 # Setup logging configuration
 logger = logging.getLogger(__name__)
@@ -65,6 +66,7 @@ class XGBoostRatingPredictor:
         logger.info("XGBoost classifier initialized")
         self.classes = None
         self.feature_importance = None
+        self.label_encoder = LabelEncoder()
     
     def train(self, X, y, test_size=0.2):
         """
@@ -72,20 +74,22 @@ class XGBoostRatingPredictor:
         
         Args:
             X (pandas.DataFrame): Features for training
-            y (pandas.Series): Target labels (numeric: 0 to 4)
+            y (pandas.Series): Target labels (string labels)
             test_size (float): Proportion of data to use for testing
         
         Returns:
-            float: Training accuracy
+            dict: Dictionary containing training results including accuracy and classification report
         """
         try:
             logger.info(f"Training model with {X.shape[0]} samples and {X.shape[1]} features")
             logger.debug(f"Target distribution: {y.value_counts().to_dict()}")
             logger.debug(f"Feature columns: {list(X.columns)}")
             
-            # Store the unique class values
+            # Store the unique class values and fit the label encoder
             self.classes = np.unique(y)
+            y_encoded = self.label_encoder.fit_transform(y)
             logger.debug(f"Unique classes: {self.classes}")
+            logger.debug(f"Encoded classes: {np.unique(y_encoded)}")
             
             # Check if we have enough samples per class for stratification
             min_samples_per_class = y.value_counts().min()
@@ -94,7 +98,7 @@ class XGBoostRatingPredictor:
             
             # Split the data into training and testing sets
             X_train, X_test, y_train, y_test = train_test_split(
-                X, y, test_size=test_size, random_state=42, stratify=y if use_stratify else None
+                X, y_encoded, test_size=test_size, random_state=42, stratify=y_encoded if use_stratify else None
             )
             
             logger.debug(f"Training set size: {X_train.shape[0]}, Test set size: {X_test.shape[0]}")
@@ -116,12 +120,20 @@ class XGBoostRatingPredictor:
             # Evaluate the model
             y_pred = self.model.predict(X_test)
             accuracy = accuracy_score(y_test, y_pred)
-            report = classification_report(y_test, y_pred, output_dict=True)
+            
+            # Convert numeric predictions back to string labels for the report
+            y_test_decoded = self.label_encoder.inverse_transform(y_test)
+            y_pred_decoded = self.label_encoder.inverse_transform(y_pred)
+            report = classification_report(y_test_decoded, y_pred_decoded, output_dict=True)
             
             logger.info(f"Model trained with accuracy: {accuracy:.4f}")
             logger.debug(f"Classification report: {report}")
             
-            return accuracy
+            return {
+                'accuracy': accuracy,
+                'classification_report': report,
+                'feature_importance': top_features.to_dict()
+            }
             
         except Exception as e:
             logger.error(f"Error training model: {str(e)}", exc_info=True)
@@ -135,7 +147,7 @@ class XGBoostRatingPredictor:
             features (pandas.DataFrame): Features for prediction
         
         Returns:
-            tuple: (predicted_rating, confidence) where predicted_rating is numeric (0 to 4)
+            tuple: (predicted_rating, confidence) where predicted_rating is a string label
         """
         if self.model is None:
             logger.error("Model not trained yet")
@@ -150,16 +162,19 @@ class XGBoostRatingPredictor:
             # Get prediction probabilities
             probabilities = self.model.predict_proba(features)
             
+            # Convert numeric prediction back to string label
+            prediction_decoded = self.label_encoder.inverse_transform(prediction)
+            
             # Get the index of the predicted class in the probability array
-            pred_class_idx = np.where(self.model.classes_ == prediction[0])[0][0]
+            pred_class_idx = prediction[0]
             
             # Get the confidence (probability) of the prediction
             confidence = probabilities[0][pred_class_idx]
             
-            logger.info(f"Predicted rating: {prediction[0]} with confidence: {confidence:.4f}")
+            logger.info(f"Predicted rating: {prediction_decoded[0]} with confidence: {confidence:.4f}")
             logger.debug(f"All class probabilities: {probabilities[0]}")
             
-            return prediction[0], confidence
+            return prediction_decoded[0], confidence
             
         except Exception as e:
             logger.error(f"Error making prediction: {str(e)}", exc_info=True)
@@ -188,7 +203,7 @@ class XGBoostRatingPredictor:
         
         Args:
             X (pandas.DataFrame): Features for evaluation
-            y (pandas.Series): True labels (numeric: 0 to 4)
+            y (pandas.Series): True labels (string labels)
         
         Returns:
             dict: Dictionary containing evaluation metrics
@@ -200,12 +215,18 @@ class XGBoostRatingPredictor:
         try:
             logger.debug(f"Evaluating model on {X.shape[0]} samples")
             
+            # Encode the labels
+            y_encoded = self.label_encoder.transform(y)
+            
             # Make predictions
             y_pred = self.model.predict(X)
             
             # Calculate metrics
-            accuracy = accuracy_score(y, y_pred)
-            report = classification_report(y, y_pred, output_dict=True)
+            accuracy = accuracy_score(y_encoded, y_pred)
+            
+            # Convert predictions back to string labels for the report
+            y_pred_decoded = self.label_encoder.inverse_transform(y_pred)
+            report = classification_report(y, y_pred_decoded, output_dict=True)
             
             logger.info(f"Model evaluation accuracy: {accuracy:.4f}")
             logger.debug(f"Evaluation classification report: {report}")

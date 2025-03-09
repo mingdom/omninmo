@@ -97,3 +97,45 @@ ModuleNotFoundError: No module named 'streamlit'
 ```
 
 Need to install the required dependencies before running the tests. 
+
+## 2024-03-09: Missing Module Error in Training Script
+### Error Message
+```
+Failed to import required modules: No module named 'src.data.stock_data_fetcher'
+```
+
+### Reproduction Steps
+1. Run `make train` command
+2. Script attempts to import StockDataFetcher from non-existent module
+
+### Resolution
+1. Installed python-dotenv package
+2. Updated all references from StockDataFetcher to FMPDataFetcher
+3. Modified imports in:
+   - scripts/train_xgboost_model.py
+   - src/app/app.py
+   - src/app/streamlit_app.py
+   - scripts/compare_models.py
+   - scripts/maintain_model.py
+   - scripts/predict_ticker.py 
+
+## 2024-03-09: XGBoost Training Errors
+### Error 1: Invalid Classes
+```
+ValueError: Invalid classes inferred from unique values of `y`.  Expected: [0 1 2 3 4], got ['Buy' 'Hold' 'Sell' 'Strong Buy' 'Strong Sell']
+```
+
+### Resolution 1
+1. Added LabelEncoder to XGBoostRatingPredictor
+2. Updated train method to encode string labels to numeric values
+3. Updated predict and evaluate methods to handle label encoding/decoding
+
+### Error 2: Float Not Subscriptable
+```
+Error during XGBoost model training: 'float' object is not subscriptable
+```
+
+### Resolution 2
+1. Updated train method to return a dictionary with accuracy and classification report
+2. Added feature importance to the return value
+3. Fixed error handling in model training 
