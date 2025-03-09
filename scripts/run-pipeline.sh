@@ -11,7 +11,7 @@ PROJECT_ROOT="$( cd "$SCRIPT_DIR/.." &> /dev/null && pwd )"
 
 # Run tests
 echo "Running tests..."
-python3 "$PROJECT_ROOT/tests/run_tests.py"
+python3 -m pytest "$PROJECT_ROOT/tests" -v
 if [ $? -ne 0 ]; then
     echo "Tests failed. Aborting pipeline."
     exit 1
@@ -22,14 +22,6 @@ echo "Training model..."
 python3 "$SCRIPT_DIR/train_xgboost_model.py"
 if [ $? -ne 0 ]; then
     echo "Model training failed. Aborting pipeline."
-    exit 1
-fi
-
-# Test model specifically
-echo "Testing model..."
-python3 -m unittest tests.test_model_functionality.TestModelFunctionality
-if [ $? -ne 0 ]; then
-    echo "Model testing failed. Aborting pipeline."
     exit 1
 fi
 

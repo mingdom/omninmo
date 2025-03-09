@@ -5,14 +5,34 @@ Stock data fetcher module for retrieving historical stock data using Financial M
 import pandas as pd
 import requests
 import logging
+import logging.handlers
 import os
 import time
 import random
 from datetime import datetime, timedelta
+import numpy as np
+from pathlib import Path
 
-# Set up logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+# Setup logging configuration
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)  # Set default level to DEBUG
+
+# Create logs directory if it doesn't exist
+Path("logs").mkdir(exist_ok=True)
+
+# Setup file handler
+file_handler = logging.handlers.RotatingFileHandler(
+    'logs/fmp_data_fetcher.log',
+    maxBytes=10485760,  # 10MB
+    backupCount=5
+)
+
+# Set formatter
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+file_handler.setFormatter(formatter)
+
+# Add handler to logger
+logger.addHandler(file_handler)
 
 # Try to load environment variables
 try:
@@ -26,6 +46,44 @@ except ImportError:
 FMP_API_KEY = os.getenv('FMP_API_KEY')
 if not FMP_API_KEY:
     logger.warning("FMP_API_KEY not found in environment variables. API calls will fail.")
+
+# Default starting prices for sample data
+DEFAULT_PRICES = {
+    'AAPL': 175.0,
+    'MSFT': 380.0,
+    'AMZN': 180.0,
+    'GOOGL': 150.0,
+    'META': 480.0,
+    'TSLA': 180.0,
+    'NVDA': 800.0,
+    'JPM': 190.0,
+    'V': 280.0,
+    'JNJ': 150.0,
+    'WMT': 60.0,
+    'PG': 160.0,
+    'DIS': 110.0,
+    'NFLX': 600.0,
+    'INTC': 40.0
+}
+
+# Default volatility for sample data
+DEFAULT_VOLATILITY = {
+    'AAPL': 0.015,
+    'MSFT': 0.018,
+    'AMZN': 0.022,
+    'GOOGL': 0.020,
+    'META': 0.025,
+    'TSLA': 0.035,
+    'NVDA': 0.030,
+    'JPM': 0.015,
+    'V': 0.012,
+    'JNJ': 0.010,
+    'WMT': 0.008,
+    'PG': 0.007,
+    'DIS': 0.018,
+    'NFLX': 0.028,
+    'INTC': 0.020
+}
 
 class FMPDataFetcher:
     """
@@ -46,6 +104,59 @@ class FMPDataFetcher:
         
         if cache_dir:
             os.makedirs(cache_dir, exist_ok=True)
+            
+        logger.debug(f"FMPDataFetcher initialized with API key: {'set' if self.api_key else 'not set'}")
+    
+    def get_data(self, ticker, start_date, end_date):
+        """
+        Get historical stock data for a given ticker and date range.
+        
+        Args:
+            ticker (str): Stock ticker symbol
+            start_date (datetime): Start date for the data
+            end_date (datetime): End date for the data
+            
+        Returns:
+            pandas.DataFrame: DataFrame containing historical stock data
+        """
+        logger.debug(f"Getting data for {ticker} from {start_date} to {end_date}")
+        
+        # Convert dates to string format for API
+        from_date = start_date.strftime('%Y-%m-%d')
+        to_date = end_date.strftime('%Y-%m-%d')
+        
+        # Calculate period based on date range
+        days_diff = (end_date - start_date).days
+        if days_diff <= 30:
+            period = '1mo'
+        elif days_diff <= 90:
+            period = '3mo'
+        elif days_diff <= 365:
+            period = '1y'
+        elif days_diff <= 730:
+            period = '2y'
+        elif days_diff <= 1825:
+            period = '5y'
+        else:
+            period = '10y'
+            
+        logger.debug(f"Calculated period: {period} for {days_diff} days")
+        
+        # Fetch data using the fetch_data method
+        return self.fetch_data(ticker, period=period)
+    
+    def get_sample_data(self, ticker):
+        """
+        Get sample data for a given ticker.
+        
+        Args:
+            ticker (str): Stock ticker symbol
+            
+        Returns:
+            pandas.DataFrame: DataFrame containing sample stock data
+        """
+        logger.debug(f"Getting sample data for {ticker}")
+        return self._generate_sample_data(ticker, period='5y', interval='1d')
     
     def fetch_data(self, ticker, period='1y', interval='1d', max_retries=3, retry_delay=2, force_sample=False):
         """
@@ -65,9 +176,7 @@ class FMPDataFetcher:
         # If force_sample is True, skip API calls and use sample data
         if force_sample:
             logger.info(f"Forcing sample data for {ticker}")
-            from src.data.stock_data_fetcher import StockDataFetcher
-            sample_generator = StockDataFetcher()
-            return sample_generator._generate_sample_data(ticker, period, interval)
+            return self._generate_sample_data(ticker, period, interval)
         
         try:
             logger.info(f"Fetching data for {ticker} with period={period}, interval={interval}")
@@ -129,7 +238,7 @@ class FMPDataFetcher:
                     
                     # Make the request
                     url = f"{self.base_url}{endpoint}"
-                    logger.info(f"Making request to {url} with params: {params}")
+                    logger.debug(f"Making request to {url} with params: {params}")
                     
                     response = requests.get(url, params=params, timeout=20)
                     
@@ -154,7 +263,7 @@ class FMPDataFetcher:
                     historical_data = response_data['historical']
                     df = pd.DataFrame(historical_data)
                     
-                    # Rename columns to match yfinance format
+                    # Rename columns to match standard format
                     df = df.rename(columns={
                         'date': 'Date',
                         'open': 'Open',
@@ -168,7 +277,7 @@ class FMPDataFetcher:
                     df['Date'] = pd.to_datetime(df['Date'])
                     df = df.set_index('Date')
                     
-                    # Sort by date (newest first to match yfinance)
+                    # Sort by date (newest first)
                     df = df.sort_index(ascending=False)
                     
                     # Select only the columns we need
@@ -186,9 +295,7 @@ class FMPDataFetcher:
             # If we still don't have data, use sample data
             if data is None or data.empty:
                 logger.warning(f"No data available for {ticker} after {max_retries} attempts, using sample data")
-                from src.data.stock_data_fetcher import StockDataFetcher
-                sample_generator = StockDataFetcher()
-                return sample_generator._generate_sample_data(ticker, period, interval)
+                return self._generate_sample_data(ticker, period, interval)
             
             # Save to cache if enabled and we have data
             if self.cache_dir and data is not None and not data.empty:
@@ -204,9 +311,7 @@ class FMPDataFetcher:
             logger.error(f"Error fetching data for {ticker}: {e}")
             # Return sample data when any error occurs
             logger.info(f"Using sample data for {ticker} due to error")
-            from src.data.stock_data_fetcher import StockDataFetcher
-            sample_generator = StockDataFetcher()
-            return sample_generator._generate_sample_data(ticker, period, interval)
+            return self._generate_sample_data(ticker, period, interval)
     
     def _convert_period_to_dates(self, period):
         """
@@ -270,8 +375,108 @@ class FMPDataFetcher:
             except Exception as e:
                 logger.error(f"Error in fetch_multiple for {ticker}: {e}")
                 # Generate sample data for this ticker
-                from src.data.stock_data_fetcher import StockDataFetcher
-                sample_generator = StockDataFetcher()
-                result[ticker] = sample_generator._generate_sample_data(ticker, period, interval)
+                result[ticker] = self._generate_sample_data(ticker, period, interval)
         
-        return result 
+        return result
+    
+    def _generate_sample_data(self, ticker, period='1y', interval='1d'):
+        """
+        Generate sample stock data for testing purposes.
+        
+        Args:
+            ticker (str): Stock ticker symbol
+            period (str): Time period to generate data for
+            interval (str): Data interval
+        
+        Returns:
+            pandas.DataFrame: DataFrame containing sample stock data
+        """
+        logger.info(f"Generating sample data for {ticker} with period={period}, interval={interval}")
+        
+        # Determine number of days based on period
+        if period == '1d':
+            days = 1
+        elif period == '5d':
+            days = 5
+        elif period == '1mo':
+            days = 30
+        elif period == '3mo':
+            days = 90
+        elif period == '6mo':
+            days = 180
+        elif period == '1y':
+            days = 365
+        elif period == '2y':
+            days = 730
+        elif period == '5y':
+            days = 1825
+        elif period == '10y':
+            days = 3650
+        elif period == 'ytd':
+            days = (datetime.now() - datetime(datetime.now().year, 1, 1)).days
+        elif period == 'max':
+            days = 3650  # Default to 10 years for 'max'
+        else:
+            days = 365  # Default to 1 year
+        
+        # Determine interval in days
+        if interval == '1d':
+            interval_days = 1
+        elif interval == '1wk':
+            interval_days = 7
+        elif interval == '1mo':
+            interval_days = 30
+        else:
+            interval_days = 1  # Default to daily
+        
+        # Calculate number of data points
+        num_points = days // interval_days
+        
+        # Get base price and volatility for the ticker
+        base_price = DEFAULT_PRICES.get(ticker, 100.0)  # Default to 100 if ticker not in defaults
+        volatility = DEFAULT_VOLATILITY.get(ticker, 0.02)  # Default to 0.02 if ticker not in defaults
+        
+        # Generate dates
+        end_date = datetime.now()
+        dates = [end_date - timedelta(days=i*interval_days) for i in range(num_points)]
+        dates.reverse()  # Oldest first
+        
+        # Generate price data with random walk
+        np.random.seed(hash(ticker) % 2**32)  # Use ticker as seed for reproducibility
+        
+        # Start with base price
+        close_prices = [base_price]
+        
+        # Generate subsequent prices with random walk
+        for i in range(1, num_points):
+            # Random daily return with drift
+            daily_return = np.random.normal(0.0002, volatility)  # Small positive drift
+            new_price = close_prices[-1] * (1 + daily_return)
+            close_prices.append(new_price)
+        
+        # Generate other price data
+        high_prices = [price * (1 + np.random.uniform(0, volatility)) for price in close_prices]
+        low_prices = [price * (1 - np.random.uniform(0, volatility)) for price in close_prices]
+        open_prices = [low + np.random.uniform(0, high - low) for low, high in zip(low_prices, high_prices)]
+        
+        # Generate volume data
+        base_volume = 1000000  # Base volume
+        volumes = [int(base_volume * (1 + np.random.uniform(-0.5, 1.0))) for _ in range(num_points)]
+        
+        # Create DataFrame
+        df = pd.DataFrame({
+            'Open': open_prices,
+            'High': high_prices,
+            'Low': low_prices,
+            'Close': close_prices,
+            'Volume': volumes
+        }, index=dates)
+        
+        # Set index name
+        df.index.name = 'Date'
+        
+        # Sort by date (newest first)
+        df = df.sort_index(ascending=False)
+        
+        logger.info(f"Generated {len(df)} sample records for {ticker}")
+        return df 
