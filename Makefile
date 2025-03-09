@@ -128,18 +128,6 @@ maintain:
 	@source $(VENV_DIR)/bin/activate && \
 	$(PYTHON) $(SCRIPTS_DIR)/maintain_model.py --mode $(MODE)
 
-maintain-daily:
-	@source $(VENV_DIR)/bin/activate && \
-	$(PYTHON) $(SCRIPTS_DIR)/maintain_model.py --mode daily
-
-maintain-weekly:
-	@source $(VENV_DIR)/bin/activate && \
-	$(PYTHON) $(SCRIPTS_DIR)/maintain_model.py --mode weekly
-
-maintain-monthly:
-	@source $(VENV_DIR)/bin/activate && \
-	$(PYTHON) $(SCRIPTS_DIR)/maintain_model.py --mode monthly
-
 # Run tests
 .PHONY: test
 test:

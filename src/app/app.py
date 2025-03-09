@@ -11,9 +11,9 @@ import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import time
 import joblib
+from pathlib import Path
 
 import sys
-import os
 
 # Add the project root directory to the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
@@ -30,7 +30,8 @@ from src.utils.analysis import (
     plot_technical_indicators,
     generate_summary,
 )
-from src.utils.trainer import train_on_default_tickers
+from src.utils.trainer import train_on_default_tickers, DEFAULT_TICKERS
+from src.utils.model_utils import get_latest_model_path
 
 # Set page config
 st.set_page_config(
@@ -58,9 +59,11 @@ def load_or_train_model():
     Returns:
         StockRatingPredictor: Loaded or trained model
     """
-    if os.path.exists(MODEL_PATH):
+    model_path = get_latest_model_path()
+    
+    if os.path.exists(model_path):
         st.sidebar.info("Loading existing model...")
-        predictor = StockRatingPredictor(model_path=MODEL_PATH)
+        predictor = StockRatingPredictor(model_path=model_path)
         return predictor
     else:
         st.sidebar.warning("No model found. Training a new model...")
@@ -78,10 +81,13 @@ def load_or_train_model():
             "JNJ",
         ]
         # Create directory if it doesn't exist
-        os.makedirs(os.path.dirname(MODEL_PATH), exist_ok=True)
+        os.makedirs(os.path.dirname(model_path), exist_ok=True)
         # Train on demo tickers
-        predictor = train_on_default_tickers(model_path=MODEL_PATH)
-        st.sidebar.success("Model trained successfully!")
+        predictor = train_on_default_tickers(model_path=model_path)
+        if predictor:
+            st.sidebar.success("Model trained successfully!")
+        else:
+            st.sidebar.error("Failed to train model!")
         return predictor
 
 
