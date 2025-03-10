@@ -199,6 +199,21 @@ Reasons for removal:
 
 This documentation provides a clear overview of how models are trained in the project and identifies areas for future enhancement.
 
+## 2025-03-22: Expanded Training Dataset with Balanced Stock Selection
+
+- Expanded the training dataset from 15 to 45 stocks:
+  - Kept existing 15 tech/large-cap stocks
+  - Added 30 new stocks across 6 sectors (Energy, Healthcare, Financials, Industrial, Consumer Staples, Utilities)
+  - Each sector now includes:
+    * 2 large-cap established companies
+    * 1 mid-cap company
+    * 1 small-cap company
+    * 1 struggling/underperforming company
+  - Added corresponding sample data configuration for testing
+  - This balanced selection reduces bias and improves model generalization
+
+This change addresses the limited diversity in the training data while maintaining a manageable dataset size for the first phase of improvements.
+
 ## Latest Changes
 
 ### Cache Documentation Added

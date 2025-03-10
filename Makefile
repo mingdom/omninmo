@@ -64,7 +64,7 @@ clear-cache:
 train: clear-cache
 	@echo "Training the XGBoost model (default)..."
 	@source $(VENV_DIR)/bin/activate && \
-	$(PYTHON) $(SCRIPTS_DIR)/train_xgboost_model.py
+	$(PYTHON) $(SCRIPTS_DIR)/train_model.py
 
 # Train the model using sample data
 .PHONY: train-sample

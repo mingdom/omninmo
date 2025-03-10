@@ -14,6 +14,7 @@ import logging.handlers
 from pathlib import Path
 from tqdm import tqdm
 import joblib
+import yaml
 
 # Setup logging configuration
 logger = logging.getLogger(__name__)
@@ -42,12 +43,19 @@ from src.data.fmp_data_fetcher import FMPDataFetcher
 from src.utils.feature_engineer import FeatureEngineer
 from src.models.xgboost_predictor import XGBoostRatingPredictor
 
+# Load tickers from config file
+def load_default_tickers():
+    try:
+        with open('config.yaml', 'r') as f:
+            config = yaml.safe_load(f)
+            return config['model']['training']['default_tickers']
+    except Exception as e:
+        logger.error(f"Error loading tickers from config: {e}")
+        # Fallback to a minimal set if config loading fails
+        return ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META']
+
 # Default tickers for training
-DEFAULT_TICKERS = [
-    'AAPL', 'MSFT', 'AMZN', 'GOOGL', 'META', 
-    'TSLA', 'NVDA', 'JPM', 'V', 'JNJ',
-    'WMT', 'PG', 'DIS', 'NFLX', 'INTC'
-]
+DEFAULT_TICKERS = load_default_tickers()
 
 # Rating map (0-4 instead of -2 to 2)
 RATING_MAP = {

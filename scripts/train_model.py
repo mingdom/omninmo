@@ -7,8 +7,6 @@ import os
 import sys
 import argparse
 import logging
-from pathlib import Path
-from datetime import datetime, timedelta
 import pandas as pd
 
 # Add the root directory to the Python path
@@ -53,31 +51,37 @@ def train_xgboost_model(tickers, model_path, period="5y", interval="1d", forward
     # Collect data and features for all tickers
     all_features = []
     all_targets = []
+    processed_tickers = []
+    skipped_tickers = []
+    error_tickers = []
 
-    print(f"Training XGBoost model on {len(tickers)} tickers...")
+    logger.info(f"Starting XGBoost model training on {len(tickers)} tickers:")
+    logger.info("Tickers to process: " + ", ".join(tickers))
     
     for ticker in tickers:
         try:
             # Fetch historical data
-            print(f"Fetching data for {ticker}...")
+            logger.info(f"Fetching data for {ticker}...")
             data = fetcher.fetch_data(ticker, period=period, interval=interval, force_sample=force_sample)
             
             if data is None or data.empty:
                 logger.warning(f"No data available for {ticker}, skipping")
+                skipped_tickers.append(ticker)
                 continue
                 
             # Calculate technical indicators
-            print(f"Calculating indicators for {ticker}...")
+            logger.info(f"Calculating indicators for {ticker}...")
             features = feature_engineer.calculate_indicators(data)
             
             if features is None or features.empty:
                 logger.warning(f"Failed to calculate indicators for {ticker}, skipping")
+                skipped_tickers.append(ticker)
                 continue
                 
             # Prepare target variable (future returns)
-            # Make sure we're using the price column from the original data
             if 'Close' not in data.columns:
                 logger.warning(f"No 'Close' column in data for {ticker}, skipping")
+                skipped_tickers.append(ticker)
                 continue
                 
             future_returns = data['Close'].shift(-forward_days) / data['Close'] - 1
@@ -89,6 +93,7 @@ def train_xgboost_model(tickers, model_path, period="5y", interval="1d", forward
             
             if len(valid_features) == 0:
                 logger.warning(f"No valid data after preprocessing for {ticker}, skipping")
+                skipped_tickers.append(ticker)
                 continue
                 
             # Convert returns to rating categories
@@ -109,12 +114,20 @@ def train_xgboost_model(tickers, model_path, period="5y", interval="1d", forward
             # Add to collection
             all_features.append(valid_features)
             all_targets.append(ratings)
+            processed_tickers.append(ticker)
             
-            print(f"Processed {ticker}: {len(valid_features)} samples")
+            logger.info(f"Successfully processed {ticker}: {len(valid_features)} samples")
             
         except Exception as e:
             logger.error(f"Error processing {ticker}: {e}")
+            error_tickers.append(ticker)
             continue
+    
+    # Log summary of processing
+    logger.info("\nProcessing Summary:")
+    logger.info(f"Successfully processed ({len(processed_tickers)}): {', '.join(processed_tickers)}")
+    logger.info(f"Skipped ({len(skipped_tickers)}): {', '.join(skipped_tickers)}")
+    logger.info(f"Errors ({len(error_tickers)}): {', '.join(error_tickers)}")
     
     if not all_features or not all_targets:
         logger.error("No valid data collected for any ticker")
@@ -124,20 +137,20 @@ def train_xgboost_model(tickers, model_path, period="5y", interval="1d", forward
     X = pd.concat(all_features, axis=0)
     y = pd.concat(all_targets, axis=0)
     
-    print(f"Combined dataset: {X.shape[0]} samples, {X.shape[1]} features")
+    logger.info(f"Combined dataset: {X.shape[0]} samples, {X.shape[1]} features")
     
     # Train the model
-    print("Training XGBoost model...")
+    logger.info("Training XGBoost model...")
     training_results = predictor.train(X, y)
     
     if training_results:
-        print(f"Training accuracy: {training_results['accuracy']:.4f}")
+        logger.info(f"Training accuracy: {training_results['accuracy']:.4f}")
         
         # Get top features by importance
         top_features = predictor.get_feature_importance(top_n=10)
-        print("Top 10 features by importance:")
+        logger.info("Top 10 features by importance:")
         for feature, importance in top_features.items():
-            print(f"  {feature}: {importance:.4f}")
+            logger.info(f"  {feature}: {importance:.4f}")
     
     # Save the model with versioning
     models_dir = os.path.dirname(os.path.abspath(model_path))
@@ -149,10 +162,10 @@ def train_xgboost_model(tickers, model_path, period="5y", interval="1d", forward
     )
     
     if success:
-        print(f"Model saved to {saved_path}")
+        logger.info(f"Model saved to {saved_path}")
         return predictor
     else:
-        print("Failed to save model")
+        logger.error("Failed to save model")
         return None
 
 def train_on_default_tickers(model_path='models/stock_predictor.pkl', period='2y', tickers=None, force_sample=False):
