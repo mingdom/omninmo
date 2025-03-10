@@ -125,10 +125,25 @@ Based on analysis of the current model training process, here are potential area
 10. **Model monitoring**: While there's versioning, there's no automated monitoring of model performance over time to detect drift.
 
 11. **Expanded ticker dataset**: The current training set uses only 15 large-cap tickers, primarily from the technology sector. Expanding the training dataset to include:
-    - More tickers (100+ stocks)
+    - More tickers (45 total in first phase)
     - Greater sector diversity (energy, healthcare, utilities, real estate, etc.)
-    - Different market capitalizations (small-cap, mid-cap)
-    - International stocks
-    - Different market conditions (growth, value, cyclical)
+    - Balanced market cap representation within each sector:
+      * 2 large-cap established companies
+      * 1 mid-cap company
+      * 1 small-cap company
+      * 1 struggling/underperforming company
+    - Example balanced sector representation:
+      * Energy: XOM, CVX (large), MPC (mid), TALO (small), GEVO (struggling)
+      * Healthcare: JNJ, PFE (large), HOLX (mid), AMRN (small), TDOC (struggling)
+      * Financials: BAC, GS (large), VIRT (mid), CUBI (small), SOFI (struggling)
+      * And similar for Industrial, Consumer Staples, Utilities sectors
     
-    This would likely improve the model's generalization ability and make it more robust when predicting ratings for stocks not seen during training. It would also help balance the dataset across different market sectors and conditions, potentially reducing bias toward tech stocks. 
+    This balanced approach would:
+    - Improve model's generalization ability
+    - Reduce bias toward successful large-cap companies
+    - Better represent real market conditions
+    - Include both growth and value stocks
+    - Capture different stages of company lifecycle
+    - Test model performance across varying levels of stock volatility and liquidity
+    
+    The diversity in company sizes and performance profiles would help create a more robust model that can better predict ratings for any type of stock, not just successful large-cap companies. 

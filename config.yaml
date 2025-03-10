@@ -13,21 +13,56 @@ model:
     period: "5y"
     interval: "1d"
     default_tickers:
-      - AAPL
-      - MSFT
-      - AMZN
-      - GOOGL
-      - META
-      - TSLA
-      - NVDA
-      - JPM
-      - V
-      - JNJ
-      - WMT
-      - PG
-      - DIS
-      - NFLX
-      - INTC
+      - AAPL    # Apple Inc. - Consumer electronics and software
+      - AMRN    # Amarin Corporation - Biopharmaceutical (small-cap)
+      - AMZN    # Amazon.com - E-commerce and cloud computing
+      - ANET    # Arista Networks - Cloud networking solutions
+      - APP     # AppLovin - Mobile app technology and marketing
+      - BABA    # Alibaba Group - Chinese e-commerce and technology
+      - BAC     # Bank of America - Banking and financial services
+      - BE      # Bloom Energy - Clean energy technology (struggling)
+      - BLBD    # Blue Bird Corp - School bus manufacturer (small-cap)
+      - BYND    # Beyond Meat - Plant-based meat products (struggling)
+      - CALM    # Cal-Maine Foods - Egg production and distribution (small-cap)
+      - CAT     # Caterpillar Inc. - Heavy equipment manufacturing
+      - CHEF    # The Chefs' Warehouse - Food distribution (mid-cap)
+      - CRM     # Salesforce - Cloud-based software
+      - CUBI    # Customers Bancorp - Regional bank (small-cap)
+      - CVX     # Chevron Corporation - Integrated oil and gas
+      - CWEN    # Clearway Energy - Renewable energy (mid-cap)
+      - DIS     # The Walt Disney Company - Entertainment and media
+      - DUK     # Duke Energy - Electric power holding company
+      - ELLO    # Ellomay Capital - Renewable energy (small-cap)
+      - GEVO    # Gevo Inc. - Renewable chemicals and biofuels (struggling)
+      - GOOGL   # Alphabet Inc. - Internet services and technology
+      - GS      # Goldman Sachs - Investment banking and securities
+      - HOLX    # Hologic - Medical devices and diagnostics (mid-cap)
+      - HON     # Honeywell International - Industrial conglomerate
+      - INTC    # Intel Corporation - Semiconductor manufacturing
+      - IONQ    # IonQ - Quantum computing technology
+      - JNJ     # Johnson & Johnson - Healthcare and pharmaceuticals
+      - JPM     # JPMorgan Chase - Banking and financial services
+      - KO      # The Coca-Cola Company - Beverage manufacturing
+      - META    # Meta Platforms - Social media and technology
+      - MPC     # Marathon Petroleum - Oil refining and marketing (mid-cap)
+      - MSFT    # Microsoft Corporation - Software and cloud computing
+      - NEE     # NextEra Energy - Renewable energy and utilities
+      - NFLX    # Netflix - Streaming media and entertainment
+      - NVDA    # NVIDIA Corporation - Graphics and AI computing
+      - PFE     # Pfizer - Pharmaceutical manufacturing
+      - PG      # Procter & Gamble - Consumer goods
+      - PLTR    # Palantir Technologies - Data analytics software
+      - SNOW    # Snowflake - Cloud data platform
+      - SOFI    # SoFi Technologies - Digital financial services (struggling)
+      - TALO    # Talos Energy - Oil and gas exploration (small-cap)
+      - TDOC    # Teladoc Health - Telemedicine services (struggling)
+      - TSLA    # Tesla - Electric vehicles and clean energy
+      - V       # Visa Inc. - Global payments technology
+      - VIRT    # Virtu Financial - Market making and trading (mid-cap)
+      - WDAY    # Workday - Enterprise cloud applications
+      - WKHS    # Workhorse Group - Electric delivery vehicles (struggling)
+      - XOM     # Exxon Mobil - Integrated oil and gas
+      - XPO     # XPO Logistics - Transportation and logistics (mid-cap)
 
 # Rating Configuration
 rating:
@@ -97,6 +132,7 @@ data:
     cache_dir: "cache"
   sample_data:
     default_prices:
+      # Original tech stocks
       AAPL: 175.0
       MSFT: 380.0
       AMZN: 180.0
@@ -112,7 +148,42 @@ data:
       DIS: 110.0
       NFLX: 600.0
       INTC: 40.0
+      # Energy Sector
+      XOM: 105.0
+      CVX: 155.0
+      MPC: 145.0
+      TALO: 12.0
+      GEVO: 1.2
+      # Healthcare Sector
+      PFE: 28.0
+      HOLX: 75.0
+      AMRN: 1.0
+      TDOC: 15.0
+      # Financials Sector
+      BAC: 35.0
+      GS: 385.0
+      VIRT: 20.0
+      CUBI: 25.0
+      SOFI: 8.0
+      # Industrial Sector
+      CAT: 270.0
+      HON: 200.0
+      XPO: 120.0
+      BLBD: 20.0
+      WKHS: 0.5
+      # Consumer Staples Sector
+      KO: 60.0
+      CHEF: 40.0
+      CALM: 45.0
+      BYND: 10.0
+      # Utilities/Energy Sector
+      NEE: 60.0
+      DUK: 95.0
+      CWEN: 30.0
+      ELLO: 8.0
+      BE: 4.0
     default_volatility:
+      # Original tech stocks
       AAPL: 0.015
       MSFT: 0.018
       AMZN: 0.022
@@ -128,6 +199,40 @@ data:
       DIS: 0.018
       NFLX: 0.028
       INTC: 0.020
+      # Energy Sector
+      XOM: 0.015
+      CVX: 0.015
+      MPC: 0.020
+      TALO: 0.035
+      GEVO: 0.050
+      # Healthcare Sector
+      PFE: 0.012
+      HOLX: 0.018
+      AMRN: 0.045
+      TDOC: 0.040
+      # Financials Sector
+      BAC: 0.018
+      GS: 0.020
+      VIRT: 0.025
+      CUBI: 0.035
+      SOFI: 0.045
+      # Industrial Sector
+      CAT: 0.018
+      HON: 0.015
+      XPO: 0.025
+      BLBD: 0.035
+      WKHS: 0.055
+      # Consumer Staples Sector
+      KO: 0.010
+      CHEF: 0.025
+      CALM: 0.030
+      BYND: 0.045
+      # Utilities/Energy Sector
+      NEE: 0.015
+      DUK: 0.012
+      CWEN: 0.025
+      ELLO: 0.035
+      BE: 0.045
 
 # Logging Configuration
 logging:
