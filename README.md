@@ -53,14 +53,8 @@ make install
 # Train with real data (requires FMP API key)
 make train
 
-# Train with sample data (for testing)
-make train-sample
-
 # Run the application
 make run
-
-# Run with sample data (when API has issues)
-make run-sample
 
 # Get a prediction for a specific ticker
 make predict TICKER=AAPL

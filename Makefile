@@ -5,7 +5,6 @@ SHELL := /bin/bash
 PYTHON := python3
 VENV_DIR := venv
 SCRIPTS_DIR := scripts
-TESTS_DIR := tests
 
 # Default target
 .PHONY: help
@@ -14,20 +13,14 @@ help:
 	@echo "  help        - Show this help message"
 	@echo "  env         - Set up and activate a virtual environment"
 	@echo "  install     - Install dependencies"
-	@echo "  test        - Run all tests"
-	@echo "  train       - Train the model (now uses XGBoost by default)"
-	@echo "  train-sample - Train the model using sample data (uses XGBoost)"
-	@echo "  run         - Run the Streamlit app (uses real data by default)"
-	@echo "  run-sample  - Run the Streamlit app with generated sample data (use when Yahoo Finance API has issues)"
-	@echo "  predict     - Predict rating for a ticker (usage: make predict TICKER=AAPL)"
+	@echo "  train       - Train the model (now uses v2 by default)"
+	@echo "  train-sample - Train the model using sample data (uses v2)"
+	@echo "  predict     - Run predictions using console app (uses watchlist from config)"
+	@echo "  predict-ticker - Predict rating for a specific ticker (usage: make predict-ticker TICKER=AAPL)"
 	@echo "  clean       - Clean up generated files"
 	@echo "  clear-cache - Clear the data cache"
-	@echo "  pipeline    - Run the full pipeline (tests, training, prediction)"
+	@echo "  pipeline    - Run the full pipeline (training and prediction)"
 	@echo "  executable  - Make all scripts executable"
-	@echo "  maintain    - Run model maintenance (usage: make maintain MODE=daily|weekly|monthly)"
-	@echo "  maintain-daily   - Run daily model update"
-	@echo "  maintain-weekly  - Run weekly model retraining"
-	@echo "  maintain-monthly - Run monthly model evaluation"
 
 # Set up virtual environment
 .PHONY: env
@@ -59,44 +52,37 @@ clear-cache:
 	@mkdir -p cache
 	@echo "Cache cleared."
 
-# Train the model (now uses XGBoost by default)
+# Train the model (using v2)
 .PHONY: train
 train: clear-cache
-	@echo "Training the XGBoost model (default)..."
+	@echo "Training the model (v2)..."
 	@source $(VENV_DIR)/bin/activate && \
-	$(PYTHON) $(SCRIPTS_DIR)/train_model.py
+	$(PYTHON) $(SCRIPTS_DIR)/v2_train.py
 
-# Train the model using sample data
+# Train the model using sample data (using v2)
 .PHONY: train-sample
 train-sample: clear-cache
-	@echo "Training the XGBoost model using sample data..."
+	@echo "Training the model using sample data (v2)..."
 	@source $(VENV_DIR)/bin/activate && \
-	$(PYTHON) $(SCRIPTS_DIR)/train_xgboost_model.py --force-sample
+	$(PYTHON) $(SCRIPTS_DIR)/v2_train.py --force-sample
 
-# Run the Streamlit app
-.PHONY: run
-run:
-	@echo "Running the Streamlit app..."
-	@source $(VENV_DIR)/bin/activate && \
-	$(PYTHON) $(SCRIPTS_DIR)/run_app.py
-
-# Run the Streamlit app with sample data
-.PHONY: run-sample
-run-sample:
-	@echo "Running the Streamlit app with sample data..."
-	@source $(VENV_DIR)/bin/activate && \
-	$(PYTHON) $(SCRIPTS_DIR)/run_app.py --sample-data
-
-# Predict rating for a ticker
+# Run predictions on watchlist
 .PHONY: predict
 predict:
+	@echo "Running predictions on watchlist..."
+	@source $(VENV_DIR)/bin/activate && \
+	$(PYTHON) $(SCRIPTS_DIR)/v2_predict.py
+
+# Predict rating for a ticker
+.PHONY: predict-ticker
+predict-ticker:
 	@if [ -z "$(TICKER)" ]; then \
-		echo "Error: TICKER is not set. Usage: make predict TICKER=AAPL"; \
+		echo "Error: TICKER is not set. Usage: make predict-ticker TICKER=AAPL"; \
 		exit 1; \
 	fi
 	@echo "Predicting rating for $(TICKER)..."
 	@source $(VENV_DIR)/bin/activate && \
-	$(PYTHON) $(SCRIPTS_DIR)/predict_ticker.py $(TICKER)
+	$(PYTHON) $(SCRIPTS_DIR)/v2_predict.py --tickers $(TICKER)
 
 # Clean up generated files
 .PHONY: clean
@@ -109,33 +95,13 @@ clean:
 pipeline:
 	@echo "Running the full pipeline..."
 	@source $(VENV_DIR)/bin/activate && \
-	bash $(SCRIPTS_DIR)/run-pipeline.sh
+	$(PYTHON) $(SCRIPTS_DIR)/v2_train.py --force-sample && \
+	$(PYTHON) $(SCRIPTS_DIR)/v2_predict.py --sample
 
 # Make all scripts executable
 .PHONY: executable
 executable:
 	@echo "Making all scripts executable..."
 	@bash $(SCRIPTS_DIR)/make_executable.sh
-	@chmod +x $(TESTS_DIR)/run_tests.py
-
-# Model maintenance targets
-.PHONY: maintain
-maintain:
-	@if [ -z "$(MODE)" ]; then \
-		echo "Error: MODE parameter is required. Use 'make maintain MODE=daily|weekly|monthly'"; \
-		exit 1; \
-	fi
-	@source $(VENV_DIR)/bin/activate && \
-	$(PYTHON) $(SCRIPTS_DIR)/maintain_model.py --mode $(MODE)
-
-# Run tests
-.PHONY: test
-test:
-	@echo "Running tests..."
-	@if [ ! -d "$(VENV_DIR)" ]; then \
-		echo "Virtual environment not found. Please run 'make env' first."; \
-		exit 1; \
-	fi
-	@if [ -f activate-venv.sh ]; then source activate-venv.sh; fi
-	@$(PYTHON) -m pytest $(TESTS_DIR) -v
-	@echo "Tests completed." 
+	@chmod +x $(SCRIPTS_DIR)/v2_predict.py
+	@chmod +x $(SCRIPTS_DIR)/v2_train.py 
