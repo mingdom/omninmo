@@ -1,141 +1,152 @@
 # Development Errors Log
 
-This file documents errors encountered during development and their solutions.
+This file documents errors encountered during development along with their resolutions.
 
-## 2025-03-09: Refactoring to Simplify Codebase
+## Format
 
-During our refactoring to simplify the codebase by removing yfinance and focusing only on XGBoost with FMP API, we encountered the following challenges:
-
-### Challenge: Multiple Data Source Dependencies
-
-**Problem:** The codebase had dependencies on both yfinance and FMP API, with fallback mechanisms between them, creating unnecessary complexity.
-
-**Solution:** 
-- Removed all yfinance-related code
-- Enhanced the FMP data fetcher to include its own sample data generator
-- Updated all references to use FMP data fetcher exclusively
-
-### Challenge: Multiple Model Implementations
-
-**Problem:** The codebase had multiple model implementations (RandomForest, GradientBoostingClassifier fallback, XGBoost) which made maintenance and testing more difficult.
-
-**Solution:**
-- Removed all non-XGBoost model implementations
-- Simplified the XGBoost predictor to remove fallback mechanisms
-- Updated all training scripts to only use XGBoost
-
-### Challenge: XGBoost Class Label Compatibility
-
-**Problem:** During training, XGBoost threw the error `Invalid classes inferred from unique values of y. Expected: [0 1 2 3 4], got [-2. -1. 0. 1. 2.]`. This was because we were using class labels from -2 to 2 (Strong Sell to Strong Buy), but XGBoost expects non-negative integer labels starting from 0.
-
-**Solution:**
-- Changed our rating system to use values 0-4 instead of -2 to 2:
-  - 0: Strong Sell (was -2)
-  - 1: Sell (was -1)
-  - 2: Hold (was 0)
-  - 3: Buy (was 1)
-  - 4: Strong Buy (was 2)
-- Created a mapping dictionary for consistent conversion between numeric and string labels
-- Updated the evaluation logic to align with the new labeling scheme
-
-### Challenge: Index Alignment in Training Data
-
-**Problem:** We encountered issues where feature and target dataframes would have different indices or lengths, causing training to fail.
-
-**Solution:**
-- Used `reset_index(drop=True)` to ensure proper index alignment of features and targets
-- Added explicit intersection of indices to ensure features and targets shared the same rows
-- Implemented validation checks to ensure data length consistency
-- Used `ignore_index=True` when concatenating data from multiple tickers
-
-## 2025-03-09: Implementing Proper Logging System
-
-When replacing print statements with a proper logging system, we encountered the following challenges:
-
-### Challenge: Consistent Log Management Across Modules
-
-**Problem:** Different parts of the codebase were using different logging approaches (some using print statements, others using basic logging), making it difficult to control verbosity and format logs consistently.
-
-**Solution:**
-- Implemented a centralized logging configuration in key modules
-- Created a logs directory to store log files
-- Added file handlers to enable persistent logging
-- Set consistent formatting for all log messages
-
-### Challenge: Log Level Control from Command Line
-
-**Problem:** Users needed a way to control logging verbosity without changing code, especially when debugging issues.
-
-**Solution:**
-- Added a command-line argument `--log-level` to the training script
-- Implemented dynamic setting of log levels based on the argument
-- Configured the root logger to propagate the level to all child loggers
-- Provided clear documentation on how to use different log levels
-
-### Challenge: Balancing Verbosity and Performance
-
-**Problem:** Debug logging can generate enormous amounts of data, potentially slowing down the application and creating large log files.
-
-**Solution:**
-- Used appropriate log levels to categorize messages (DEBUG, INFO, WARNING, ERROR)
-- Made DEBUG the most verbose level with detailed data shape, content, and processing information
-- Set INFO as the default level for normal operation
-- Ensured logging statements use lazy evaluation for expensive operations (e.g., `f"Large data: {large_data}"` only evaluated when that log level is enabled)
-
-These improvements significantly enhanced our ability to diagnose issues during development while maintaining clean operation in production use.
-
-## Test Refactoring Errors
-
-### 2023-03-09: Test Refactoring
-
-#### Missing Dependencies
-When running the tests, we encountered several missing dependencies:
 ```
-ModuleNotFoundError: No module named 'pandas'
-ModuleNotFoundError: No module named 'numpy'
-ModuleNotFoundError: No module named 'streamlit'
-```
+## YYYY-MM-DD: Error Description
 
-Need to install the required dependencies before running the tests. 
+### Error
+Error message goes here
 
-## 2024-03-09: Missing Module Error in Training Script
-### Error Message
-```
-Failed to import required modules: No module named 'src.data.stock_data_fetcher'
-```
-
-### Reproduction Steps
-1. Run `make train` command
-2. Script attempts to import StockDataFetcher from non-existent module
+### Context
+What we were trying to do when the error occurred
 
 ### Resolution
-1. Installed python-dotenv package
-2. Updated all references from StockDataFetcher to FMPDataFetcher
-3. Modified imports in:
-   - scripts/train_xgboost_model.py
-   - src/app/app.py
-   - src/app/streamlit_app.py
-   - scripts/compare_models.py
-   - scripts/maintain_model.py
-   - scripts/predict_ticker.py 
+How the error was resolved
 
-## 2024-03-09: XGBoost Training Errors
-### Error 1: Invalid Classes
+## 2023-06-13: Random.normalvariate() Error in Sample Data Generation
+
+### Error
 ```
-ValueError: Invalid classes inferred from unique values of `y`.  Expected: [0 1 2 3 4], got ['Buy' 'Hold' 'Sell' 'Strong Buy' 'Strong Sell']
+Random.normalvariate() takes from 1 to 3 positional arguments but 4 were given
 ```
 
-### Resolution 1
-1. Added LabelEncoder to XGBoostRatingPredictor
-2. Updated train method to encode string labels to numeric values
-3. Updated predict and evaluate methods to handle label encoding/decoding
+### Context
+When running the pipeline with sample data, we encountered an error in the data_fetcher.py file. The random.normalvariate() function was being called with incorrect arguments when generating sample data.
 
-### Error 2: Float Not Subscriptable
-```
-Error during XGBoost model training: 'float' object is not subscriptable
+### Resolution
+Changed the implementation to use numpy's random functions instead:
+
+```python
+# Before
+df['Open'] = df['Close'] * (1 + random.normalvariate(0, 0.005, len(df)))
+df['High'] = df[['Open', 'Close']].max(axis=1) * (1 + abs(random.normalvariate(0, 0.005, len(df))))
+df['Low'] = df[['Open', 'Close']].min(axis=1) * (1 - abs(random.normalvariate(0, 0.005, len(df))))
+df['Volume'] = random.normalvariate(1000000, 200000, len(df))
+
+# After
+df['Open'] = df['Close'] * (1 + np.random.normal(0, 0.005, len(df)))
+df['High'] = df[['Open', 'Close']].max(axis=1) * (1 + abs(np.random.normal(0, 0.005, len(df))))
+df['Low'] = df[['Open', 'Close']].min(axis=1) * (1 - abs(np.random.normal(0, 0.005, len(df))))
+df['Volume'] = np.random.normal(1000000, 200000, len(df))
 ```
 
-### Resolution 2
-1. Updated train method to return a dictionary with accuracy and classification report
-2. Added feature importance to the return value
-3. Fixed error handling in model training 
+The Python `random.normalvariate()` function takes only a mean and standard deviation, while we were trying to generate an array of random values. Numpy's `np.random.normal()` can generate arrays of random values, which is what we needed.
+
+## 2023-06-13: XGBoost Error with Non-numeric Data
+
+### Error
+```
+DataFrame.dtypes for data must be int, float, bool or category. When categorical type is supplied, The experimental DMatrix parameter`enable_categorical` must be set to `True`. Invalid columns:label: object
+```
+
+### Context
+When trying to make predictions with our trained model, we encountered an error because some of the feature columns contained non-numeric data. XGBoost requires all input data to be numeric.
+
+### Resolution
+Added preprocessing in the predict method to ensure all features are numeric:
+
+```python
+# Ensure all features are numeric
+for col in features.columns:
+    if features[col].dtype == 'object':
+        logger.warning(f"Converting non-numeric column {col} to numeric")
+        features[col] = pd.to_numeric(features[col], errors='coerce')
+
+# Fill any NaN values that might have been introduced
+features = features.fillna(0)
+```
+
+This code converts any non-numeric columns to numeric values, and fills any resulting NaN values with zeros to ensure the data is valid for XGBoost.
+
+## 2023-06-13: XGBoost Feature Mismatch Error
+
+### Error
+```
+feature_names mismatch: ['Close', 'Open', 'High', 'Low', 'Volume', ...] ['Open', 'High', 'Low', 'Close', 'adjClose', 'Volume', 'unadjustedVolume', 'change', 'changePercent', 'vwap', 'label', 'changeOverTime', ...]
+training data did not have the following fields: change, vwap, changePercent, label, changeOverTime, adjClose, unadjustedVolume
+```
+
+### Context
+When making predictions, we encountered a feature mismatch error because the features used during training were different from the features available during prediction. This can happen when data comes from different sources or when the feature engineering process changes.
+
+### Resolution
+Enhanced the predict method to handle feature mismatches:
+
+1. Store feature names during training:
+```python
+# Store feature names for prediction
+self.feature_names = X.columns.tolist()
+```
+
+2. Ensure prediction data has the same features in the same order:
+```python
+# Check if we have the expected feature names
+if self.feature_names is not None:
+    # Get the intersection of available features
+    common_features = list(set(features.columns) & set(self.feature_names))
+    
+    if len(common_features) < len(self.feature_names):
+        missing_features = set(self.feature_names) - set(common_features)
+        logger.warning(f"Missing features: {missing_features}")
+        
+        # Add missing features with zeros
+        for feature in missing_features:
+            features[feature] = 0
+    
+    # Remove extra features not used in training
+    extra_features = set(features.columns) - set(self.feature_names)
+    if extra_features:
+        logger.warning(f"Removing extra features not used in training: {extra_features}")
+        features = features[self.feature_names]
+    
+    # Ensure features are in the same order as during training
+    features = features[self.feature_names]
+```
+
+This ensures that the prediction data has exactly the same features in the same order as the training data, which is required by XGBoost.
+
+## Non-numeric Feature Error in Training Data
+
+### Error Message
+```
+ValueError: DataFrame.dtypes for data must be int, float, bool or category. When categorical type is supplied, The experimental DMatrix parameter `enable_categorical` must be set to `True`. Invalid columns:label: object
+```
+
+### Context
+When training the model with real market data, XGBoost rejected a non-numeric column named 'label' that contained date strings (e.g., "March 13, 20").
+
+### Investigation
+- The 'label' column appears to be coming from the API data
+- Sample values show it contains date strings in the format "Month DD, YY"
+- This column is not actually a feature we want to use for training
+- The column was inadvertently included in the feature set
+
+### Resolution
+1. Modified the `generate` method in `Features` class to explicitly list all desired columns
+2. Created a comprehensive list of 46 numeric features to use for training:
+   - Price data (Open, High, Low, Close, Volume)
+   - Returns (1d, 5d, 10d, 20d, 60d, log)
+   - Moving averages (SMA and EMA with periods 5, 10, 20, 50, 200)
+   - Technical indicators (RSI, MACD, Bollinger Bands)
+   - Volatility measures
+3. Verified that all selected features are numeric (float64 or int64)
+4. Successfully trained model with R² score of 0.5948
+
+### Prevention
+- Always explicitly specify which columns to use for training
+- Add data type validation earlier in the pipeline
+- Document expected data types for all features
+- Consider adding automated tests for feature data types

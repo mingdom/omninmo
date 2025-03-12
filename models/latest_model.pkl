@@ -1,1 +1,0 @@
-/Users/dongming/projects/omninmo/models/stock_predictor_20250310_001342.pkl
