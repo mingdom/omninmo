@@ -188,3 +188,124 @@ with mlflow.start_run(run_name=run_name, experiment_id=experiment_id) as run:
 
 ### Prevention
 Always check if an experiment exists before starting an MLflow run, especially in a new environment or when setting up MLflow for the first time.
+
+## March 12, 2024 - Perfect Model Consistency Error
+
+### Error Description
+Model training was showing perfect consistency in performance metrics and feature importance across different training runs, which is statistically improbable.
+
+### Repro Steps
+1. Run training multiple times with same parameters:
+```bash
+python -m src.v2.train --period 10y --forward-days 90 -y
+```
+2. Compare cross-validation results and feature importance scores
+3. Observe identical metrics across runs:
+   - R² scores: 0.6809 ± 0.0131
+   - Feature stability: 0.7882
+   - Feature rankings identical
+
+### Root Cause
+1. Fixed random state (42) in model initialization
+2. Same model instance being reused across cross-validation folds
+3. No randomization in final model training
+
+### Fix
+1. Modified `Predictor` class to use timestamp-based random states
+2. Updated cross-validation to create new model instances per fold
+3. Added fresh random state for final model training
+
+### Verification
+After fix:
+- R² scores show natural variation (0.6723 ± 0.0260)
+- Feature stability score decreased to 0.6547
+- Feature rankings vary between runs
+
+### Prevention
+1. Always use dynamic random states in model training
+2. Create fresh model instances for each training iteration
+3. Add unit tests to verify training variability
+
+## Silent Error Swallowing in DataFetcher
+
+## Error Description
+The `DataFetcher` class was silently falling back to sample data in several error conditions without informing the user or requiring explicit permission. This violated our tenet of never hiding errors.
+
+## Repro Steps
+1. Run training without setting FMP_API_KEY:
+```bash
+make train
+```
+2. Observe that the training proceeds with sample data without any error
+
+## Root Cause
+The `fetch_data` method in `DataFetcher` was designed to automatically fall back to sample data in three cases:
+1. When no API key was set (`if force_sample or not self.api_key`)
+2. When API request failed (in the exception handler)
+3. When API returned no data (in the empty data check)
+
+This design choice prioritized convenience over error visibility and control.
+
+## Fix
+1. Modified `fetch_data` to raise errors instead of falling back to sample data:
+   - Added `ValueError` when no API key is set
+   - Propagate API errors instead of catching and swallowing them
+   - Raise `ValueError` when API returns no data
+2. Only use sample data when explicitly requested via `force_sample=True`
+3. Added clear error messages with instructions on how to fix issues
+
+## Verification
+1. Run without API key:
+```bash
+unset FMP_API_KEY
+make train
+```
+Expected: Error about missing API key
+
+2. Run with explicit sample data request:
+```bash
+make train-sample
+```
+Expected: Successfully runs with sample data
+
+## Prevention
+1. Added docstring documenting error cases
+2. Error messages include actionable steps
+3. Follow the tenet: "Debug errors fully! Never hide an error by swallowing it"
+
+## Data Shuffling Error in Training Pipeline
+
+### Error Description
+Training pipeline was producing identical results across different runs, even with random seeds in cross-validation.
+
+### Reproduction Steps
+1. Run `make train` multiple times
+2. Observe identical metrics across runs
+3. Check cross-validation splits - they are identical despite random seeds
+
+### Root Cause
+Data was being processed and combined in a deterministic order:
+1. Tickers processed alphabetically
+2. Each ticker's data sorted by date
+3. Data concatenated in this fixed order
+4. Cross-validation splits on ordered data produced identical folds
+
+### Fix
+Modified `src/v2/train.py`:
+- Added random shuffling of combined dataset before training
+- Used `np.random.permutation` to generate random indices
+- Applied same shuffling to both features and targets
+- Added data type logging for debugging
+
+### Verification
+Run training multiple times and observe:
+- Different metrics across runs
+- Variation in cross-validation splits
+- Stable overall performance
+- Different feature importance rankings
+
+### Prevention
+- Added documentation about data ordering effects
+- Added logging of data shapes and types
+- Consider adding tests for data shuffling
+- Monitor feature stability scores

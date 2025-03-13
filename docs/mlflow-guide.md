@@ -31,19 +31,16 @@ Then open your browser to http://127.0.0.1:5000 to access the MLflow UI.
 
 ### MLflow Directory Structure
 
-MLflow stores its data in the `logs/mlruns` directory:
+MLflow stores its data in the `mlruns` directory:
 
 ```
-logs/mlruns/
-├── 0/                      # Default experiment (unused)
-├── 572766249267779371/     # Stock prediction experiment
-│   ├── 1fe2c87ac8234a27... # Run ID
-│   │   ├── artifacts/      # Stored artifacts (plots, models)
-│   │   ├── metrics/        # Performance metrics
-│   │   ├── params/         # Model parameters
-│   │   └── meta.yaml       # Run metadata
-│   └── meta.yaml           # Experiment metadata
-└── meta.yaml               # MLflow metadata
+mlruns/
+├── 0/                      # Default experiment
+│   ├── <run_id>/          # Individual run data
+│   │   ├── metrics/       # Run metrics
+│   │   ├── params/        # Run parameters
+│   │   └── artifacts/     # Run artifacts (plots, models)
+└── 1/                     # Custom experiment
 ```
 
 ## Integration with omninmo
@@ -203,10 +200,11 @@ mlflow search runs --experiment-ids 572766249267779371 \
 You can access MLflow data programmatically:
 
 ```python
+import os
 import mlflow
 
-# Set tracking URI
-mlflow.set_tracking_uri("file:./logs/mlruns")
+# Set tracking URI to local mlruns directory
+mlflow.set_tracking_uri("file:./mlruns")
 
 # Get experiment
 experiment = mlflow.get_experiment_by_name("stock_prediction")

@@ -16,28 +16,28 @@ model:
   prediction:
     mode: "regression"  # Default prediction mode: 'regression' or 'classification'
   training:
-    # Number of days to look ahead for prediction (5-30 days recommended)
-    forward_days: 30
-    # Historical data period for training (2y-5y recommended)
-    period: "5y"
+    # Number of days to look ahead for prediction (updated for medium-term)
+    forward_days: 90
+    # Historical data period for training (increased for better medium-term patterns)
+    period: "10y"
     # Data interval (1d recommended for best results)
     interval: "1d"
     # Minimum number of days required for reliable predictions
-    min_data_days: 60
-    # Score thresholds for mapping to categorical ratings (optional)
+    min_data_days: 200
+    # Score thresholds for mapping to categorical ratings (adjusted for 90-day horizon)
     score_thresholds:
       strong_buy: 0.8   # Scores >= 0.8 are Strong Buy
       buy: 0.6          # Scores >= 0.6 are Buy
       hold: 0.4         # Scores >= 0.4 are Hold
       sell: 0.2         # Scores >= 0.2 are Sell
       strong_sell: 0.0  # Scores < 0.2 are Strong Sell
-    # Return thresholds for rating categories
+    # Return thresholds for rating categories (adjusted for 90-day horizon)
     rating_thresholds:
-      strong_buy: 0.06   # >6% return (adjusted for 30-day horizon)
-      buy: 0.03         # >3% return (adjusted for 30-day horizon)
-      hold: -0.03       # -3% to 3% return (adjusted for 30-day horizon)
-      sell: -0.06       # <-6% return (adjusted for 30-day horizon)
-      strong_sell: -0.06 # <-6% return (adjusted for 30-day horizon)
+      strong_buy: 0.15   # >15% return
+      buy: 0.08         # >8% return
+      hold: -0.08       # -8% to 8% return
+      sell: -0.15       # <-15% return
+      strong_sell: -0.15 # <-15% return
     # Default tickers for training (diverse set of stocks)
     default_tickers:
       - AAPL    # Apple Inc. - Consumer electronics and software

@@ -12,6 +12,8 @@ from sklearn.model_selection import train_test_split, cross_val_score, KFold
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from sklearn.metrics import accuracy_score, classification_report
 import math
+from datetime import datetime
+import random
 
 from src.v2.config import config
 
@@ -34,7 +36,9 @@ class Predictor:
         self.learning_rate = params.get('learning_rate', 0.1)
         self.max_depth = params.get('max_depth', 6)
         self.n_estimators = params.get('n_estimators', 100)
-        self.random_state = params.get('random_state', 42)
+        
+        # Use truly random seed
+        self.random_state = params.get('random_state', random.randint(1, 1000000))
         
         # Initialize model
         if mode == 'classification':
@@ -82,6 +86,25 @@ class Predictor:
             y = y.astype(int)
         else:
             y = y.astype(np.float32)
+        
+        # Create new model instance with truly random state
+        if self.mode == 'classification':
+            self.model = xgb.XGBClassifier(
+                learning_rate=self.learning_rate,
+                max_depth=self.max_depth,
+                n_estimators=self.n_estimators,
+                random_state=random.randint(1, 1000000),
+                use_label_encoder=False,
+                eval_metric='mlogloss'
+            )
+        else:
+            self.model = xgb.XGBRegressor(
+                learning_rate=self.learning_rate,
+                max_depth=self.max_depth,
+                n_estimators=self.n_estimators,
+                random_state=random.randint(1, 1000000),
+                objective='reg:squarederror'
+            )
         
         # Train the model
         self.model.fit(X, y)
@@ -402,8 +425,8 @@ class Predictor:
         # Store feature names for prediction
         self.feature_names = X.columns.tolist()
         
-        # Initialize k-fold cross validation
-        kf = KFold(n_splits=n_splits, shuffle=True, random_state=self.random_state)
+        # Initialize k-fold cross validation with a truly random state
+        kf = KFold(n_splits=n_splits, shuffle=True, random_state=random.randint(1, 1000000))
         
         # Lists to store metrics for each fold
         fold_metrics = []
@@ -413,6 +436,10 @@ class Predictor:
         # Memory optimization: Pre-allocate arrays
         X_values = X.values
         y_values = y.values
+        
+        # Store metrics for similarity check
+        r2_scores = []  # For regression
+        accuracy_scores = []  # For classification
         
         for fold, (train_idx, val_idx) in enumerate(kf.split(X_values), 1):
             logger.info(f"\nFold {fold}/{n_splits}")
@@ -425,12 +452,32 @@ class Predictor:
             X_train_df = pd.DataFrame(X_train, columns=self.feature_names)
             X_val_df = pd.DataFrame(X_val, columns=self.feature_names)
             
+            # Create a new model instance for each fold with a truly random state
+            fold_random_state = random.randint(1, 1000000)
+            if self.mode == 'classification':
+                fold_model = xgb.XGBClassifier(
+                    learning_rate=self.learning_rate,
+                    max_depth=self.max_depth,
+                    n_estimators=self.n_estimators,
+                    random_state=fold_random_state,
+                    use_label_encoder=False,
+                    eval_metric='mlogloss'
+                )
+            else:
+                fold_model = xgb.XGBRegressor(
+                    learning_rate=self.learning_rate,
+                    max_depth=self.max_depth,
+                    n_estimators=self.n_estimators,
+                    random_state=fold_random_state,
+                    objective='reg:squarederror'
+                )
+            
             # Train model on this fold
-            self.model.fit(X_train_df, y_train)
+            fold_model.fit(X_train_df, y_train)
             
             # Store feature importance for this fold
             fold_importance = pd.Series(
-                self.model.feature_importances_,
+                fold_model.feature_importances_,
                 index=self.feature_names
             ).sort_values(ascending=False)
             feature_importance_list.append(fold_importance)
@@ -446,7 +493,7 @@ class Predictor:
             del X_train_df
             
             # Evaluate on validation set
-            y_pred = self.model.predict(X_val_df)
+            y_pred = fold_model.predict(X_val_df)
             
             # Free more memory
             del X_val_df
@@ -462,6 +509,7 @@ class Predictor:
                     'classification_report': report
                 })
                 
+                accuracy_scores.append(accuracy)
                 logger.info(f"Fold {fold} Accuracy: {accuracy:.4f}")
                 
             else:  # regression mode
@@ -478,7 +526,23 @@ class Predictor:
                     'r2': r2
                 })
                 
+                r2_scores.append(r2)
                 logger.info(f"Fold {fold} - RMSE: {rmse:.4f}, MAE: {mae:.4f}, R²: {r2:.4f}")
+            
+            # Clean up fold-specific model
+            del fold_model
+        
+        # Check for suspiciously similar results across folds
+        if self.mode == 'classification':
+            accuracy_std = np.std(accuracy_scores)
+            if accuracy_std < 0.001:  # Less than 0.1% variation
+                logger.warning("WARNING: Extremely low variation in accuracy scores across folds. "
+                             "This might indicate an issue with randomization.")
+        else:
+            r2_std = np.std(r2_scores)
+            if r2_std < 0.001:  # Less than 0.1% variation
+                logger.warning("WARNING: Extremely low variation in R² scores across folds. "
+                             "This might indicate an issue with randomization.")
         
         # Calculate average feature importance across folds
         self.feature_importance = pd.concat(feature_importance_list, axis=1).mean(axis=1).sort_values(ascending=False)

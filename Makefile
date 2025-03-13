@@ -55,14 +55,14 @@ clear-cache:
 
 # Train the model (using v2)
 .PHONY: train
-train: clear-cache
+train:
 	@echo "Training the model (v2)..."
 	@source $(VENV_DIR)/bin/activate && \
 	$(PYTHON) $(SCRIPTS_DIR)/v2_train.py
 
 # Train the model using sample data (using v2)
 .PHONY: train-sample
-train-sample: clear-cache
+train-sample:
 	@echo "Training the model using sample data (v2)..."
 	@source $(VENV_DIR)/bin/activate && \
 	$(PYTHON) $(SCRIPTS_DIR)/v2_train.py --force-sample
