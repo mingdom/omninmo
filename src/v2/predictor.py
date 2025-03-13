@@ -8,7 +8,7 @@ import logging
 import numpy as np
 import pandas as pd
 import xgboost as xgb
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, cross_val_score, KFold
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from sklearn.metrics import accuracy_score, classification_report
 import math
@@ -61,77 +61,51 @@ class Predictor:
         self.feature_importance = None
         self.feature_names = None
     
-    def train(self, X, y, test_size=0.2):
+    def train(self, X, y):
         """
-        Train the model
+        Train the model on the full dataset after cross-validation.
+        This ensures we have a final model trained on all available data
+        while maintaining confidence in its performance through prior CV.
         
         Args:
-            X (pandas.DataFrame): Features
-            y (pandas.Series): Target values
-            test_size (float): Proportion of data for testing
+            X (pd.DataFrame): Feature matrix
+            y (pd.Series): Target values
             
         Returns:
-            dict: Training results
+            dict: Training results including metrics and feature importance
         """
-        logger.info(f"Training {self.mode} model with {len(X)} samples")
+        logger.info("Training final model on full dataset...")
         
-        # Store feature names for prediction
-        self.feature_names = X.columns.tolist()
-        
-        # Split data
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=test_size, random_state=self.random_state
-        )
-        
-        # Train model
-        self.model.fit(X_train, y_train)
-        
-        # Calculate feature importance
-        self.feature_importance = pd.Series(
-            self.model.feature_importances_,
-            index=X.columns
-        ).sort_values(ascending=False)
-        
-        # Log top features
-        logger.info("Top 10 important features:")
-        top_features = self.feature_importance.head(10)
-        for feature, importance in top_features.items():
-            logger.info(f"  {feature}: {importance:.4f}")
-        
-        # Evaluate model
+        # Ensure data types are correct
+        X = X.astype(np.float32)
         if self.mode == 'classification':
-            # For classification
-            y_pred = self.model.predict(X_test)
-            accuracy = accuracy_score(y_test, y_pred)
-            report = classification_report(y_test, y_pred, output_dict=True)
-            
-            logger.info(f"Accuracy: {accuracy:.4f}")
-            
-            # Store classes
-            self.classes = self.model.classes_
-            
-            return {
-                'accuracy': accuracy,
-                'classification_report': report,
-                'feature_importance': top_features.to_dict()
-            }
+            y = y.astype(int)
+        else:
+            y = y.astype(np.float32)
         
-        else:  # regression mode
-            # For regression
-            y_pred = self.model.predict(X_test)
-            mse = mean_squared_error(y_test, y_pred)
-            rmse = math.sqrt(mse)
-            mae = mean_absolute_error(y_test, y_pred)
-            r2 = r2_score(y_test, y_pred)
-            
-            logger.info(f"RMSE: {rmse:.4f}, MAE: {mae:.4f}, R²: {r2:.4f}")
-            
-            return {
-                'rmse': rmse,
-                'mae': mae,
-                'r2': r2,
-                'feature_importance': top_features.to_dict()
-            }
+        # Train the model
+        self.model.fit(X, y)
+        
+        # Get predictions
+        y_pred = self.model.predict(X)
+        
+        # Calculate metrics
+        results = {}
+        if self.mode == 'classification':
+            results['accuracy'] = accuracy_score(y, y_pred)
+            results['classification_report'] = classification_report(y, y_pred)
+        else:
+            results['rmse'] = np.sqrt(mean_squared_error(y, y_pred))
+            results['mae'] = mean_absolute_error(y, y_pred)
+            results['r2'] = r2_score(y, y_pred)
+        
+        # Get feature importance
+        if hasattr(self.model, 'feature_importances_'):
+            results['feature_importance'] = dict(zip(X.columns, self.model.feature_importances_))
+        elif hasattr(self.model, 'coef_'):
+            results['feature_importance'] = dict(zip(X.columns, np.abs(self.model.coef_)))
+        
+        return results
     
     def predict(self, features):
         """
@@ -385,6 +359,207 @@ class Predictor:
         except Exception as e:
             logger.error(f"Error loading model: {e}")
             return None
+
+    def cross_validate(self, X, y, n_splits=5):
+        """
+        Perform k-fold cross-validation with feature importance stability analysis.
+        
+        Args:
+            X (pd.DataFrame): Feature matrix
+            y (pd.Series): Target values
+            n_splits (int): Number of folds for cross validation
+            
+        Returns:
+            dict: Cross-validation results including:
+                - Mean and std of performance metrics
+                - Feature importance stability score
+                - Individual fold results
+        """
+        logger.info(f"Performing {n_splits}-fold cross validation")
+        
+        # Data validation
+        if len(X) < n_splits * 2:  # Ensure at least 2 samples per fold
+            raise ValueError(f"Insufficient data for {n_splits} folds. Need at least {n_splits * 2} samples, got {len(X)}")
+        
+        if X.isna().any().any():
+            raise ValueError("Features contain NaN values. Please handle missing data before cross-validation.")
+            
+        if y.isna().any():
+            raise ValueError("Target contains NaN values. Please handle missing data before cross-validation.")
+            
+        # Validate target variable for classification mode
+        if self.mode == 'classification':
+            unique_classes = y.nunique()
+            if unique_classes < 2:
+                raise ValueError(f"Classification requires at least 2 classes, got {unique_classes}")
+            
+            # Check if we have enough samples per class
+            class_counts = y.value_counts()
+            min_class_count = class_counts.min()
+            if min_class_count < n_splits:
+                logger.warning(f"Some classes have fewer samples than folds. Smallest class has {min_class_count} samples.")
+        
+        # Store feature names for prediction
+        self.feature_names = X.columns.tolist()
+        
+        # Initialize k-fold cross validation
+        kf = KFold(n_splits=n_splits, shuffle=True, random_state=self.random_state)
+        
+        # Lists to store metrics for each fold
+        fold_metrics = []
+        feature_importance_list = []
+        feature_ranks_list = []  # For stability calculation
+        
+        # Memory optimization: Pre-allocate arrays
+        X_values = X.values
+        y_values = y.values
+        
+        for fold, (train_idx, val_idx) in enumerate(kf.split(X_values), 1):
+            logger.info(f"\nFold {fold}/{n_splits}")
+            
+            # Split data using numpy arrays for memory efficiency
+            X_train, X_val = X_values[train_idx], X_values[val_idx]
+            y_train, y_val = y_values[train_idx], y_values[val_idx]
+            
+            # Convert back to pandas for XGBoost (required for feature names)
+            X_train_df = pd.DataFrame(X_train, columns=self.feature_names)
+            X_val_df = pd.DataFrame(X_val, columns=self.feature_names)
+            
+            # Train model on this fold
+            self.model.fit(X_train_df, y_train)
+            
+            # Store feature importance for this fold
+            fold_importance = pd.Series(
+                self.model.feature_importances_,
+                index=self.feature_names
+            ).sort_values(ascending=False)
+            feature_importance_list.append(fold_importance)
+            
+            # Store feature ranks for stability calculation
+            feature_ranks = pd.Series(
+                range(len(self.feature_names)),
+                index=fold_importance.index
+            )
+            feature_ranks_list.append(feature_ranks)
+            
+            # Free memory
+            del X_train_df
+            
+            # Evaluate on validation set
+            y_pred = self.model.predict(X_val_df)
+            
+            # Free more memory
+            del X_val_df
+            
+            if self.mode == 'classification':
+                # Classification metrics
+                accuracy = accuracy_score(y_val, y_pred)
+                report = classification_report(y_val, y_pred, output_dict=True)
+                
+                fold_metrics.append({
+                    'fold': fold,
+                    'accuracy': accuracy,
+                    'classification_report': report
+                })
+                
+                logger.info(f"Fold {fold} Accuracy: {accuracy:.4f}")
+                
+            else:  # regression mode
+                # Regression metrics
+                mse = mean_squared_error(y_val, y_pred)
+                rmse = math.sqrt(mse)
+                mae = mean_absolute_error(y_val, y_pred)
+                r2 = r2_score(y_val, y_pred)
+                
+                fold_metrics.append({
+                    'fold': fold,
+                    'rmse': rmse,
+                    'mae': mae,
+                    'r2': r2
+                })
+                
+                logger.info(f"Fold {fold} - RMSE: {rmse:.4f}, MAE: {mae:.4f}, R²: {r2:.4f}")
+        
+        # Calculate average feature importance across folds
+        self.feature_importance = pd.concat(feature_importance_list, axis=1).mean(axis=1).sort_values(ascending=False)
+        
+        # Calculate feature importance stability using Spearman correlation
+        n_features = len(self.feature_names)
+        stability_matrix = np.zeros((n_splits, n_splits))
+        for i in range(n_splits):
+            for j in range(i + 1, n_splits):
+                corr = feature_ranks_list[i].corr(feature_ranks_list[j], method='spearman')
+                stability_matrix[i, j] = corr
+                stability_matrix[j, i] = corr
+        
+        # Average stability score (mean of upper triangle)
+        stability_score = np.mean(stability_matrix[np.triu_indices(n_splits, k=1)])
+        
+        # Log feature importance stability
+        logger.info(f"\nFeature Importance Stability Score: {stability_score:.4f}")
+        if stability_score < 0.8:
+            logger.warning("Feature importance stability is below target threshold (0.8)")
+        
+        # Log top features
+        logger.info("\nTop 10 important features (averaged across folds):")
+        top_features = self.feature_importance.head(10)
+        for feature, importance in top_features.items():
+            logger.info(f"  {feature}: {importance:.4f}")
+        
+        # Calculate aggregate metrics
+        if self.mode == 'classification':
+            accuracies = [m['accuracy'] for m in fold_metrics]
+            mean_accuracy = np.mean(accuracies)
+            std_accuracy = np.std(accuracies)
+            
+            logger.info(f"\nCross Validation Results:")
+            logger.info(f"Mean Accuracy: {mean_accuracy:.4f} ± {std_accuracy:.4f}")
+            
+            # Check variance threshold
+            if std_accuracy > 0.2 * mean_accuracy:  # > 20% of mean
+                logger.warning("High variance between folds detected (> 20% of mean accuracy)")
+            
+            return {
+                'fold_metrics': fold_metrics,
+                'mean_accuracy': mean_accuracy,
+                'std_accuracy': std_accuracy,
+                'feature_importance': top_features.to_dict(),
+                'feature_stability': stability_score
+            }
+            
+        else:  # regression mode
+            rmse_scores = [m['rmse'] for m in fold_metrics]
+            mae_scores = [m['mae'] for m in fold_metrics]
+            r2_scores = [m['r2'] for m in fold_metrics]
+            
+            mean_rmse = np.mean(rmse_scores)
+            mean_mae = np.mean(mae_scores)
+            mean_r2 = np.mean(r2_scores)
+            
+            std_rmse = np.std(rmse_scores)
+            std_mae = np.std(mae_scores)
+            std_r2 = np.std(r2_scores)
+            
+            logger.info(f"\nCross Validation Results:")
+            logger.info(f"Mean RMSE: {mean_rmse:.4f} ± {std_rmse:.4f}")
+            logger.info(f"Mean MAE: {mean_mae:.4f} ± {std_mae:.4f}")
+            logger.info(f"Mean R²: {mean_r2:.4f} ± {std_r2:.4f}")
+            
+            # Check variance threshold
+            if std_rmse > 0.2 * mean_rmse:  # > 20% of mean
+                logger.warning("High RMSE variance between folds detected (> 20% of mean)")
+            
+            return {
+                'fold_metrics': fold_metrics,
+                'mean_rmse': mean_rmse,
+                'mean_mae': mean_mae,
+                'mean_r2': mean_r2,
+                'std_rmse': std_rmse,
+                'std_mae': std_mae,
+                'std_r2': std_r2,
+                'feature_importance': top_features.to_dict(),
+                'feature_stability': stability_score
+            }
 
 if __name__ == "__main__":
     # Simple test

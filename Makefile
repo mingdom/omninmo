@@ -17,6 +17,7 @@ help:
 	@echo "  train-sample - Train the model using sample data (uses v2)"
 	@echo "  predict     - Run predictions using console app (uses watchlist from config)"
 	@echo "  predict-ticker - Predict rating for a specific ticker (usage: make predict-ticker TICKER=AAPL)"
+	@echo "  mlflow      - Start the MLflow UI to view training results (optional: make mlflow PORT=5001)"
 	@echo "  clean       - Clean up generated files"
 	@echo "  clear-cache - Clear the data cache"
 	@echo "  pipeline    - Run the full pipeline (training and prediction)"
@@ -83,6 +84,14 @@ predict-ticker:
 	@echo "Predicting rating for $(TICKER)..."
 	@source $(VENV_DIR)/bin/activate && \
 	$(PYTHON) $(SCRIPTS_DIR)/v2_predict.py --tickers $(TICKER)
+
+# Start the MLflow UI
+.PHONY: mlflow
+mlflow:
+	@echo "Starting MLflow UI on http://127.0.0.1:$(PORT)..."
+	@echo "Press Ctrl+C to stop the server."
+	@source $(VENV_DIR)/bin/activate && \
+	$(PYTHON) $(SCRIPTS_DIR)/run_mlflow.py $(if $(PORT),--port $(PORT),)
 
 # Clean up generated files
 .PHONY: clean

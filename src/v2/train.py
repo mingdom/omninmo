@@ -13,6 +13,7 @@ from src.v2.config import config
 from src.v2.data_fetcher import DataFetcher
 from src.v2.features import Features
 from src.v2.predictor import Predictor
+from src.v2.training_summary import generate_training_summary, save_training_summary, log_mlflow_metrics
 
 # Setup logging
 logging.basicConfig(
@@ -28,7 +29,7 @@ logger = logging.getLogger(__name__)
 def train_model(tickers=None, model_path=None, period=None, interval=None, 
                forward_days=None, force_sample=False, overwrite=False, mode=None):
     """
-    Train a stock prediction model
+    Train a stock prediction model using k-fold cross-validation
     
     Args:
         tickers (list): List of ticker symbols to train on
@@ -41,7 +42,10 @@ def train_model(tickers=None, model_path=None, period=None, interval=None,
         mode (str): 'regression' or 'classification'
         
     Returns:
-        Predictor: Trained model
+        tuple: (Predictor, dict) - Trained model and results including:
+            - Cross-validation metrics
+            - Feature importance stability
+            - Final model performance
     """
     # Load configuration with defaults
     if tickers is None:
@@ -71,7 +75,7 @@ def train_model(tickers=None, model_path=None, period=None, interval=None,
         response = input(f"Model file {model_path} already exists. Overwrite? (y/n): ")
         if response.lower() != 'y':
             logger.info("Training cancelled by user")
-            return None
+            return None, None
     
     # Initialize components
     fetcher = DataFetcher(cache_dir="cache")
@@ -180,7 +184,7 @@ def train_model(tickers=None, model_path=None, period=None, interval=None,
     
     if not all_features or not all_targets:
         logger.error("No valid data collected for training")
-        return None
+        return None, None
     
     # Combine data from all tickers
     X_combined = pd.concat(all_features, axis=0)
@@ -193,42 +197,53 @@ def train_model(tickers=None, model_path=None, period=None, interval=None,
     for col in X_combined.columns:
         logger.info(f"  {col}: {X_combined[col].dtype}")
         if X_combined[col].dtype == 'object':
-            # Show sample values and their types for debugging
             sample_values = X_combined[col].head()
             logger.info(f"    Sample values for {col}:")
             for val in sample_values:
                 logger.info(f"      Value: {val}, Type: {type(val)}")
     
-    # Train the model
+    # Perform cross-validation
+    logger.info("\nPerforming cross-validation...")
+    cv_results = predictor.cross_validate(X_combined, y_combined)
+    
+    # Train final model on full dataset
+    logger.info("\nTraining final model on full dataset...")
     training_results = predictor.train(X_combined, y_combined)
     
-    if training_results:
-        if mode == 'classification':
-            logger.info(f"Training accuracy: {training_results['accuracy']:.4f}")
-        else:
-            logger.info(f"Training metrics:")
-            logger.info(f"  RMSE: {training_results['rmse']:.4f}")
-            logger.info(f"  MAE: {training_results['mae']:.4f}")
-            logger.info(f"  R²: {training_results['r2']:.4f}")
-    
-    # Analyze feature importance
-    logger.info("\nAnalyzing feature importance...")
-    importance_df = predictor.analyze_feature_importance()
-    if importance_df is not None:
-        # Save feature importance analysis
-        analysis_path = model_path.replace('.pkl', '_feature_analysis.csv')
-        importance_df.to_csv(analysis_path, index=False)
-        logger.info(f"Feature importance analysis saved to {analysis_path}")
+    # Generate and save training summary
+    summary = generate_training_summary(
+        predictor=predictor,
+        cv_results=cv_results,
+        training_results=training_results,
+        processed_tickers=processed_tickers,
+        skipped_tickers=skipped_tickers,
+        error_tickers=error_tickers
+    )
+    save_training_summary(summary)
     
     # Save the model
     predictor.save(model_path)
     logger.info(f"Model saved to {model_path}")
     
-    return predictor
+    # Log metrics to MLflow
+    run_id = log_mlflow_metrics(
+        predictor=predictor,
+        cv_results=cv_results,
+        training_results=training_results,
+        X_data=X_combined,
+        processed_tickers=processed_tickers,
+        skipped_tickers=skipped_tickers,
+        error_tickers=error_tickers,
+        model_path=model_path
+    )
+    
+    logger.info(f"MLflow run ID: {run_id}")
+    
+    return predictor, cv_results
 
 def main():
     """Main function to parse arguments and train model"""
-    parser = argparse.ArgumentParser(description='Train stock prediction model')
+    parser = argparse.ArgumentParser(description='Train stock prediction model using cross-validation')
     parser.add_argument('--tickers', type=str, nargs='+', help='List of ticker symbols')
     parser.add_argument('--model-path', type=str, help='Path to save the model')
     parser.add_argument('--period', type=str, help='Period to fetch data (e.g., 5y)')
@@ -252,5 +267,5 @@ def main():
         mode=args.mode
     )
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main() 
