@@ -31,6 +31,7 @@ Thumbs.db
 # Log files
 *.log
 logs/**
+mlruns/**
 
 # Local configuration
 .env.local

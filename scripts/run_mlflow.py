@@ -20,7 +20,7 @@ def main():
     project_root = os.path.dirname(script_dir)
     
     # Set the MLflow tracking URI
-    mlruns_dir = os.path.join(project_root, 'logs/mlruns')
+    mlruns_dir = os.path.join(project_root, 'mlruns')
     tracking_uri = f"file:{mlruns_dir}"
     
     print(f"Starting MLflow UI on http://{args.host}:{args.port}")

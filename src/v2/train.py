@@ -8,6 +8,7 @@ import argparse
 import logging
 from datetime import datetime
 import pandas as pd
+import numpy as np
 
 from src.v2.config import config
 from src.v2.data_fetcher import DataFetcher
@@ -191,6 +192,12 @@ def train_model(tickers=None, model_path=None, period=None, interval=None,
     y_combined = pd.concat(all_targets, axis=0)
     
     logger.info(f"Combined dataset: {X_combined.shape[0]} samples, {X_combined.shape[1]} features")
+    
+    # Shuffle the combined data to ensure random splits
+    # Use the index to keep X and y aligned
+    shuffle_idx = np.random.permutation(len(X_combined))
+    X_combined = X_combined.iloc[shuffle_idx].reset_index(drop=True)
+    y_combined = y_combined.iloc[shuffle_idx].reset_index(drop=True)
     
     # Log data types of all columns
     logger.info("\nFeature data types:")

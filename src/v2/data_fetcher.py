@@ -40,6 +40,9 @@ class DataFetcher:
             
         Returns:
             pandas.DataFrame: DataFrame with stock data
+            
+        Raises:
+            ValueError: If no API key is set and force_sample is False
         """
         # Check cache first
         cache_file = os.path.join(self.cache_dir, f"{ticker}_{period}_{interval}.csv")
@@ -48,10 +51,18 @@ class DataFetcher:
             logger.info(f"Loading cached data for {ticker}")
             return pd.read_csv(cache_file, index_col=0, parse_dates=True)
         
-        # If forcing sample data or no API key, use sample data
-        if force_sample or not self.api_key:
-            logger.info(f"Using sample data for {ticker}")
+        # If forcing sample data, use sample data
+        if force_sample:
+            logger.info(f"Using sample data for {ticker} (forced)")
             return self._generate_sample_data(ticker, period, interval)
+        
+        # Check for API key
+        if not self.api_key:
+            raise ValueError(
+                "No API key found. Please set the FMP_API_KEY environment variable or "
+                "configure it in the config file. If you want to use sample data instead, "
+                "explicitly set force_sample=True"
+            )
         
         # If we have an API key, try to fetch from API
         try:
@@ -63,13 +74,11 @@ class DataFetcher:
                 df.to_csv(cache_file)
                 return df
             else:
-                logger.warning(f"No data returned from API for {ticker}, using sample data")
-                return self._generate_sample_data(ticker, period, interval)
+                raise ValueError(f"No data returned from API for {ticker}")
                 
         except Exception as e:
             logger.error(f"Error fetching data for {ticker}: {e}")
-            logger.info(f"Falling back to sample data for {ticker}")
-            return self._generate_sample_data(ticker, period, interval)
+            raise
     
     def _fetch_from_api(self, ticker, period='5y'):
         """Fetch data from Financial Modeling Prep API"""
@@ -98,10 +107,19 @@ class DataFetcher:
             'apikey': self.api_key
         }
         
+        # Debug logging
+        logger.debug(f"Making API request for {ticker}:")
+        logger.debug(f"URL: {url}")
+        logger.debug(f"Date range: {start_str} to {end_str}")
+        logger.debug(f"API key length: {len(self.api_key) if self.api_key else 0}")
+        
         # Make request
         response = requests.get(url, params=params)
         
+        # Debug logging for response
+        logger.debug(f"Response status code: {response.status_code}")
         if response.status_code != 200:
+            logger.debug(f"Response content: {response.text}")
             logger.error(f"API returned status code {response.status_code}")
             return None
         
@@ -109,6 +127,7 @@ class DataFetcher:
         data = response.json()
         
         if 'historical' not in data:
+            logger.debug(f"Response data keys: {list(data.keys())}")
             logger.error(f"No historical data found for {ticker}")
             return None
         
@@ -130,10 +149,16 @@ class DataFetcher:
             'volume': 'Volume'
         }, inplace=True)
         
+        logger.debug(f"Successfully fetched {len(df)} rows of data for {ticker}")
         return df
     
     def _generate_sample_data(self, ticker, period='5y', interval='1d'):
         """Generate sample stock data when API is unavailable"""
+        # Set random seed based on current timestamp
+        current_timestamp = int(datetime.now().timestamp())
+        np.random.seed(current_timestamp)
+        random.seed(current_timestamp)
+        
         # Get default price and volatility from config
         default_price = config.get(f'data.sample_data.default_prices.{ticker}', 100.0)
         default_volatility = config.get(f'data.sample_data.default_volatility.{ticker}', 0.02)
@@ -172,6 +197,10 @@ class DataFetcher:
         df['Low'] = df[['Open', 'Close']].min(axis=1) * (1 - abs(np.random.normal(0, 0.005, len(df))))
         df['Volume'] = np.random.normal(1000000, 200000, len(df))
         df['Volume'] = df['Volume'].clip(10000)  # Ensure volume is positive
+        
+        # Reset random seed to avoid affecting other parts of the code
+        np.random.seed(None)
+        random.seed(None)
         
         return df
 

@@ -14,6 +14,11 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
+# Get the project root directory
+script_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(os.path.dirname(script_dir))
+MLRUNS_DIR = os.path.join(project_root, 'logs/mlruns')
+
 def generate_training_summary(predictor, cv_results, training_results, processed_tickers, skipped_tickers, error_tickers):
     """
     Generate an executive summary of the training results
@@ -162,15 +167,41 @@ def log_mlflow_metrics(predictor, cv_results, training_results, X_data, processe
     Returns:
         str: MLflow run ID
     """
-    # Set MLflow tracking URI to local directory
-    mlflow.set_tracking_uri("file:./logs/mlruns")
+    # Get the project root directory and set up MLflow tracking
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(os.path.dirname(script_dir))
+    mlruns_dir = os.path.join(project_root, 'mlruns')
+    tracking_uri = f"file:{mlruns_dir}"
+    
+    if os.path.exists(mlruns_dir):
+        # Clean up any malformed experiments
+        for exp_dir in os.listdir(mlruns_dir):
+            exp_path = os.path.join(mlruns_dir, exp_dir)
+            meta_path = os.path.join(exp_path, "meta.yaml")
+            if not os.path.exists(meta_path) and exp_dir != ".trash":
+                logger.warning(f"Removing malformed experiment directory: {exp_dir}")
+                import shutil
+                shutil.rmtree(exp_path, ignore_errors=True)
+    
+    mlflow.set_tracking_uri(tracking_uri)
     
     # Create experiment if it doesn't exist
     experiment_name = "stock_prediction"
     try:
-        experiment_id = mlflow.get_experiment_by_name(experiment_name).experiment_id
-    except:
-        experiment_id = mlflow.create_experiment(experiment_name)
+        experiment = mlflow.get_experiment_by_name(experiment_name)
+        if experiment is None:
+            logger.info(f"Creating new experiment: {experiment_name}")
+            experiment_id = mlflow.create_experiment(experiment_name)
+        else:
+            experiment_id = experiment.experiment_id
+    except Exception as e:
+        logger.warning(f"Error accessing experiment, creating new one: {str(e)}")
+        # Force create new experiment
+        try:
+            experiment_id = mlflow.create_experiment(experiment_name)
+        except Exception as e2:
+            logger.error(f"Failed to create experiment: {str(e2)}")
+            raise
     
     # Start a new MLflow run
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -215,8 +246,31 @@ def log_mlflow_metrics(predictor, cv_results, training_results, X_data, processe
                 "feature_stability": cv_results['feature_stability']
             })
         
-        # Log the model
-        mlflow.sklearn.log_model(predictor.model, "model")
+        # Create model signature and input example
+        input_example = X_data.head(5).copy()  # Create explicit copy
+        
+        # Convert integer columns to float64 to handle potential missing values
+        input_schema = {}
+        for col in X_data.columns:
+            if X_data[col].dtype.kind in 'iu':  # integer types
+                input_schema[col] = np.float64
+                input_example.loc[:, col] = input_example[col].astype(np.float64)
+        
+        if input_schema:
+            X_data = X_data.astype(input_schema)
+        
+        signature = mlflow.models.infer_signature(
+            model_input=X_data,
+            model_output=predictor.model.predict(X_data[:5])
+        )
+        
+        # Log the model with signature and input example
+        mlflow.sklearn.log_model(
+            predictor.model, 
+            "model",
+            signature=signature,
+            input_example=input_example
+        )
         
         # Generate and log feature importance plot
         try:
