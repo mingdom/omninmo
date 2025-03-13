@@ -1,0 +1,290 @@
+"""
+Functions for generating and saving training summaries
+"""
+
+import os
+import json
+from datetime import datetime
+import pandas as pd
+import logging
+import mlflow
+import shap
+import matplotlib.pyplot as plt
+import numpy as np
+
+logger = logging.getLogger(__name__)
+
+def generate_training_summary(predictor, cv_results, training_results, processed_tickers, skipped_tickers, error_tickers):
+    """
+    Generate an executive summary of the training results
+    
+    Args:
+        predictor: The trained Predictor instance
+        cv_results: Results from cross-validation
+        training_results: Results from final training
+        processed_tickers: List of successfully processed tickers
+        skipped_tickers: List of skipped tickers
+        error_tickers: List of tickers that had errors
+        
+    Returns:
+        dict: Summary of training results
+    """
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    
+    summary = {
+        "timestamp": timestamp,
+        "mode": predictor.mode,
+        "data_coverage": {
+            "processed_tickers": len(processed_tickers),
+            "skipped_tickers": len(skipped_tickers),
+            "error_tickers": len(error_tickers),
+            "total_tickers": len(processed_tickers) + len(skipped_tickers) + len(error_tickers)
+        },
+        "model_params": {
+            "learning_rate": predictor.learning_rate,
+            "max_depth": predictor.max_depth,
+            "n_estimators": predictor.n_estimators
+        }
+    }
+    
+    # Add mode-specific metrics
+    if predictor.mode == 'regression':
+        summary["cross_validation"] = {
+            "rmse": {
+                "mean": float(cv_results['mean_rmse']),
+                "std": float(cv_results['std_rmse'])
+            },
+            "r2": {
+                "mean": float(cv_results['mean_r2']),
+                "std": float(cv_results['std_r2'])
+            },
+            "mae": {
+                "mean": float(cv_results['mean_mae']),
+                "std": float(cv_results['std_mae'])
+            }
+        }
+        summary["final_model"] = {
+            "rmse": float(training_results['rmse']),
+            "r2": float(training_results['r2']),
+            "mae": float(training_results['mae'])
+        }
+    else:  # classification mode
+        summary["cross_validation"] = {
+            "accuracy": {
+                "mean": float(cv_results['mean_accuracy']),
+                "std": float(cv_results['std_accuracy'])
+            }
+        }
+        summary["final_model"] = {
+            "accuracy": float(training_results['accuracy'])
+        }
+    
+    # Add feature importance analysis
+    feature_importance = pd.Series(training_results['feature_importance'])
+    top_features = feature_importance.nlargest(10)
+    
+    summary["feature_analysis"] = {
+        "stability_score": float(cv_results['feature_stability']),
+        "top_features": {
+            name: float(importance) 
+            for name, importance in top_features.items()
+        },
+        "cumulative_importance": float(top_features.sum())
+    }
+    
+    return summary
+
+def save_training_summary(summary, base_dir="logs/training"):
+    """
+    Save the training summary to a JSON file
+    
+    Args:
+        summary (dict): The training summary
+        base_dir (str): Directory to save summaries
+        
+    Returns:
+        str: Path to the saved summary file
+    """
+    # Create directory if it doesn't exist
+    os.makedirs(base_dir, exist_ok=True)
+    
+    # Generate filename with timestamp
+    filename = f"training_summary_{summary['timestamp']}.json"
+    filepath = os.path.join(base_dir, filename)
+    
+    # Save summary
+    with open(filepath, 'w') as f:
+        json.dump(summary, f, indent=2)
+    
+    logger.info(f"\nTraining summary saved to: {filepath}")
+    
+    # Print executive summary to console
+    print("\n=== TRAINING EXECUTIVE SUMMARY ===")
+    print(f"Timestamp: {summary['timestamp']}")
+    print(f"Mode: {summary['mode']}")
+    print("\nData Coverage:")
+    print(f"- Processed tickers: {summary['data_coverage']['processed_tickers']}")
+    print(f"- Success rate: {summary['data_coverage']['processed_tickers']/summary['data_coverage']['total_tickers']*100:.1f}%")
+    
+    print("\nModel Performance:")
+    if summary['mode'] == 'regression':
+        print(f"- Cross-validation R²: {summary['cross_validation']['r2']['mean']:.4f} ± {summary['cross_validation']['r2']['std']:.4f}")
+        print(f"- Final model R²: {summary['final_model']['r2']:.4f}")
+        print(f"- Cross-validation RMSE: {summary['cross_validation']['rmse']['mean']:.4f} ± {summary['cross_validation']['rmse']['std']:.4f}")
+        print(f"- Final model RMSE: {summary['final_model']['rmse']:.4f}")
+    else:
+        print(f"- Cross-validation accuracy: {summary['cross_validation']['accuracy']['mean']:.4f} ± {summary['cross_validation']['accuracy']['std']:.4f}")
+        print(f"- Final model accuracy: {summary['final_model']['accuracy']:.4f}")
+    
+    print("\nFeature Analysis:")
+    print(f"- Feature stability score: {summary['feature_analysis']['stability_score']:.4f}")
+    print("- Top 5 features:")
+    for i, (feature, importance) in enumerate(list(summary['feature_analysis']['top_features'].items())[:5], 1):
+        print(f"  {i}. {feature}: {importance:.4f}")
+    print(f"- Cumulative importance (top 10): {summary['feature_analysis']['cumulative_importance']:.4f}")
+    
+    return filepath
+
+def log_mlflow_metrics(predictor, cv_results, training_results, X_data, processed_tickers, skipped_tickers, error_tickers, model_path):
+    """
+    Log metrics, parameters, and artifacts to MLflow
+    
+    Args:
+        predictor: The trained Predictor instance
+        cv_results: Results from cross-validation
+        training_results: Results from final training
+        X_data: Feature data used for training
+        processed_tickers: List of successfully processed tickers
+        skipped_tickers: List of skipped tickers
+        error_tickers: List of tickers that had errors
+        model_path: Path where the model is saved
+        
+    Returns:
+        str: MLflow run ID
+    """
+    # Set MLflow tracking URI to local directory
+    mlflow.set_tracking_uri("file:./logs/mlruns")
+    
+    # Create experiment if it doesn't exist
+    experiment_name = "stock_prediction"
+    try:
+        experiment_id = mlflow.get_experiment_by_name(experiment_name).experiment_id
+    except:
+        experiment_id = mlflow.create_experiment(experiment_name)
+    
+    # Start a new MLflow run
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    run_name = f"model_training_{timestamp}"
+    
+    with mlflow.start_run(run_name=run_name, experiment_id=experiment_id) as run:
+        # Log basic parameters
+        mlflow.log_params({
+            "mode": predictor.mode,
+            "learning_rate": predictor.learning_rate,
+            "max_depth": predictor.max_depth,
+            "n_estimators": predictor.n_estimators,
+            "processed_tickers_count": len(processed_tickers),
+            "skipped_tickers_count": len(skipped_tickers),
+            "error_tickers_count": len(error_tickers),
+            "total_samples": X_data.shape[0],
+            "feature_count": X_data.shape[1]
+        })
+        
+        # Log processed tickers as a list
+        mlflow.log_param("processed_tickers", ", ".join(processed_tickers))
+        
+        # Log metrics based on mode
+        if predictor.mode == 'regression':
+            mlflow.log_metrics({
+                "cv_rmse_mean": cv_results['mean_rmse'],
+                "cv_rmse_std": cv_results['std_rmse'],
+                "cv_r2_mean": cv_results['mean_r2'],
+                "cv_r2_std": cv_results['std_r2'],
+                "cv_mae_mean": cv_results['mean_mae'],
+                "cv_mae_std": cv_results['std_mae'],
+                "final_rmse": training_results['rmse'],
+                "final_r2": training_results['r2'],
+                "final_mae": training_results['mae'],
+                "feature_stability": cv_results['feature_stability']
+            })
+        else:  # classification mode
+            mlflow.log_metrics({
+                "cv_accuracy_mean": cv_results['mean_accuracy'],
+                "cv_accuracy_std": cv_results['std_accuracy'],
+                "final_accuracy": training_results['accuracy'],
+                "feature_stability": cv_results['feature_stability']
+            })
+        
+        # Log the model
+        mlflow.sklearn.log_model(predictor.model, "model")
+        
+        # Generate and log feature importance plot
+        try:
+            plt.figure(figsize=(10, 6))
+            feature_importance = pd.Series(training_results['feature_importance'])
+            top_features = feature_importance.nlargest(15).sort_values(ascending=True)
+            
+            top_features.plot(kind='barh', title='Feature Importance')
+            plt.tight_layout()
+            
+            # Save and log the plot
+            importance_plot_path = "feature_importance.png"
+            plt.savefig(importance_plot_path)
+            mlflow.log_artifact(importance_plot_path)
+            os.remove(importance_plot_path)  # Clean up
+            
+            # Generate SHAP summary plot if possible
+            try:
+                # Create SHAP explainer
+                explainer = shap.Explainer(predictor.model)
+                
+                # Calculate SHAP values (limit to 1000 samples if dataset is large)
+                sample_size = min(1000, X_data.shape[0])
+                X_sample = X_data.sample(sample_size) if X_data.shape[0] > sample_size else X_data
+                
+                # Calculate SHAP values
+                shap_values = explainer(X_sample)
+                
+                # Create summary plot
+                plt.figure(figsize=(10, 8))
+                shap.summary_plot(shap_values, X_sample, show=False)
+                plt.tight_layout()
+                
+                # Save and log the plot
+                shap_plot_path = "shap_summary.png"
+                plt.savefig(shap_plot_path)
+                mlflow.log_artifact(shap_plot_path)
+                os.remove(shap_plot_path)  # Clean up
+                
+                # Create and log SHAP dependence plots for top 3 features
+                top_feature_names = list(top_features.index)[-3:]
+                for feature in top_feature_names:
+                    if feature in X_sample.columns:
+                        plt.figure(figsize=(10, 6))
+                        feature_idx = list(X_sample.columns).index(feature)
+                        shap.dependence_plot(feature_idx, shap_values.values, X_sample, show=False)
+                        plt.tight_layout()
+                        
+                        # Save and log the plot
+                        dep_plot_path = f"shap_dependence_{feature}.png"
+                        plt.savefig(dep_plot_path)
+                        mlflow.log_artifact(dep_plot_path)
+                        os.remove(dep_plot_path)  # Clean up
+                
+            except Exception as e:
+                logger.warning(f"Could not generate SHAP plots: {e}")
+                
+        except Exception as e:
+            logger.warning(f"Could not generate feature importance plot: {e}")
+        
+        # Log the model file as an artifact
+        if os.path.exists(model_path):
+            mlflow.log_artifact(model_path)
+        
+        # Print MLflow tracking info
+        print(f"\nMLflow tracking info:")
+        print(f"- Run ID: {run.info.run_id}")
+        print(f"- Experiment ID: {run.info.experiment_id}")
+        print(f"- View results locally: mlflow ui")
+        
+        return run.info.run_id 

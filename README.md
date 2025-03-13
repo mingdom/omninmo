@@ -40,6 +40,7 @@ omninmo analyzes stock price data and technical indicators to predict one of fiv
 - **ML Prediction**: Uses XGBoost to predict stock ratings
 - **Interactive UI**: User-friendly interface with charts
 - **Command-line Tools**: Quick predictions from the terminal
+- **Model Tracking**: Uses MLflow to track experiments and visualize results
 
 ## Common Commands
 
@@ -59,6 +60,9 @@ make run
 # Get a prediction for a specific ticker
 make predict TICKER=AAPL
 
+# View model training results with MLflow
+make mlflow
+
 # Run all tests
 make test
 
@@ -74,6 +78,9 @@ omninmo/
 ├── scripts/         # Command-line tools
 ├── models/          # Saved ML models
 ├── docs/            # Detailed documentation
+├── logs/           # All logs and run data
+│   ├── mlruns/     # MLflow experiment tracking data
+│   └── training/   # Training summary reports
 └── tests/           # Unit and integration tests
 ```
 
@@ -82,7 +89,31 @@ omninmo/
 - **Backend**: Python 3
 - **Data Source**: Financial Modeling Prep (FMP) API
 - **ML Framework**: XGBoost
+- **Model Tracking**: MLflow
+- **Model Interpretability**: SHAP
 - **Frontend**: Streamlit
+
+## Model Tracking with MLflow
+
+omninmo uses MLflow to track model training experiments, metrics, and artifacts. This provides several benefits:
+
+### Key Features
+- **Experiment Tracking**: Log parameters, metrics, and artifacts for each training run
+- **Model Comparison**: Compare different models side-by-side
+- **Feature Importance**: Visualize which features have the most impact on predictions
+- **Model Interpretability**: SHAP plots help understand how features affect predictions
+
+### Using MLflow
+After training a model, you can view the results in the MLflow UI:
+
+```bash
+# Start the MLflow UI
+make mlflow
+```
+
+Then open your browser to http://127.0.0.1:5000 to access the MLflow UI.
+
+For a comprehensive guide on using MLflow with omninmo, see the [MLflow Guide](./docs/mlflow_usage.md).
 
 ## Documentation
 
@@ -91,6 +122,8 @@ For detailed documentation, see the [docs](./docs/) directory:
 - [Technical Guide](./docs/technical_guide.md) - Technical details and architecture
 - [Development Guide](./docs/development_guide.md) - How to contribute
 - [User Guide](./docs/user_guide.md) - How to use the application
+- [MLflow Guide](./docs/mlflow_usage.md) - Comprehensive guide to using MLflow for model tracking and analysis
+- [Model Analysis Guide](./docs/model-analysis-howto.md) - How to evaluate and compare model training results
 
 ## All Available Make Commands
 
@@ -104,6 +137,7 @@ Run `make help` to see all available commands. Here are the most useful ones:
 - `make run` - Run the application
 - `make run-sample` - Run the application with sample data
 - `make predict TICKER=AAPL` - Predict rating for a ticker
+- `make mlflow` - Start the MLflow UI to view training results
 - `make test` - Run all tests
 - `make clean` - Clean up generated files
 - `make clear-cache` - Clear the data cache

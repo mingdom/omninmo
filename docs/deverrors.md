@@ -150,3 +150,41 @@ When training the model with real market data, XGBoost rejected a non-numeric co
 - Add data type validation earlier in the pipeline
 - Document expected data types for all features
 - Consider adding automated tests for feature data types
+
+## MLflow Experiment Not Found Error (2024-03-14)
+
+### Error Message
+```
+mlflow.exceptions.MlflowException: Could not find experiment with ID 0
+```
+
+### Reproduction Steps
+1. Installed MLflow and SHAP packages
+2. Created MLflow integration in `training_summary.py`
+3. Attempted to run training with `python -m src.v2.train --force-sample --yes`
+4. Error occurred when trying to start an MLflow run without creating an experiment first
+
+### Root Cause
+MLflow requires an experiment to be created before starting a run. By default, it tries to use experiment ID 0, but this doesn't exist in a fresh MLflow installation.
+
+### Solution
+Modified the `log_mlflow_metrics` function in `training_summary.py` to:
+1. Check if the experiment exists
+2. Create the experiment if it doesn't exist
+3. Pass the experiment ID explicitly when starting a run
+
+```python
+# Create experiment if it doesn't exist
+experiment_name = "stock_prediction"
+try:
+    experiment_id = mlflow.get_experiment_by_name(experiment_name).experiment_id
+except:
+    experiment_id = mlflow.create_experiment(experiment_name)
+
+# Start a new MLflow run with explicit experiment ID
+with mlflow.start_run(run_name=run_name, experiment_id=experiment_id) as run:
+    # ... rest of the code
+```
+
+### Prevention
+Always check if an experiment exists before starting an MLflow run, especially in a new environment or when setting up MLflow for the first time.
