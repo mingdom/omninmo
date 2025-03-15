@@ -41,6 +41,8 @@ model:
     # Default tickers for training (diverse set of stocks)
     default_tickers:
       - AAPL    # Apple Inc. - Consumer electronics and software
+      - AMAT    # Applied Materials - Semiconductor equipment and materials
+      - AMD     # Advanced Micro Devices - Semiconductor manufacturing
       - AMRN    # Amarin Corporation - Biopharmaceutical (small-cap)
       - AMZN    # Amazon.com - E-commerce and cloud computing
       - ANET    # Arista Networks - Cloud networking solutions
@@ -65,11 +67,14 @@ model:
       - GS      # Goldman Sachs - Investment banking and securities
       - HOLX    # Hologic - Medical devices and diagnostics (mid-cap)
       - HON     # Honeywell International - Industrial conglomerate
+      - IBM     # International Business Machines - Technology services and consulting
       - INTC    # Intel Corporation - Semiconductor manufacturing
       - IONQ    # IonQ - Quantum computing technology
       - JNJ     # Johnson & Johnson - Healthcare and pharmaceuticals
       - JPM     # JPMorgan Chase - Banking and financial services
       - KO      # The Coca-Cola Company - Beverage manufacturing
+      - LMT     # Lockheed Martin - Aerospace and defense
+      - LRCX    # LRCX - Semiconductor equipment and materials
       - META    # Meta Platforms - Social media and technology
       - MPC     # Marathon Petroleum - Oil refining and marketing (mid-cap)
       - MSFT    # Microsoft Corporation - Software and cloud computing

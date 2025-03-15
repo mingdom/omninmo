@@ -117,13 +117,30 @@ For a comprehensive guide on using MLflow with omninmo, see the [MLflow Guide](.
 
 ## Documentation
 
-For detailed documentation, see the [docs](./docs/) directory:
+For detailed documentation, see the [Documentation Index](./docs/README.md) in the docs directory. Our documentation is organized into three main categories:
 
-- [Technical Guide](./docs/technical_guide.md) - Technical details and architecture
-- [Development Guide](./docs/development_guide.md) - How to contribute
-- [User Guide](./docs/user_guide.md) - How to use the application
-- [MLflow Guide](./docs/mlflow_usage.md) - Comprehensive guide to using MLflow for model tracking and analysis
-- [Model Analysis Guide](./docs/model-analysis-howto.md) - How to evaluate and compare model training results
+1. **Current Implementation** (top-level docs)
+   - [Architecture Guide](./docs/architecture.md)
+   - [Features Documentation](./docs/features.md)
+   - [Model Documentation](./docs/models.md)
+   - [Cross-validation Guide](./docs/cross-validation.md)
+   - [MLflow Guide](./docs/mlflow-guide.md)
+
+2. **Development Plans** (`docs/devplan/`)
+   - Future improvements
+   - Design documents
+   - Migration guides
+
+3. **Implementation Progress** (`docs/devlog/`)
+   - Daily development notes
+   - Implementation details
+   - Performance improvements
+
+See the [Documentation Index](./docs/README.md) for:
+- Complete documentation listing
+- Documentation philosophy
+- Contribution guidelines
+- Cross-referencing guide
 
 ## All Available Make Commands
 

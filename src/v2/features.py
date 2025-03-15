@@ -15,12 +15,14 @@ class Features:
         """Initialize the feature generator"""
         pass
     
-    def generate(self, df):
+    def generate(self, df, market_data=None, use_enhanced_features=False):
         """
         Generate features from stock price data
         
         Args:
             df (pandas.DataFrame): DataFrame with OHLCV data
+            market_data (pandas.DataFrame): DataFrame with market index data (e.g., S&P 500)
+            use_enhanced_features (bool): Whether to generate enhanced risk-adjusted features
             
         Returns:
             pandas.DataFrame: DataFrame with additional features
@@ -42,6 +44,31 @@ class Features:
             self._add_rsi(result)
             self._add_macd(result)
             self._add_bollinger_bands(result)
+            self._add_adx(result)  # Add ADX feature
+            
+            # Add enhanced risk-adjusted features if requested
+            if use_enhanced_features:
+                logger.info("Generating enhanced risk-adjusted features")
+                
+                # Add enhanced risk metrics if market data is available
+                if market_data is not None:
+                    # Ensure market_data has the same index as result
+                    market_data = market_data.reindex(result.index, method='ffill')
+                    
+                    # Add beta and market sensitivity features
+                    self._add_beta_features(result, market_data)
+                    
+                    # Add conditional performance metrics
+                    self._add_conditional_performance(result, market_data)
+                
+                # Add volatility and downside risk metrics
+                self._add_volatility_features(result)
+                
+                # Add return distribution characteristics
+                self._add_distribution_features(result)
+                
+                # Calculate risk-adjusted target
+                self._add_risk_adjusted_target(result)
             
             # Fill NaN values that might have been introduced
             # Use ffill and bfill instead of method parameter (which is deprecated)
@@ -51,11 +78,10 @@ class Features:
             keep_columns = [
                 # Price data
                 'Open', 'High', 'Low', 'Close', 'Volume',
-                # Returns
-                'return_1d', 'return_5d', 'return_10d', 'return_20d', 'return_60d',
+                # Returns (removed 5d and 10d returns)
+                'return_1d', 'return_20d', 'return_60d',
                 'log_return_1d',
-                # Moving averages
-                'ema_8', 'close_to_ema_8',
+                # Moving averages (removed close_to_ema_8)
                 'ema_21', 'close_to_ema_21',
                 'sma_50', 'close_to_sma_50',
                 'sma_200', 'close_to_sma_200',
@@ -70,9 +96,46 @@ class Features:
                 # Technical indicators
                 'rsi', 'rsi_ma_context',
                 'macd', 'macd_signal', 'macd_hist',
-                'bb_middle', 'bb_std', 'bb_upper', 'bb_lower',
-                'bb_width', 'bb_pct_b'
+                # Bollinger Bands (removed redundant bands)
+                'bb_std', 'bb_width', 'bb_pct_b',
+                # ADX indicators
+                'adx', 'adx_trend_strength'
             ]
+            
+            # Add enhanced feature columns if they exist
+            if use_enhanced_features:
+                enhanced_columns = [
+                    # Beta features
+                    'beta_60d', 'beta_120d',
+                    'market_corr_60d', 'market_corr_120d',
+                    'rel_strength_60d', 'rel_strength_120d',
+                    
+                    # Volatility features
+                    'volatility_30d', 'volatility_60d', 'volatility_90d',
+                    'downside_dev_30d', 'downside_dev_60d', 'downside_dev_90d',
+                    'vol_ratio_30_60d', 'vol_ratio_30_90d',
+                    
+                    # Distribution features
+                    'returns_skew_90d', 'returns_kurt_90d',
+                    'drawdown_vol_ratio_90d',
+                    
+                    # Conditional performance
+                    'bull_return_90d', 'bull_volatility_90d',
+                    'bear_return_90d', 'bear_volatility_90d',
+                    'bull_bear_return_ratio',
+                    
+                    # Risk-adjusted target
+                    'target_sharpe_ratio'
+                ]
+                
+                # Filter out enhanced columns that don't exist in the result
+                enhanced_columns = [col for col in enhanced_columns if col in result.columns]
+                
+                # Add enhanced columns to keep_columns
+                keep_columns.extend(enhanced_columns)
+            
+            # Filter out columns that don't exist in the result
+            keep_columns = [col for col in keep_columns if col in result.columns]
             
             result = result[keep_columns]
             
@@ -89,8 +152,8 @@ class Features:
         # Daily returns
         df['return_1d'] = df['Close'].pct_change(1)
         
-        # N-day returns
-        for n in [5, 10, 20, 60]:
+        # N-day returns (removed 5d and 10d)
+        for n in [20, 60]:
             df[f'return_{n}d'] = df['Close'].pct_change(n)
         
         # Log returns (reduces skewness)
@@ -105,8 +168,9 @@ class Features:
             # Relative position to moving average (%)
             df[f'close_to_sma_{window}'] = (df['Close'] / df[f'sma_{window}'] - 1) * 100
         
-        # Exponential moving averages
-        for window in [8, 21]:  # Updated for medium-term focus
+        # Exponential moving averages (removed close_to_ema_8)
+        df['ema_8'] = df['Close'].ewm(span=8, adjust=False).mean()  # Keep for crossover
+        for window in [21]:  # Removed ema_8 relative position
             df[f'ema_{window}'] = df['Close'].ewm(span=window, adjust=False).mean()
             
             # Relative position to EMA (%)
@@ -190,19 +254,182 @@ class Features:
     
     def _add_bollinger_bands(self, df, window=20, num_std=2):
         """Add Bollinger Bands"""
-        # Calculate middle band (SMA)
-        df['bb_middle'] = df['Close'].rolling(window=window).mean()
+        # Calculate middle band (SMA) - removed as redundant
+        sma = df['Close'].rolling(window=window).mean()
         
         # Calculate the standard deviation
         df['bb_std'] = df['Close'].rolling(window=window).std()
         
-        # Calculate upper and lower bands
-        df['bb_upper'] = df['bb_middle'] + (df['bb_std'] * num_std)
-        df['bb_lower'] = df['bb_middle'] - (df['bb_std'] * num_std)
+        # Calculate upper and lower bands - removed as redundant
+        upper = sma + (df['bb_std'] * num_std)
+        lower = sma - (df['bb_std'] * num_std)
         
         # Calculate bandwidth and %B
-        df['bb_width'] = (df['bb_upper'] - df['bb_lower']) / df['bb_middle']
-        df['bb_pct_b'] = (df['Close'] - df['bb_lower']) / (df['bb_upper'] - df['bb_lower'])
+        df['bb_width'] = (upper - lower) / sma
+        df['bb_pct_b'] = (df['Close'] - lower) / (upper - lower)
+    
+    def _add_adx(self, df, period=14):
+        """
+        Add Average Directional Index (ADX) to measure trend strength
+        
+        ADX measures trend strength regardless of direction
+        Values > 25 indicate strong trend
+        """
+        # Calculate +DI and -DI
+        high_diff = df['High'].diff()
+        low_diff = df['Low'].diff().multiply(-1)
+        
+        plus_dm = (high_diff > low_diff) & (high_diff > 0)
+        plus_dm = high_diff.where(plus_dm, 0)
+        
+        minus_dm = (low_diff > high_diff) & (low_diff > 0)
+        minus_dm = low_diff.where(minus_dm, 0)
+        
+        # Calculate ATR
+        tr1 = df['High'] - df['Low']
+        tr2 = (df['High'] - df['Close'].shift(1)).abs()
+        tr3 = (df['Low'] - df['Close'].shift(1)).abs()
+        tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+        atr = tr.rolling(period).mean()
+        
+        # Calculate +DI and -DI
+        plus_di = 100 * plus_dm.rolling(period).mean() / atr
+        minus_di = 100 * minus_dm.rolling(period).mean() / atr
+        
+        # Calculate DX and ADX
+        dx = 100 * (plus_di - minus_di).abs() / (plus_di + minus_di)
+        df['adx'] = dx.rolling(period).mean()
+        df['adx_trend_strength'] = (df['adx'] > 25).astype(int)
+        
+        return df
+    
+    # Enhanced risk-adjusted features
+    
+    def _add_beta_features(self, df, market_data, windows=[60, 120]):
+        """
+        Calculate beta and correlation with market indices
+        
+        Args:
+            df (pandas.DataFrame): DataFrame with stock data
+            market_data (pandas.DataFrame): DataFrame with market index data
+            windows (list): List of window sizes for rolling calculations
+        """
+        # Calculate returns for the stock
+        stock_returns = df['Close'].pct_change()
+        
+        # Calculate returns for market indices
+        market_returns = market_data['Close'].pct_change()
+        
+        for window in windows:
+            # Calculate rolling beta (slope of regression line)
+            df[f'beta_{window}d'] = stock_returns.rolling(window).cov(market_returns) / market_returns.rolling(window).var()
+            
+            # Calculate rolling correlation
+            df[f'market_corr_{window}d'] = stock_returns.rolling(window).corr(market_returns)
+            
+            # Calculate relative strength vs market
+            stock_cum_return = (1 + stock_returns).rolling(window).apply(lambda x: np.prod(1 + x) - 1)
+            market_cum_return = (1 + market_returns).rolling(window).apply(lambda x: np.prod(1 + x) - 1)
+            df[f'rel_strength_{window}d'] = stock_cum_return / market_cum_return.replace(0, np.nan)
+    
+    def _add_volatility_features(self, df, windows=[30, 60, 90]):
+        """
+        Add volatility and downside risk metrics
+        
+        Args:
+            df (pandas.DataFrame): DataFrame with stock data
+            windows (list): List of window sizes for rolling calculations
+        """
+        returns = df['Close'].pct_change()
+        
+        for window in windows:
+            # Historical volatility (annualized)
+            df[f'volatility_{window}d'] = returns.rolling(window).std() * np.sqrt(252)
+            
+            # Downside deviation (focuses only on negative returns)
+            downside_returns = returns.copy()
+            downside_returns[downside_returns > 0] = 0
+            df[f'downside_dev_{window}d'] = downside_returns.rolling(window).std() * np.sqrt(252)
+            
+            # Volatility ratio (recent vs longer-term)
+            if window > 30:
+                df[f'vol_ratio_30_{window}d'] = df['volatility_30d'] / df[f'volatility_{window}d']
+    
+    def _add_distribution_features(self, df, window=90):
+        """
+        Add return distribution characteristics
+        
+        Args:
+            df (pandas.DataFrame): DataFrame with stock data
+            window (int): Window size for rolling calculations
+        """
+        returns = df['Close'].pct_change()
+        
+        # Calculate rolling skewness
+        df[f'returns_skew_{window}d'] = returns.rolling(window).skew()
+        
+        # Calculate rolling kurtosis
+        df[f'returns_kurt_{window}d'] = returns.rolling(window).kurt()
+        
+        # Calculate drawdown to volatility ratio
+        if f'max_drawdown_{window}d' in df.columns and f'volatility_{window}d' in df.columns:
+            df[f'drawdown_vol_ratio_{window}d'] = df[f'max_drawdown_{window}d'].abs() / df[f'volatility_{window}d']
+    
+    def _add_conditional_performance(self, df, market_data, window=90):
+        """
+        Add performance metrics conditional on market regime
+        
+        Args:
+            df (pandas.DataFrame): DataFrame with stock data
+            market_data (pandas.DataFrame): DataFrame with market index data
+            window (int): Window size for rolling calculations
+        """
+        # Get market regime (bull market when price > 200-day MA)
+        if 'sma_200' not in market_data.columns:
+            market_data['sma_200'] = market_data['Close'].rolling(200).mean()
+        
+        bull_market = (market_data['Close'] > market_data['sma_200']).astype(int)
+        
+        # Calculate stock returns
+        returns = df['Close'].pct_change()
+        
+        # Align dates
+        aligned_bull = bull_market.reindex(returns.index, method='ffill')
+        
+        # Calculate conditional returns
+        bull_returns = returns.copy()
+        bull_returns[aligned_bull == 0] = np.nan
+        
+        bear_returns = returns.copy()
+        bear_returns[aligned_bull == 1] = np.nan
+        
+        # Calculate performance metrics in bull markets
+        df[f'bull_return_{window}d'] = bull_returns.rolling(window, min_periods=window//4).mean()
+        df[f'bull_volatility_{window}d'] = bull_returns.rolling(window, min_periods=window//4).std()
+        
+        # Calculate performance metrics in bear markets
+        df[f'bear_return_{window}d'] = bear_returns.rolling(window, min_periods=window//4).mean()
+        df[f'bear_volatility_{window}d'] = bear_returns.rolling(window, min_periods=window//4).std()
+        
+        # Calculate relative performance in different regimes
+        df[f'bull_bear_return_ratio'] = df[f'bull_return_{window}d'] / df[f'bear_return_{window}d'].abs()
+    
+    def _add_risk_adjusted_target(self, df, window=90, risk_free_rate=0.05):
+        """
+        Calculate Sharpe ratio as target
+        
+        Args:
+            df (pandas.DataFrame): DataFrame with stock data
+            window (int): Window size for rolling calculations
+            risk_free_rate (float): Annual risk-free rate
+        """
+        # Check if future return column exists (it should be added during training)
+        if 'future_return_90d' in df.columns and 'volatility_90d' in df.columns:
+            # Calculate quarterly risk-free rate
+            quarterly_rfr = risk_free_rate / 4
+            
+            # Calculate Sharpe ratio
+            df['target_sharpe_ratio'] = (df['future_return_90d'] - quarterly_rfr) / df['volatility_90d']
 
 if __name__ == "__main__":
     # Simple test
@@ -212,8 +439,8 @@ if __name__ == "__main__":
     data = fetcher.fetch_data('AAPL', period='1y', force_sample=True)
     
     features = Features()
-    result = features.generate(data)
+    feature_df = features.generate(data, use_enhanced_features=True)
     
-    print(f"Original columns: {list(data.columns)}")
-    print(f"Feature columns: {list(result.columns)}")
-    print(f"Total features: {len(result.columns)}") 
+    if feature_df is not None:
+        print(f"Generated {len(feature_df.columns)} features")
+        print(feature_df.columns.tolist()) 
