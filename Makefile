@@ -14,8 +14,7 @@ help:
 	@echo "  env         - Set up and activate a virtual environment"
 	@echo "  install     - Install dependencies and set script permissions"
 	@echo "  train       - Train the model (use --sample for training with sample data)"
-	@echo "  predict     - Run predictions using console app (uses watchlist from config)"
-	@echo "  predict-ticker - Predict rating for a specific ticker (usage: make predict-ticker TICKER=AAPL)"
+	@echo "  predict     - Run predictions using console app (usage: make predict [NVDA])"
 	@echo "  mlflow      - Start the MLflow UI to view training results (optional: make mlflow PORT=5001)"
 	@echo "  clean       - Clean up generated files"
 	@echo "               Options: --cache (also clear data cache)"
@@ -52,23 +51,18 @@ train:
 	@source $(VENV_DIR)/bin/activate && \
 	$(PYTHON) $(SCRIPTS_DIR)/v2_train.py $(if $(findstring --sample,$(MAKECMDGOALS)),--force-sample,)
 
-# Run predictions on watchlist
+# Run predictions
 .PHONY: predict
 predict:
-	@echo "Running predictions on watchlist..."
+	@echo "Running predictions..."
 	@source $(VENV_DIR)/bin/activate && \
-	$(PYTHON) $(SCRIPTS_DIR)/v2_predict.py
-
-# Predict rating for a ticker
-.PHONY: predict-ticker
-predict-ticker:
-	@if [ -z "$(TICKER)" ]; then \
-		echo "Error: TICKER is not set. Usage: make predict-ticker TICKER=AAPL"; \
-		exit 1; \
+	if [ -n "$(filter-out $@,$(MAKECMDGOALS))" ]; then \
+		echo "Predicting rating for $(filter-out $@,$(MAKECMDGOALS))..."; \
+		$(PYTHON) $(SCRIPTS_DIR)/v2_predict.py --tickers $(filter-out $@,$(MAKECMDGOALS)); \
+	else \
+		echo "Running predictions on watchlist..."; \
+		$(PYTHON) $(SCRIPTS_DIR)/v2_predict.py; \
 	fi
-	@echo "Predicting rating for $(TICKER)..."
-	@source $(VENV_DIR)/bin/activate && \
-	$(PYTHON) $(SCRIPTS_DIR)/v2_predict.py --tickers $(TICKER)
 
 # Start the MLflow UI
 .PHONY: mlflow
@@ -94,3 +88,6 @@ clean:
 .PHONY: --sample --cache
 --sample:
 --cache: 
+
+%:
+	@: 
