@@ -1,9 +1,11 @@
 # Master list of things we should address
-1. Meme stocks
-2. Confidence not really useful
-3. Datetime of logs
-4. Unnecessary flags
+- Confidence not really useful
+- Datetime of logs
+- Unnecessary flags
+- Don't put the .env file in git
 
 
-Last thing:
-LLM totally failed at doing a refactor to remove a flag. Maybe try this in vscode with augment next?
+Log:
+- Cursor totally failed at doing a refactor to remove a flag. Maybe try this in vscode with augment next?
+- I was able to achieve this in Augment.
+- Augment also fixed caching for me
