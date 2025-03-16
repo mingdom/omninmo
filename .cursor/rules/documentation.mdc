@@ -1,6 +1,6 @@
 ---
 description: Document development progress
-globs: 
+globs:
 alwaysApply: false
 ---
 # Document changes as part of the development process
