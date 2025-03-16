@@ -9,6 +9,9 @@ cache/
 __pycache__/
 *.py[cod]
 *$py.class
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
 
 # Distribution / packaging
 dist/
@@ -34,6 +37,8 @@ logs/**
 mlruns/**
 
 # Local configuration
+.env*
+!.env.example
 .env.local
 .env.development.local
 .env.test.local
@@ -48,7 +53,14 @@ mlruns/**
 # Test coverage
 .coverage
 htmlcov/
+coverage.xml
+.coverage.*
 
 # this is where we store the models
 models/
 .archive/
+
+# Temporary files
+*.tmp
+*~
+*.bak
