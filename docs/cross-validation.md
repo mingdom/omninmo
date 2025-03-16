@@ -1,4 +1,57 @@
-# Cross-Validation Specification
+# Cross-Validation Guide
+
+## Overview
+The model uses k-fold cross-validation to ensure robust performance and prevent overfitting. This guide explains the cross-validation process and how to interpret the results.
+
+## Cross-Validation Process
+1. Data is split into k folds (default k=5)
+2. Model is trained k times, each time using k-1 folds for training and 1 fold for validation
+3. Performance metrics are calculated for each fold
+4. Final metrics are averaged across all folds
+
+## Requirements
+- Minimum data points per ticker
+- Balanced feature representation
+- No data leakage between folds
+
+## Metrics
+- RMSE (Root Mean Square Error)
+- MAE (Mean Absolute Error)
+- R² (R-squared)
+
+## Implementation
+```python
+predictor = Predictor()
+cv_results = predictor.cross_validate(X, y)
+```
+
+## Results Format
+```python
+{
+    'mean_rmse': float,
+    'std_rmse': float,
+    'mean_mae': float,
+    'std_mae': float,
+    'mean_r2': float,
+    'std_r2': float
+}
+```
+
+## Interpretation
+- Lower RMSE/MAE indicates better predictions
+- Higher R² indicates better fit
+- Low standard deviation indicates stable performance
+
+## Best Practices
+1. Use sufficient k-folds (5-10)
+2. Ensure enough data per fold
+3. Monitor for overfitting
+4. Check feature importance stability
+
+## Troubleshooting
+1. High variance between folds
+2. Poor performance on validation sets
+3. Unstable feature importance
 
 ## Why Cross-Validation?
 
@@ -22,9 +75,6 @@ Poor model evaluation can lead to:
 3. **Confidence**: Provide clear confidence intervals for performance metrics
 4. **Insight**: Better understand feature importance stability
 5. **Quality**: Catch overfitting early in the development cycle
-
-## Overview
-This document specifies the implementation of k-fold cross-validation in the stock prediction system. Cross-validation is essential for assessing model performance, detecting overfitting, and ensuring the model generalizes well to unseen data.
 
 ## Implementation Details
 

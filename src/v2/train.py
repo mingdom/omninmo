@@ -71,7 +71,7 @@ def train_model(
         interval = config.get("model.training.interval", "1d")
 
     if forward_days is None:
-        forward_days = config.get("model.training.forward_days", 30)
+        forward_days = config.get("model.training.forward_days", 90)
 
     if model_path is None:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -96,7 +96,7 @@ def train_model(
     else:
         logger.info("Using standard features")
 
-    predictor = Predictor(mode=mode)
+    predictor = Predictor()
 
     # Fetch market data for beta calculations if using enhanced features
     market_data = None
@@ -118,7 +118,7 @@ def train_model(
     skipped_tickers = []
     error_tickers = []
 
-    logger.info(f"Training model on {len(tickers)} tickers with {mode} mode")
+    logger.info(f"Training model on {len(tickers)} tickers")
     logger.info(f"Looking ahead {forward_days} days for returns")
 
     for ticker in tickers:
@@ -151,7 +151,11 @@ def train_model(
                 skipped_tickers.append(ticker)
                 continue
 
-            # Drop rows with NaN values
+            # Add future return column to feature_df
+            feature_df[future_return_col] = df[future_return_col]
+
+            # Drop rows with NaN values in features or target
+            feature_df = feature_df.dropna(subset=[future_return_col])
             feature_df = feature_df.dropna()
 
             if len(feature_df) < 30:
@@ -162,46 +166,17 @@ def train_model(
                 continue
 
             # Prepare target variable
-            if (
-                use_risk_adjusted_target
-                and use_enhanced_features
-                and "target_sharpe_ratio" in feature_df.columns
-            ):
+            if use_risk_adjusted_target and use_enhanced_features and 'target_sharpe_ratio' in feature_df.columns:
                 target_col = "target_sharpe_ratio"
                 logger.info(f"Using risk-adjusted target (Sharpe ratio) for {ticker}")
             else:
                 target_col = future_return_col
                 logger.info(f"Using raw return as target for {ticker}")
 
-            # For classification, convert returns to rating categories
-            if mode == "classification":
-
-                def get_rating(return_value):
-                    if return_value > 0.15:
-                        return 4  # Strong Buy
-                    elif return_value > 0.05:
-                        return 3  # Buy
-                    elif return_value > -0.05:
-                        return 2  # Hold
-                    elif return_value > -0.15:
-                        return 1  # Sell
-                    else:
-                        return 0  # Strong Sell
-
-                feature_df["rating"] = feature_df[target_col].apply(get_rating)
-                target = feature_df["rating"]
-            else:
-                target = feature_df[target_col]
+            target = feature_df[target_col]
 
             # Drop target columns from features
-            feature_df = feature_df.drop(
-                columns=[
-                    col
-                    for col in feature_df.columns
-                    if "future_" in col or col == "target_sharpe_ratio"
-                ],
-                errors="ignore",
-            )
+            feature_df = feature_df.drop(columns=[col for col in feature_df.columns if 'future_' in col or col == 'target_sharpe_ratio'], errors='ignore')
 
             # Add to training data
             all_features.append(feature_df)
