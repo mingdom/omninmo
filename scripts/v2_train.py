@@ -48,7 +48,8 @@ def main():
         forward_days=args.forward_days,
         force_sample=args.force_sample,
         overwrite=args.yes,
-        mode=args.mode,
+        use_enhanced_features=args.enhanced_features,
+        use_risk_adjusted_target=args.risk_adjusted_target
     )
 
 

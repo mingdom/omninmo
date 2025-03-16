@@ -3,6 +3,7 @@ XGBoost model for stock prediction
 """
 
 import os
+import gc
 import pickle
 import logging
 import numpy as np
@@ -10,7 +11,6 @@ import pandas as pd
 import xgboost as xgb
 from sklearn.model_selection import train_test_split, cross_val_score, KFold
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
-from sklearn.metrics import accuracy_score, classification_report
 import math
 from datetime import datetime
 import random
@@ -109,7 +109,10 @@ class Predictor:
             features (pandas.DataFrame): Features for prediction
 
         Returns:
-            tuple: (predicted_return, score, rating, confidence)
+            tuple: (predicted_return, score, rating)
+                - predicted_return (float): Predicted return value
+                - score (float): Normalized score between 0 and 1
+                - rating (str): Rating category (Strong Buy, Buy, Hold, Sell, Strong Sell)
         """
         if self.model is None:
             logger.error("Model not trained yet")
@@ -165,10 +168,7 @@ class Predictor:
             # Get rating based on thresholds
             rating = self.get_rating(predicted_return)
 
-            # Simple confidence calculation
-            confidence = 0.7  # Default confidence
-
-            return predicted_return, score, rating, confidence
+            return predicted_return, score, rating
 
         except Exception as e:
             logger.error(f"Error making prediction: {e}")
@@ -508,8 +508,8 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
 
     # Test model creation
-    model = Predictor(mode="regression")
-    print(f"Created {model.mode} model")
+    model = Predictor()
+    print("Created model")
 
     # Test loading
     if os.path.exists("models/test_model.pkl"):

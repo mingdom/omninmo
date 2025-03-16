@@ -137,30 +137,17 @@ class ConsoleApp:
                     logger.warning(f"Failed to make prediction for {ticker}")
                     continue
                 
-                if self.predictor.mode == 'regression':
-                    predicted_return, score, rating, confidence = prediction
-                    
-                    # Add to results
-                    results.append({
-                        'Ticker': ticker,
-                        'Price': latest_price,
-                        'Date': latest_date,
-                        'Predicted Return': f"{predicted_return:.2%}",
-                        'Score': f"{score:.2f}",
-                        'Rating': rating,
-                        'Confidence': f"{confidence:.2f}"
-                    })
-                else:
-                    rating, confidence = prediction
-                    
-                    # Add to results
-                    results.append({
-                        'Ticker': ticker,
-                        'Price': latest_price,
-                        'Date': latest_date,
-                        'Rating': rating,
-                        'Confidence': f"{confidence:.2f}"
-                    })
+                predicted_return, score, rating = prediction
+                
+                # Add to results
+                results.append({
+                    'Ticker': ticker,
+                    'Price': latest_price,
+                    'Date': latest_date,
+                    'Predicted Return': f"{predicted_return:.2%}",
+                    'Score': f"{score:.2f}",
+                    'Rating': rating
+                })
                 
             except Exception as e:
                 logger.error(f"Error processing {ticker}: {e}")
@@ -172,11 +159,8 @@ class ConsoleApp:
         # Convert to DataFrame
         results_df = pd.DataFrame(results)
         
-        # Sort by score or confidence
-        if 'Score' in results_df.columns:
-            results_df.sort_values('Score', ascending=False, inplace=True)
-        else:
-            results_df.sort_values('Confidence', ascending=False, inplace=True)
+        # Sort by score
+        results_df.sort_values('Score', ascending=False, inplace=True)
         
         # Output results based on format
         if output_format == 'table':

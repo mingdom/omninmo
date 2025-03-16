@@ -38,7 +38,7 @@ def generate_training_summary(predictor, cv_results, training_results, processed
     
     summary = {
         "timestamp": timestamp,
-        "mode": predictor.mode,
+        "mode": "regression",
         "data_coverage": {
             "processed_tickers": len(processed_tickers),
             "skipped_tickers": len(skipped_tickers),
@@ -52,37 +52,26 @@ def generate_training_summary(predictor, cv_results, training_results, processed
         }
     }
     
-    # Add mode-specific metrics
-    if predictor.mode == 'regression':
-        summary["cross_validation"] = {
-            "rmse": {
-                "mean": float(cv_results['mean_rmse']),
-                "std": float(cv_results['std_rmse'])
-            },
-            "r2": {
-                "mean": float(cv_results['mean_r2']),
-                "std": float(cv_results['std_r2'])
-            },
-            "mae": {
-                "mean": float(cv_results['mean_mae']),
-                "std": float(cv_results['std_mae'])
-            }
+    # Add metrics (regression only)
+    summary["cross_validation"] = {
+        "rmse": {
+            "mean": float(cv_results['mean_rmse']),
+            "std": float(cv_results['std_rmse'])
+        },
+        "r2": {
+            "mean": float(cv_results['mean_r2']),
+            "std": float(cv_results['std_r2'])
+        },
+        "mae": {
+            "mean": float(cv_results['mean_mae']),
+            "std": float(cv_results['std_mae'])
         }
-        summary["final_model"] = {
-            "rmse": float(training_results['rmse']),
-            "r2": float(training_results['r2']),
-            "mae": float(training_results['mae'])
-        }
-    else:  # classification mode
-        summary["cross_validation"] = {
-            "accuracy": {
-                "mean": float(cv_results['mean_accuracy']),
-                "std": float(cv_results['std_accuracy'])
-            }
-        }
-        summary["final_model"] = {
-            "accuracy": float(training_results['accuracy'])
-        }
+    }
+    summary["final_model"] = {
+        "rmse": float(training_results['rmse']),
+        "r2": float(training_results['r2']),
+        "mae": float(training_results['mae'])
+    }
     
     # Add feature importance analysis
     feature_importance = pd.Series(training_results['feature_importance'])
@@ -132,14 +121,10 @@ def save_training_summary(summary, base_dir="logs/training"):
     print(f"- Success rate: {summary['data_coverage']['processed_tickers']/summary['data_coverage']['total_tickers']*100:.1f}%")
     
     print("\nModel Performance:")
-    if summary['mode'] == 'regression':
-        print(f"- Cross-validation R²: {summary['cross_validation']['r2']['mean']:.4f} ± {summary['cross_validation']['r2']['std']:.4f}")
-        print(f"- Final model R²: {summary['final_model']['r2']:.4f}")
-        print(f"- Cross-validation RMSE: {summary['cross_validation']['rmse']['mean']:.4f} ± {summary['cross_validation']['rmse']['std']:.4f}")
-        print(f"- Final model RMSE: {summary['final_model']['rmse']:.4f}")
-    else:
-        print(f"- Cross-validation accuracy: {summary['cross_validation']['accuracy']['mean']:.4f} ± {summary['cross_validation']['accuracy']['std']:.4f}")
-        print(f"- Final model accuracy: {summary['final_model']['accuracy']:.4f}")
+    print(f"- Cross-validation R²: {summary['cross_validation']['r2']['mean']:.4f} ± {summary['cross_validation']['r2']['std']:.4f}")
+    print(f"- Final model R²: {summary['final_model']['r2']:.4f}")
+    print(f"- Cross-validation RMSE: {summary['cross_validation']['rmse']['mean']:.4f} ± {summary['cross_validation']['rmse']['std']:.4f}")
+    print(f"- Final model RMSE: {summary['final_model']['rmse']:.4f}")
     
     print("\nFeature Analysis:")
     print(f"- Feature stability score: {summary['feature_analysis']['stability_score']:.4f}")
@@ -210,7 +195,7 @@ def log_mlflow_metrics(predictor, cv_results, training_results, X_data, processe
     with mlflow.start_run(run_name=run_name, experiment_id=experiment_id) as run:
         # Log basic parameters
         mlflow.log_params({
-            "mode": predictor.mode,
+            "mode": "regression",
             "learning_rate": predictor.learning_rate,
             "max_depth": predictor.max_depth,
             "n_estimators": predictor.n_estimators,
@@ -224,27 +209,19 @@ def log_mlflow_metrics(predictor, cv_results, training_results, X_data, processe
         # Log processed tickers as a list
         mlflow.log_param("processed_tickers", ", ".join(processed_tickers))
         
-        # Log metrics based on mode
-        if predictor.mode == 'regression':
-            mlflow.log_metrics({
-                "cv_rmse_mean": cv_results['mean_rmse'],
-                "cv_rmse_std": cv_results['std_rmse'],
-                "cv_r2_mean": cv_results['mean_r2'],
-                "cv_r2_std": cv_results['std_r2'],
-                "cv_mae_mean": cv_results['mean_mae'],
-                "cv_mae_std": cv_results['std_mae'],
-                "final_rmse": training_results['rmse'],
-                "final_r2": training_results['r2'],
-                "final_mae": training_results['mae'],
-                "feature_stability": cv_results['feature_stability']
-            })
-        else:  # classification mode
-            mlflow.log_metrics({
-                "cv_accuracy_mean": cv_results['mean_accuracy'],
-                "cv_accuracy_std": cv_results['std_accuracy'],
-                "final_accuracy": training_results['accuracy'],
-                "feature_stability": cv_results['feature_stability']
-            })
+        # Log metrics
+        mlflow.log_metrics({
+            "cv_rmse_mean": cv_results['mean_rmse'],
+            "cv_rmse_std": cv_results['std_rmse'],
+            "cv_r2_mean": cv_results['mean_r2'],
+            "cv_r2_std": cv_results['std_r2'],
+            "cv_mae_mean": cv_results['mean_mae'],
+            "cv_mae_std": cv_results['std_mae'],
+            "final_rmse": training_results['rmse'],
+            "final_r2": training_results['r2'],
+            "final_mae": training_results['mae'],
+            "feature_stability": cv_results['feature_stability']
+        })
         
         # Create model signature and input example
         input_example = X_data.head(5).copy()  # Create explicit copy
