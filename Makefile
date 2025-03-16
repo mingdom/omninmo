@@ -12,16 +12,13 @@ help:
 	@echo "Available targets:"
 	@echo "  help        - Show this help message"
 	@echo "  env         - Set up and activate a virtual environment"
-	@echo "  install     - Install dependencies"
-	@echo "  train       - Train the model (now uses v2 by default)"
-	@echo "  train-sample - Train the model using sample data (uses v2)"
+	@echo "  install     - Install dependencies and set script permissions"
+	@echo "  train       - Train the model (use --sample for training with sample data)"
 	@echo "  predict     - Run predictions using console app (uses watchlist from config)"
 	@echo "  predict-ticker - Predict rating for a specific ticker (usage: make predict-ticker TICKER=AAPL)"
 	@echo "  mlflow      - Start the MLflow UI to view training results (optional: make mlflow PORT=5001)"
 	@echo "  clean       - Clean up generated files"
-	@echo "  clear-cache - Clear the data cache"
-	@echo "  pipeline    - Run the full pipeline (training and prediction)"
-	@echo "  executable  - Make all scripts executable"
+	@echo "               Options: --cache (also clear data cache)"
 
 # Set up virtual environment
 .PHONY: env
@@ -43,29 +40,17 @@ install:
 	@source $(VENV_DIR)/bin/activate && \
 	$(PYTHON) -m pip install --upgrade pip && \
 	bash $(SCRIPTS_DIR)/install-reqs.sh
+	@echo "Setting script permissions..."
+	@chmod +x $(SCRIPTS_DIR)/*.sh
+	@chmod +x $(SCRIPTS_DIR)/*.py
 	@echo "Installation complete!"
 
-# Clear the data cache
-.PHONY: clear-cache
-clear-cache:
-	@echo "Clearing data cache..."
-	@rm -rf cache/*
-	@mkdir -p cache
-	@echo "Cache cleared."
-
-# Train the model (using v2)
+# Train the model
 .PHONY: train
 train:
-	@echo "Training the model (v2)..."
+	@echo "Training the model..."
 	@source $(VENV_DIR)/bin/activate && \
-	$(PYTHON) $(SCRIPTS_DIR)/v2_train.py
-
-# Train the model using sample data (using v2)
-.PHONY: train-sample
-train-sample:
-	@echo "Training the model using sample data (v2)..."
-	@source $(VENV_DIR)/bin/activate && \
-	$(PYTHON) $(SCRIPTS_DIR)/v2_train.py --force-sample
+	$(PYTHON) $(SCRIPTS_DIR)/v2_train.py $(if $(findstring --sample,$(MAKECMDGOALS)),--force-sample,)
 
 # Run predictions on watchlist
 .PHONY: predict
@@ -98,19 +83,14 @@ mlflow:
 clean:
 	@echo "Cleaning up generated files..."
 	@bash $(SCRIPTS_DIR)/clean.sh
+	@if [ "$(findstring --cache,$(MAKECMDGOALS))" != "" ]; then \
+		echo "Clearing data cache..."; \
+		rm -rf cache/*; \
+		mkdir -p cache; \
+		echo "Cache cleared."; \
+	fi
 
-# Run the full pipeline
-.PHONY: pipeline
-pipeline:
-	@echo "Running the full pipeline..."
-	@source $(VENV_DIR)/bin/activate && \
-	$(PYTHON) $(SCRIPTS_DIR)/v2_train.py --force-sample && \
-	$(PYTHON) $(SCRIPTS_DIR)/v2_predict.py --sample
-
-# Make all scripts executable
-.PHONY: executable
-executable:
-	@echo "Making all scripts executable..."
-	@bash $(SCRIPTS_DIR)/make_executable.sh
-	@chmod +x $(SCRIPTS_DIR)/v2_predict.py
-	@chmod +x $(SCRIPTS_DIR)/v2_train.py 
+# Allow --sample and --cache as targets without actions
+.PHONY: --sample --cache
+--sample:
+--cache: 
