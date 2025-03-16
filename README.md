@@ -54,9 +54,6 @@ make install
 # Train with real data (requires FMP API key)
 make train
 
-# Run the application
-make run
-
 # Get a prediction for a specific ticker
 make predict TICKER=AAPL
 
@@ -145,21 +142,6 @@ See the [Documentation Index](./docs/README.md) for:
 ## All Available Make Commands
 
 Run `make help` to see all available commands. Here are the most useful ones:
-
-- `make help` - Show available targets
-- `make env` - Set up and activate a virtual environment
-- `make install` - Install dependencies
-- `make train` - Train the model with real data
-- `make train-sample` - Train the model with sample data
-- `make run` - Run the application
-- `make run-sample` - Run the application with sample data
-- `make predict TICKER=AAPL` - Predict rating for a ticker
-- `make mlflow` - Start the MLflow UI to view training results
-- `make test` - Run all tests
-- `make clean` - Clean up generated files
-- `make clear-cache` - Clear the data cache
-- `make pipeline` - Run the full pipeline (tests, training, prediction)
-- `make maintain MODE=daily|weekly|monthly` - Run model maintenance
 
 ## License
 
