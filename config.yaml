@@ -13,8 +13,6 @@ model:
     sigmoid_k: 10      # Scaling factor for sigmoid
     linear_min: -0.1   # -10% maps to 0 (for linear method)
     linear_max: 0.1    # +10% maps to 1 (for linear method)
-  prediction:
-    mode: "regression"  # Default prediction mode: 'regression' or 'classification'
   training:
     # Number of days to look ahead for prediction (updated for medium-term)
     forward_days: 90
@@ -118,7 +116,7 @@ app:
   layout: "wide"
   initial_sidebar_state: "expanded"
   cache:
-    ttl: 3600  # Cache time to live in seconds
+    ttl: 86400  # Cache time to live in seconds
   watchlist:
     default:
       - AI     # AI Software
@@ -289,4 +287,4 @@ charts:
     colors:
       ma_50: "orange"
       ma_200: "red"
-      volume: "rgba(0, 0, 255, 0.5)" 
+      volume: "rgba(0, 0, 255, 0.5)"
