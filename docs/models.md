@@ -10,25 +10,28 @@ The stock prediction system uses XGBoost to predict future stock returns and gen
 #### Timeframe and Signals
 - **Prediction Window**: 30 days forward-looking (configurable via `model.training.forward_days`)
 - **Signal Categories**:
-  | Signal | Expected Return (30 days) | Threshold |
-  |--------|--------------------------|-----------|
-  | Strong Buy | > +6% | > 0.06 |
-  | Buy | +3% to +6% | > 0.03 |
-  | Hold | -3% to +3% | > -0.03 |
-  | Sell | -6% to -3% | > -0.06 |
-  | Strong Sell | < -6% | ≤ -0.06 |
+  | Signal | Expected Return (30 days) | Category Value |
+  |--------|--------------------------|----------------|
+  | Strong Buy | > +15% | 4 |
+  | Buy | +5% to +15% | 3 |
+  | Hold | -5% to +5% | 2 |
+  | Sell | -15% to -5% | 1 |
+  | Strong Sell | < -15% | 0 |
 
 #### Operating Modes
 1. **Regression Mode** (Default)
    - Predicts actual expected returns
    - Converts returns to ratings using thresholds
    - Uses fixed 0.7 confidence score
-   
+
 2. **Classification Mode**
    - Directly predicts rating categories
    - Uses model's prediction probability as confidence score
 
 ### Technical Implementation
+
+#### Model Type
+The system uses XGBoost regression to predict expected returns, which are then converted to ratings using configurable thresholds.
 
 #### Feature Engineering (41 features)
 1. **Price-based Features**
@@ -50,7 +53,7 @@ The stock prediction system uses XGBoost to predict future stock returns and gen
 #### Model Architecture
 - **Framework**: XGBoost
 - **Configuration**: Driven by config.yaml
-- **Feature Handling**: 
+- **Feature Handling**:
   - Graceful handling of missing features
   - Automatic feature alignment
   - NaN handling with ffill/bfill
@@ -280,4 +283,4 @@ The total investment for priorities 1-4 would be approximately 20-27 developer w
 ### Documentation Updates
 - Feature documentation
 - Configuration changes
-- Performance reports 
+- Performance reports
