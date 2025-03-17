@@ -2,18 +2,17 @@
 XGBoost model for stock prediction
 """
 
-import os
 import gc
-import pickle
 import logging
+import os
+import pickle
+import random
+
 import numpy as np
 import pandas as pd
 import xgboost as xgb
-from sklearn.model_selection import train_test_split, cross_val_score, KFold
-from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
-import math
-from datetime import datetime
-import random
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+from sklearn.model_selection import KFold
 
 from src.v2.config import config
 
@@ -477,7 +476,7 @@ class Predictor:
         std_mae = np.std(maes)
         std_r2 = np.std(r2s)
 
-        logger.info(f"\nCross Validation Results:")
+        logger.info("\nCross Validation Results:")
         logger.info(f"Mean RMSE: {mean_rmse:.4f} ± {std_rmse:.4f}")
         logger.info(f"Mean MAE: {mean_mae:.4f} ± {std_mae:.4f}")
         logger.info(f"Mean R²: {mean_r2:.4f} ± {std_r2:.4f}")
@@ -501,8 +500,6 @@ class Predictor:
 
 if __name__ == "__main__":
     # Simple test
-    from src.v2.data_fetcher import DataFetcher
-    from src.v2.features import Features
 
     # Setup logging
     logging.basicConfig(level=logging.INFO)
