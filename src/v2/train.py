@@ -2,13 +2,13 @@
 Script for training the stock prediction model
 """
 
-import os
-import sys
 import argparse
 import logging
+import os
+import sys
 from datetime import datetime
+
 import pandas as pd
-import numpy as np
 
 from src.v2.config import config
 from src.v2.data_fetcher import DataFetcher
@@ -16,8 +16,8 @@ from src.v2.features import Features
 from src.v2.predictor import Predictor
 from src.v2.training_summary import (
     generate_training_summary,
-    save_training_summary,
     log_mlflow_metrics,
+    save_training_summary,
 )
 
 # Setup logging

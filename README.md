@@ -42,6 +42,7 @@ For detailed documentation, see the [Documentation Index](./docs/README.md) in t
 - [Features Documentation](./docs/features.md)
 - [Model Documentation](./docs/models.md)
 - [MLflow Guide](./docs/mlflow-guide.md)
+- [Linting Guide](./docs/lint.md)
 - [Development Plans](./docs/devplan/)
 - [Implementation Progress](./docs/devlog/)
 

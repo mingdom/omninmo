@@ -2,15 +2,15 @@
 Data fetcher for stock data
 """
 
-import os
-import json
-import random
 import logging
-import pandas as pd
-import numpy as np
-from datetime import datetime, timedelta
-import requests
+import os
+import random
 import time
+from datetime import datetime, timedelta
+
+import numpy as np
+import pandas as pd
+import requests
 
 from src.v2.config import config
 

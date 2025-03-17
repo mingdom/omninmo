@@ -5,6 +5,8 @@ SHELL := /bin/bash
 PYTHON := python3
 VENV_DIR := venv
 SCRIPTS_DIR := scripts
+LOGS_DIR := logs
+TIMESTAMP := $(shell date +%Y%m%d_%H%M%S)
 
 # Default target
 .PHONY: help
@@ -18,6 +20,8 @@ help:
 	@echo "  mlflow      - Start the MLflow UI to view training results (optional: make mlflow PORT=5001)"
 	@echo "  clean       - Clean up generated files"
 	@echo "               Options: --cache (also clear data cache)"
+	@echo "  lint        - Run Python linter"
+	@echo "               Options: --fix (auto-fix issues)"
 
 # Set up virtual environment
 .PHONY: env
@@ -36,13 +40,17 @@ install:
 		echo "Virtual environment not found. Please run 'make env' first."; \
 		exit 1; \
 	fi
-	@source $(VENV_DIR)/bin/activate && \
+	@mkdir -p $(LOGS_DIR)
+	@(echo "=== Installation Log $(TIMESTAMP) ===" && \
+	echo "Starting installation at: $$(date)" && \
+	(source $(VENV_DIR)/bin/activate && \
 	$(PYTHON) -m pip install --upgrade pip && \
-	bash $(SCRIPTS_DIR)/install-reqs.sh
-	@echo "Setting script permissions..."
-	@chmod +x $(SCRIPTS_DIR)/*.sh
-	@chmod +x $(SCRIPTS_DIR)/*.py
-	@echo "Installation complete!"
+	bash $(SCRIPTS_DIR)/install-reqs.sh) 2>&1 && \
+	echo "Setting script permissions..." && \
+	chmod +x $(SCRIPTS_DIR)/*.sh && \
+	chmod +x $(SCRIPTS_DIR)/*.py && \
+	echo "Installation complete at: $$(date)") | tee $(LOGS_DIR)/install_$(TIMESTAMP).log
+	@echo "Installation log saved to: $(LOGS_DIR)/install_$(TIMESTAMP).log"
 
 # Train the model
 .PHONY: train
@@ -84,10 +92,47 @@ clean:
 		echo "Cache cleared."; \
 	fi
 
+# Lint Python code
+.PHONY: lint lint-fix
+lint:
+	@echo "Running Python linter..."
+	@if [ ! -d "$(VENV_DIR)" ]; then \
+		echo "Virtual environment not found. Please run 'make env' first."; \
+		exit 1; \
+	fi
+	@mkdir -p $(LOGS_DIR)
+	@(echo "=== Lint Check Log $(TIMESTAMP) ===" && \
+	echo "Starting lint check at: $$(date)" && \
+	(source $(VENV_DIR)/bin/activate && \
+	echo "Running linter in check-only mode..." && \
+	ruff check .; \
+	EXIT_CODE=$$?; \
+	if [ $$EXIT_CODE -ne 0 ]; then \
+		echo ""; \
+		echo "Linting issues found. To automatically fix issues, run:"; \
+		echo "  make lint-fix"; \
+	fi; \
+	exit $$EXIT_CODE) 2>&1) | tee $(LOGS_DIR)/lint_$(TIMESTAMP).log
+	@echo "Lint check log saved to: $(LOGS_DIR)/lint_$(TIMESTAMP).log"
+
+lint-fix:
+	@echo "Running Python linter with auto-fix..."
+	@if [ ! -d "$(VENV_DIR)" ]; then \
+		echo "Virtual environment not found. Please run 'make env' first."; \
+		exit 1; \
+	fi
+	@mkdir -p $(LOGS_DIR)
+	@(echo "=== Lint Fix Log $(TIMESTAMP) ===" && \
+	echo "Starting lint fix at: $$(date)" && \
+	(source $(VENV_DIR)/bin/activate && \
+	echo "Running linter with auto-fix enabled..." && \
+	ruff check --fix .) 2>&1) | tee $(LOGS_DIR)/lint_$(TIMESTAMP).log
+	@echo "Lint fix log saved to: $(LOGS_DIR)/lint_$(TIMESTAMP).log"
+
 # Allow --sample and --cache as targets without actions
 .PHONY: --sample --cache
 --sample:
---cache: 
+--cache:
 
 %:
 	@: 
