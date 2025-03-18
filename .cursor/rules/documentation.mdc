@@ -1,8 +1,0 @@
----
-description: Document development progress
-globs:
-alwaysApply: false
----
-# Document changes as part of the development process
-- Document progress of your changes in a file called 'docs/devlog.md'
-- Every time you encounter a non-trivial error, please document it 'docs/deverrors.md' with the exact error message and repro steps
