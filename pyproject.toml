@@ -21,6 +21,9 @@ ignore = [
     "E501",  # line too long - let's handle line length more flexibly for data science code
     "N803",  # argument name should be lowercase - common in ML to use X, y
     "N806",  # variable name should be lowercase - common in ML to use X_train, y_test
+    "PLR0913",  # too many arguments - common in ML functions with many parameters
+    "PLR0912",  # too many branches - common in ML data processing and training loops
+    "PLR0915",  # too many statements - common in ML training and evaluation functions
 ]
 
 # Allow autofix for all enabled rules (when `--fix`) is provided
@@ -43,20 +46,8 @@ exclude = [
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
 [tool.ruff.lint.per-file-ignores]
-# Ignore unused imports in __init__.py files
-"__init__.py" = ["F401"]
-# Ignore specific rules in test files
-"tests/*" = ["PLR2004"]  # Magic numbers are more acceptable in tests
-# ML-specific ignores
-"src/v2/predictor.py" = ["PLR0913", "PLR0915"]  # ML models often need many parameters
-"src/v2/train.py" = ["PLR0913", "PLR0912", "PLR0915"]  # Training code is inherently complex
-"src/v2/training_summary.py" = ["PLR0913", "PLR0915"]  # Analysis code can be complex
-"src/v2/console_app.py" = ["PLR0912"]  # Console app needs many branches for user interaction
-"src/v2/features.py" = ["PLR2004"]  # Ignoring specific magic numbers in features.py
-
-[tool.ruff.lint.mccabe]
-# Maximum cyclomatic complexity allowed
-max-complexity = 15  # Increased for ML code which can be more complex
+# DO NOT IGNORE UNLESS IT'S A REALLY GOOD REASON!
+"__init__.py" = ["F401"]  # Re-exports are common in __init__.py files
 
 [tool.ruff.lint.isort]
 known-first-party = ["src"] 

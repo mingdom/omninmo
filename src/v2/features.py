@@ -25,6 +25,9 @@ TREND_STRENGTH_THRESHOLD = config.get(
 MIN_ROLLING_PERIODS = config.get(
     "features.min_rolling_periods", 30
 )  # Minimum periods for rolling calculations
+VOLATILITY_BASE_WINDOW = config.get(
+    "features.volatility.base_window", 30
+)  # Base window for volatility comparisons
 
 
 class Features:
@@ -420,9 +423,10 @@ class Features:
             ).std() * np.sqrt(252)
 
             # Volatility ratio (recent vs longer-term)
-            if window > 30:
-                df[f"vol_ratio_30_{window}d"] = (
-                    df["volatility_30d"] / df[f"volatility_{window}d"]
+            if window > VOLATILITY_BASE_WINDOW:
+                df[f"vol_ratio_{VOLATILITY_BASE_WINDOW}_{window}d"] = (
+                    df[f"volatility_{VOLATILITY_BASE_WINDOW}d"]
+                    / df[f"volatility_{window}d"]
                 )
 
     def _add_distribution_features(self, df, window=90):
