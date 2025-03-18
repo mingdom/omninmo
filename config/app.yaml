@@ -7,16 +7,34 @@ cache:
 # Default watchlist used in console_app.py
 watchlist:
   default:
-    - AI     # AI Software
-    - AMAT   # Semiconductor Manufacturing
-    - GOOGL  # Big Tech / AI
-    - HPE    # Enterprise IT
-    - IONQ   # Quantum Computing
-    - LRCX   # Semiconductor Equipment
-    - LULU   # Retail / Athleisure
-    - MELI   # Latin American E-commerce
-    - META   # Social Media / Metaverse
-    - NVDA   # Semiconductors / AI
-    - PANW   # Cybersecurity
-    - PDD    # Chinese E-commerce
-    - PLTR   # Data Analytics / AI 
+      - AI     # AI Software
+      - AMAT   # Semiconductor Manufacturing
+      - AMZN   # E-commerce / Cloud
+      - ANET   # Cloud Networking
+      - AAPL   # Consumer Tech
+      - APP    # Mobile Tech / Marketing
+      - AXP    # Financial Services
+      - BABA   # Chinese E-commerce
+      - BKNG   # Travel / Online Booking
+      - CRM    # Enterprise CRM
+      - CRWD   # Cybersecurity
+      - FTNT   # Network Security
+      - GOOGL  # Big Tech / AI
+      - HPE    # Enterprise IT
+      - IONQ   # Quantum Computing
+      - LRCX   # Semiconductor Equipment
+      - LULU   # Retail / Athleisure
+      - MELI   # Latin American E-commerce
+      - META   # Social Media / Metaverse
+      - NVDA   # Semiconductors / AI
+      - PANW   # Cybersecurity
+      - PDD    # Chinese E-commerce
+      - PLTR   # Data Analytics / AI
+      - QCOM   # Mobile Technology
+      - QQQ    # Nasdaq 100 ETF
+      - SNOW   # Data Cloud Platform
+      - SPY    # S&P 500 ETF
+      - UBER   # Mobility / Delivery
+      - V      # Payments
+      - WDAY   # Enterprise Software
+      - ZS     # Cloud Security

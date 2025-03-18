@@ -6,8 +6,9 @@ xgboost:
   random_state: 42
   test_size: 0.2
 normalization:
-  method: "sigmoid"  # Options: sigmoid, linear, tanh
+  method: "tanh"  # Options: sigmoid, linear, tanh
   sigmoid_k: 10      # Scaling factor for sigmoid
+  tanh_k: 10        # Scaling factor for tanh
   linear_min: -0.1   # -10% maps to 0 (for linear method)
   linear_max: 0.1    # +10% maps to 1 (for linear method)
 training:
@@ -46,6 +47,7 @@ training:
     - BABA    # Alibaba Group - Chinese e-commerce and technology
     - BAC     # Bank of America - Banking and financial services
     - BE      # Bloom Energy - Clean energy technology (struggling)
+    - BIDU    # Baidu - Chinese search engine and AI technology
     - BLBD    # Blue Bird Corp - School bus manufacturer (small-cap)
     - BYND    # Beyond Meat - Plant-based meat products (struggling)
     - CALM    # Cal-Maine Foods - Egg production and distribution (small-cap)

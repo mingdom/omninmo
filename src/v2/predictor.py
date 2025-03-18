@@ -192,6 +192,11 @@ class Predictor:
             k = params.get("sigmoid_k", 10)
             return 1 / (1 + np.exp(-k * return_value))
 
+        elif method == "tanh":
+            # Apply tanh normalization and rescale from (-1,1) to (0,1)
+            k = params.get("tanh_k", 10)  # Use same default as sigmoid for consistency
+            return (np.tanh(k * return_value) + 1) / 2
+
         elif method == "linear":
             # Apply linear normalization
             min_val = params.get("linear_min", -0.1)
@@ -386,7 +391,7 @@ class Predictor:
 
         # Perform cross-validation
         for fold, (train_idx, test_idx) in enumerate(kf.split(X)):
-            logger.info(f"Training fold {fold+1}/{n_splits}...")
+            logger.info(f"Training fold {fold + 1}/{n_splits}...")
 
             # Split data
             X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
@@ -424,7 +429,7 @@ class Predictor:
 
             # Log metrics
             logger.info(
-                f"Fold {fold+1} metrics: RMSE={rmse:.4f}, MAE={mae:.4f}, R²={r2:.4f}"
+                f"Fold {fold + 1} metrics: RMSE={rmse:.4f}, MAE={mae:.4f}, R²={r2:.4f}"
             )
 
             # Clean up to free memory
