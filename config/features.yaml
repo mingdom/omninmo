@@ -1,0 +1,11 @@
+# Feature Configuration
+thresholds:
+  rsi: 30  # RSI oversold/overbought threshold
+  stochastic:
+    low: 30  # Stochastic oversold threshold
+    high: 70  # Stochastic overbought threshold
+  volume_increase: 25  # Volume increase threshold (percentage)
+  trend_strength: 25  # ADX trend strength threshold
+min_rolling_periods: 30  # Minimum periods for rolling calculations
+volatility:
+  base_window: 30  # Base window for volatility comparisons (days) 

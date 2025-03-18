@@ -1,0 +1,9 @@
+# Data Configuration
+
+# API access for Financial Modeling Prep
+fmp:
+  api_key: ${FMP_API_KEY}  # Will be loaded from environment variable
+  cache_dir: "cache"
+
+# Maximum age of data before requiring refresh
+max_age_days: 30 

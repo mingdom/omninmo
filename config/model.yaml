@@ -1,0 +1,93 @@
+# Model Configuration
+xgboost:
+  learning_rate: 0.1
+  max_depth: 6
+  n_estimators: 100
+  random_state: 42
+  test_size: 0.2
+normalization:
+  method: "sigmoid"  # Options: sigmoid, linear, tanh
+  sigmoid_k: 10      # Scaling factor for sigmoid
+  linear_min: -0.1   # -10% maps to 0 (for linear method)
+  linear_max: 0.1    # +10% maps to 1 (for linear method)
+training:
+  # Number of days to look ahead for prediction (updated for medium-term)
+  forward_days: 90
+  # Historical data period for training (increased for better medium-term patterns)
+  period: "10y"
+  # Data interval (1d recommended for best results)
+  interval: "1d"
+  # Minimum number of days required for reliable predictions
+  min_data_days: 60  # Minimum days of data required for training
+  min_feature_days: 30  # Minimum days required after feature generation
+  # Score thresholds for mapping to categorical ratings (adjusted for 90-day horizon)
+  score_thresholds:
+    strong_buy: 0.8   # Scores >= 0.8 are Strong Buy
+    buy: 0.6          # Scores >= 0.6 are Buy
+    hold: 0.4         # Scores >= 0.4 are Hold
+    sell: 0.2         # Scores >= 0.2 are Sell
+    strong_sell: 0.0  # Scores < 0.2 are Strong Sell
+  # Return thresholds for rating categories (adjusted for 90-day horizon)
+  rating_thresholds:
+    strong_buy: 0.15   # >15% return
+    buy: 0.08         # >8% return
+    hold: -0.08       # -8% to 8% return
+    sell: -0.15       # <-15% return
+    strong_sell: -0.15 # <-15% return
+  # Default tickers for training (diverse set of stocks)
+  default_tickers:
+    - AAPL    # Apple Inc. - Consumer electronics and software
+    - AMAT    # Applied Materials - Semiconductor equipment and materials
+    - AMD     # Advanced Micro Devices - Semiconductor manufacturing
+    - AMRN    # Amarin Corporation - Biopharmaceutical (small-cap)
+    - AMZN    # Amazon.com - E-commerce and cloud computing
+    - ANET    # Arista Networks - Cloud networking solutions
+    - APP     # AppLovin - Mobile app technology and marketing
+    - BABA    # Alibaba Group - Chinese e-commerce and technology
+    - BAC     # Bank of America - Banking and financial services
+    - BE      # Bloom Energy - Clean energy technology (struggling)
+    - BLBD    # Blue Bird Corp - School bus manufacturer (small-cap)
+    - BYND    # Beyond Meat - Plant-based meat products (struggling)
+    - CALM    # Cal-Maine Foods - Egg production and distribution (small-cap)
+    - CAT     # Caterpillar Inc. - Heavy equipment manufacturing
+    - CHEF    # The Chefs' Warehouse - Food distribution (mid-cap)
+    - CRM     # Salesforce - Cloud-based software
+    - CUBI    # Customers Bancorp - Regional bank (small-cap)
+    - CVX     # Chevron Corporation - Integrated oil and gas
+    - CWEN    # Clearway Energy - Renewable energy (mid-cap)
+    - DIS     # The Walt Disney Company - Entertainment and media
+    - DUK     # Duke Energy - Electric power holding company
+    - ELLO    # Ellomay Capital - Renewable energy (small-cap)
+    - GEVO    # Gevo Inc. - Renewable chemicals and biofuels (struggling)
+    - GOOGL   # Alphabet Inc. - Internet services and technology
+    - GS      # Goldman Sachs - Investment banking and securities
+    - HOLX    # Hologic - Medical devices and diagnostics (mid-cap)
+    - HON     # Honeywell International - Industrial conglomerate
+    - IBM     # International Business Machines - Technology services and consulting
+    - INTC    # Intel Corporation - Semiconductor manufacturing
+    - IONQ    # IonQ - Quantum computing technology
+    - JNJ     # Johnson & Johnson - Healthcare and pharmaceuticals
+    - JPM     # JPMorgan Chase - Banking and financial services
+    - KO      # The Coca-Cola Company - Beverage manufacturing
+    - LMT     # Lockheed Martin - Aerospace and defense
+    - LRCX    # LRCX - Semiconductor equipment and materials
+    - META    # Meta Platforms - Social media and technology
+    - MPC     # Marathon Petroleum - Oil refining and marketing (mid-cap)
+    - MSFT    # Microsoft Corporation - Software and cloud computing
+    - NEE     # NextEra Energy - Renewable energy and utilities
+    - NFLX    # Netflix - Streaming media and entertainment
+    - NVDA    # NVIDIA Corporation - Graphics and AI computing
+    - PFE     # Pfizer - Pharmaceutical manufacturing
+    - PG      # Procter & Gamble - Consumer goods
+    - PLTR    # Palantir Technologies - Data analytics software
+    - SNOW    # Snowflake - Cloud data platform
+    - SOFI    # SoFi Technologies - Digital financial services (struggling)
+    - TALO    # Talos Energy - Oil and gas exploration (small-cap)
+    - TDOC    # Teladoc Health - Telemedicine services (struggling)
+    - TSLA    # Tesla - Electric vehicles and clean energy
+    - V       # Visa Inc. - Global payments technology
+    - VIRT    # Virtu Financial - Market making and trading (mid-cap)
+    - WDAY    # Workday - Enterprise cloud applications
+    - WKHS    # Workhorse Group - Electric delivery vehicles (struggling)
+    - XOM     # Exxon Mobil - Integrated oil and gas
+    - XPO     # XPO Logistics - Transportation and logistics (mid-cap) 

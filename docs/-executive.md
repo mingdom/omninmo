@@ -9,7 +9,8 @@ Log:
 - Cursor totally failed at doing a refactor to remove a flag. Maybe try this in vscode with augment next?
 - I was able to achieve this in Augment.
 - Augment also fixed caching for me
-
+- Config stuff
+- Make log level configurable and its own yaml
 
 ### Feature prompt
 can you read through the feature engineering roadmap and cross-check the plan against the current implementation and then create an updated roadmap?
