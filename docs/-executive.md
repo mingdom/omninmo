@@ -1,8 +1,8 @@
 # Master list of things we should address
-- Confidence not really useful
-- Datetime of logs
-- Unnecessary flags
-- Make
+- Train should output top 30 most useful features
+- Figure out how to tune the model iteratively
+- I wonder if we can have one model predict price and another predict drawdown?
+- Some way to measure beta vs SPY in the stocks?
 
 
 Log:
