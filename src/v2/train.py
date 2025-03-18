@@ -28,6 +28,14 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Constants from config
+MIN_DATA_DAYS = config.get(
+    "model.training.min_data_days", 60
+)  # Minimum days for reliable training
+MIN_FEATURE_DAYS = config.get(
+    "model.training.min_feature_days", 30
+)  # Minimum days after feature generation
+
 
 def train_model(
     tickers=None,
@@ -130,7 +138,7 @@ def train_model(
                 ticker, period=period, interval=interval, force_sample=force_sample
             )
 
-            if df is None or len(df) < 60:
+            if df is None or len(df) < MIN_DATA_DAYS:
                 logger.warning(f"Not enough data for {ticker}, skipping")
                 skipped_tickers.append(ticker)
                 continue
@@ -158,7 +166,7 @@ def train_model(
             feature_df = feature_df.dropna(subset=[future_return_col])
             feature_df = feature_df.dropna()
 
-            if len(feature_df) < 30:
+            if len(feature_df) < MIN_FEATURE_DAYS:
                 logger.warning(
                     f"Not enough data after feature generation for {ticker}, skipping"
                 )
@@ -166,7 +174,11 @@ def train_model(
                 continue
 
             # Prepare target variable
-            if use_risk_adjusted_target and use_enhanced_features and 'target_sharpe_ratio' in feature_df.columns:
+            if (
+                use_risk_adjusted_target
+                and use_enhanced_features
+                and "target_sharpe_ratio" in feature_df.columns
+            ):
                 target_col = "target_sharpe_ratio"
                 logger.info(f"Using risk-adjusted target (Sharpe ratio) for {ticker}")
             else:
@@ -176,7 +188,14 @@ def train_model(
             target = feature_df[target_col]
 
             # Drop target columns from features
-            feature_df = feature_df.drop(columns=[col for col in feature_df.columns if 'future_' in col or col == 'target_sharpe_ratio'], errors='ignore')
+            feature_df = feature_df.drop(
+                columns=[
+                    col
+                    for col in feature_df.columns
+                    if "future_" in col or col == "target_sharpe_ratio"
+                ],
+                errors="ignore",
+            )
 
             # Add to training data
             all_features.append(feature_df)
@@ -206,9 +225,6 @@ def train_model(
 
     # Train final model on all data
     train_results = predictor.train(X, y)
-
-    # Analyze feature importance
-    importance_analysis = predictor.analyze_feature_importance()
 
     # Save model
     predictor.save(model_path)

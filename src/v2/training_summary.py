@@ -23,7 +23,7 @@ MLRUNS_DIR = os.path.join(project_root, 'logs/mlruns')
 def generate_training_summary(predictor, cv_results, training_results, processed_tickers, skipped_tickers, error_tickers):
     """
     Generate an executive summary of the training results
-    
+
     Args:
         predictor: The trained Predictor instance
         cv_results: Results from cross-validation
@@ -31,7 +31,7 @@ def generate_training_summary(predictor, cv_results, training_results, processed
         processed_tickers: List of successfully processed tickers
         skipped_tickers: List of skipped tickers
         error_tickers: List of tickers that had errors
-        
+
     Returns:
         dict: Summary of training results
     """
@@ -92,11 +92,11 @@ def generate_training_summary(predictor, cv_results, training_results, processed
 def save_training_summary(summary, base_dir="logs/training"):
     """
     Save the training summary to a JSON file
-    
+
     Args:
         summary (dict): The training summary
         base_dir (str): Directory to save summaries
-        
+
     Returns:
         str: Path to the saved summary file
     """
@@ -139,7 +139,7 @@ def save_training_summary(summary, base_dir="logs/training"):
 def log_mlflow_metrics(predictor, cv_results, training_results, X_data, processed_tickers, skipped_tickers, error_tickers, model_path):
     """
     Log metrics, parameters, and artifacts to MLflow
-    
+
     Args:
         predictor: The trained Predictor instance
         cv_results: Results from cross-validation
@@ -149,7 +149,7 @@ def log_mlflow_metrics(predictor, cv_results, training_results, X_data, processe
         skipped_tickers: List of skipped tickers
         error_tickers: List of tickers that had errors
         model_path: Path where the model is saved
-        
+
     Returns:
         str: MLflow run ID
     """
