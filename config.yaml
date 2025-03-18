@@ -21,7 +21,8 @@ model:
     # Data interval (1d recommended for best results)
     interval: "1d"
     # Minimum number of days required for reliable predictions
-    min_data_days: 200
+    min_data_days: 60  # Minimum days of data required for training
+    min_feature_days: 30  # Minimum days required after feature generation
     # Score thresholds for mapping to categorical ratings (adjusted for 90-day horizon)
     score_thresholds:
       strong_buy: 0.8   # Scores >= 0.8 are Strong Buy
@@ -158,6 +159,7 @@ data:
   fmp:
     api_key: ${FMP_API_KEY}  # Will be loaded from environment variable
     cache_dir: "cache"
+  max_age_days: 30  # Maximum age of data before requiring refresh
   sample_data:
     default_prices:
       # Original tech stocks
@@ -288,3 +290,14 @@ charts:
       ma_50: "orange"
       ma_200: "red"
       volume: "rgba(0, 0, 255, 0.5)"
+
+# Feature Configuration
+features:
+  thresholds:
+    rsi: 30  # RSI oversold/overbought threshold
+    stochastic:
+      low: 30  # Stochastic oversold threshold
+      high: 70  # Stochastic overbought threshold
+    volume_increase: 25  # Volume increase threshold (percentage)
+    trend_strength: 25  # ADX trend strength threshold
+  min_rolling_periods: 30  # Minimum periods for rolling calculations

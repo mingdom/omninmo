@@ -18,6 +18,9 @@ from src.v2.config import config
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Constants
+HTTP_SUCCESS = 200
+
 
 class DataFetcher:
     """Class to fetch stock data from API or use sample data"""
@@ -145,7 +148,7 @@ class DataFetcher:
         # Make request
         response = requests.get(url)
 
-        if response.status_code != 200:
+        if response.status_code != HTTP_SUCCESS:
             raise ValueError(
                 f"API request failed with status code {response.status_code}: {response.text}"
             )
@@ -241,6 +244,18 @@ class DataFetcher:
             df["Low"] = df["Close"] * np.random.uniform(0.99, 0.995, n)
 
         return df
+
+    def _fetch_data(self, url, params=None):
+        try:
+            response = requests.get(url, params=params)
+            if response.status_code == HTTP_SUCCESS:
+                return response.json()
+            else:
+                logger.error(f"Failed to fetch data: {response.status_code}")
+                return None
+        except Exception as e:
+            logger.error(f"Error fetching data: {e}")
+            return None
 
 
 if __name__ == "__main__":
