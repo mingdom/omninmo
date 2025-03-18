@@ -1,0 +1,6 @@
+# Main configuration file that imports all section files
+imports:
+  - model.yaml   # ML model parameters
+  - features.yaml # Feature engineering parameters
+  - app.yaml     # App settings (watchlist, cache)
+  - data.yaml    # API access and data settings 

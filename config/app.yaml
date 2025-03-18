@@ -1,0 +1,22 @@
+# App Configuration
+
+# Cache timeout (used for caching data)
+cache:
+  ttl: 86400  # Cache time to live in seconds (24 hours)
+
+# Default watchlist used in console_app.py
+watchlist:
+  default:
+    - AI     # AI Software
+    - AMAT   # Semiconductor Manufacturing
+    - GOOGL  # Big Tech / AI
+    - HPE    # Enterprise IT
+    - IONQ   # Quantum Computing
+    - LRCX   # Semiconductor Equipment
+    - LULU   # Retail / Athleisure
+    - MELI   # Latin American E-commerce
+    - META   # Social Media / Metaverse
+    - NVDA   # Semiconductors / AI
+    - PANW   # Cybersecurity
+    - PDD    # Chinese E-commerce
+    - PLTR   # Data Analytics / AI 
