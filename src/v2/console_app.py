@@ -114,6 +114,21 @@ class ConsoleApp:
             set(tickers)
         )  # Convert to set for uniqueness and sort alphabetically
 
+        # Display model configuration
+        forward_days = config.get("model.training.forward_days", 90)
+        norm_method = config.get("model.normalization.method", "tanh")
+        norm_k = config.get(f"model.normalization.{norm_method}_k", 10)
+
+        print("\nModel Configuration:")
+        print(f"- Prediction horizon: {forward_days} days")
+        print(f"- Normalization: {norm_method} (k={norm_k})")
+        print("- Rating thresholds:")
+        for rating, threshold in config.get(
+            "model.training.rating_thresholds", {}
+        ).items():
+            print(f"  • {rating}: {threshold:.1%}")
+        print()
+
         logger.info(f"Running predictions for {len(tickers)} unique tickers")
 
         # Prepare results table

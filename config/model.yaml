@@ -12,8 +12,8 @@ normalization:
   linear_min: -0.1   # -10% maps to 0 (for linear method)
   linear_max: 0.1    # +10% maps to 1 (for linear method)
 training:
-  # Number of days to look ahead for prediction (updated for medium-term)
-  forward_days: 90
+  # Number of days to look ahead for prediction
+  forward_days: 30
   # Historical data period for training (increased for better medium-term patterns)
   period: "10y"
   # Data interval (1d recommended for best results)
@@ -28,13 +28,13 @@ training:
     hold: 0.4         # Scores >= 0.4 are Hold
     sell: 0.2         # Scores >= 0.2 are Sell
     strong_sell: 0.0  # Scores < 0.2 are Strong Sell
-  # Return thresholds for rating categories (adjusted for 90-day horizon)
+  # Return thresholds
   rating_thresholds:
-    strong_buy: 0.15   # >15% return
-    buy: 0.08         # >8% return
-    hold: -0.08       # -8% to 8% return
-    sell: -0.15       # <-15% return
-    strong_sell: -0.15 # <-15% return
+    strong_buy: 0.10
+    buy: 0.05
+    hold: -0.05
+    sell: -0.10
+    strong_sell: -0.20
   # Default tickers for training (diverse set of stocks)
   default_tickers:
     - AAPL    # Apple Inc. - Consumer electronics and software
@@ -43,6 +43,7 @@ training:
     - AMRN    # Amarin Corporation - Biopharmaceutical (small-cap)
     - AMZN    # Amazon.com - E-commerce and cloud computing
     - ANET    # Arista Networks - Cloud networking solutions
+    - ASML    # ASML Holding - Semiconductor equipment and materials
     - APP     # AppLovin - Mobile app technology and marketing
     - BABA    # Alibaba Group - Chinese e-commerce and technology
     - BAC     # Bank of America - Banking and financial services
@@ -55,11 +56,14 @@ training:
     - CHEF    # The Chefs' Warehouse - Food distribution (mid-cap)
     - CRM     # Salesforce - Cloud-based software
     - CUBI    # Customers Bancorp - Regional bank (small-cap)
+    - CRWD    # CrowdStrike - Cybersecurity software (mid-cap)
     - CVX     # Chevron Corporation - Integrated oil and gas
     - CWEN    # Clearway Energy - Renewable energy (mid-cap)
     - DIS     # The Walt Disney Company - Entertainment and media
     - DUK     # Duke Energy - Electric power holding company
     - ELLO    # Ellomay Capital - Renewable energy (small-cap)
+    - ELY     # Eldorado Resorts - Casino and gaming (mid-cap)
+    - FTNT    # Fortinet - Network security software (mid-cap)
     - GEVO    # Gevo Inc. - Renewable chemicals and biofuels (struggling)
     - GOOGL   # Alphabet Inc. - Internet services and technology
     - GS      # Goldman Sachs - Investment banking and securities
@@ -71,6 +75,7 @@ training:
     - JNJ     # Johnson & Johnson - Healthcare and pharmaceuticals
     - JPM     # JPMorgan Chase - Banking and financial services
     - KO      # The Coca-Cola Company - Beverage manufacturing
+    - KLAC    # KLA Corporation - Semiconductor equipment and materials
     - LMT     # Lockheed Martin - Aerospace and defense
     - LRCX    # LRCX - Semiconductor equipment and materials
     - META    # Meta Platforms - Social media and technology
@@ -93,3 +98,4 @@ training:
     - WKHS    # Workhorse Group - Electric delivery vehicles (struggling)
     - XOM     # Exxon Mobil - Integrated oil and gas
     - XPO     # XPO Logistics - Transportation and logistics (mid-cap) 
+    - ZS      # Zscaler - Cloud security software (mid-cap)
