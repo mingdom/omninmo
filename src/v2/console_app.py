@@ -12,12 +12,18 @@ from tabulate import tabulate
 
 from src.v2.config import config
 from src.v2.data_fetcher import DataFetcher
+from src.v2.exceptions import (
+    ConfigurationError,
+    FeatureGenerationError,
+    InsufficientDataError,
+    ModelNotLoadedError,
+)
 from src.v2.features import Features
 from src.v2.predictor import Predictor
 
 # Setup logging
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.ERROR,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[logging.FileHandler("logs/console_app.log"), logging.StreamHandler()],
 )
@@ -47,14 +53,19 @@ class ConsoleApp:
 
         Returns:
             bool: True if model loaded successfully
+
+        Raises:
+            ConfigurationError: If no model file is found
         """
         if model_path is None:
             # Find the latest model file
             model_dir = "models"
             if not os.path.exists(model_dir):
                 os.makedirs(model_dir, exist_ok=True)
-                logger.warning(f"Created models directory: {model_dir}")
-                return False
+                logger.debug(f"Created models directory: {model_dir}")
+                raise ConfigurationError(
+                    "No models directory found. Created empty directory."
+                )
 
             model_files = [
                 f
@@ -63,8 +74,7 @@ class ConsoleApp:
             ]
 
             if not model_files:
-                logger.error("No model files found in the models directory")
-                return False
+                raise ConfigurationError("No model files found in the models directory")
 
             # Sort by modification time (newest first)
             model_files.sort(
@@ -77,10 +87,9 @@ class ConsoleApp:
         self.predictor = Predictor.load(model_path)
 
         if self.predictor is None:
-            logger.error(f"Failed to load model from {model_path}")
-            return False
+            raise ConfigurationError(f"Failed to load model from {model_path}")
 
-        logger.info(f"Loaded model from {model_path}")
+        logger.debug(f"Model loaded successfully from {model_path}")
         return True
 
     def run_predictions(
@@ -96,60 +105,71 @@ class ConsoleApp:
 
         Returns:
             pandas.DataFrame: Prediction results
+
+        Raises:
+            ModelNotLoadedError: If model is not loaded
+            ConfigurationError: If no tickers specified
+            InsufficientDataError: If not enough data for prediction
+            FeatureGenerationError: If feature generation fails
         """
         if self.predictor is None:
-            logger.error("No model loaded. Call load_model() first")
-            return None
+            raise ModelNotLoadedError("No model loaded. Call load_model() first")
 
         # Use watchlist if no tickers provided
         if tickers is None:
             tickers = config.get("app.watchlist.default")
 
         if not tickers:
-            logger.error("No tickers specified and no watchlist found in config")
-            return None
+            raise ConfigurationError(
+                "No tickers specified and no watchlist found in config"
+            )
 
         # Ensure tickers are unique and sorted alphabetically
-        tickers = sorted(
-            set(tickers)
-        )  # Convert to set for uniqueness and sort alphabetically
+        tickers = sorted(set(tickers))
 
         # Display model configuration
-        forward_days = config.get("model.training.forward_days", 90)
+        forward_days = config.get("model.training.forward_days", 30)
         norm_method = config.get("model.normalization.method", "tanh")
         norm_k = config.get(f"model.normalization.{norm_method}_k", 10)
 
         print("\nModel Configuration:")
         print(f"- Prediction horizon: {forward_days} days")
         print(f"- Normalization: {norm_method} (k={norm_k})")
-        print("- Rating thresholds:")
-        for rating, threshold in config.get(
-            "model.training.rating_thresholds", {}
-        ).items():
-            print(f"  • {rating}: {threshold:.1%}")
+        print("- Score interpretation:")
+        print("  • > 0.5: Positive outlook")
+        print("  • = 0.5: Neutral")
+        print("  • < 0.5: Negative outlook")
         print()
 
-        logger.info(f"Running predictions for {len(tickers)} unique tickers")
+        logger.debug(f"Running predictions for {len(tickers)} tickers")
 
         # Prepare results table
         results = []
+        errors = []
 
         # Process each ticker
         for ticker in tickers:
             try:
+                logger.debug(f"Processing {ticker}")
+
                 # Fetch data
                 df = self.fetcher.fetch_data(ticker, force_sample=use_sample_data)
 
+                # Check data sufficiency
                 if df is None or len(df) < MIN_DATA_DAYS:
-                    logger.warning(f"Insufficient data for {ticker}")
-                    continue
+                    raise InsufficientDataError(
+                        f"Insufficient data for {ticker}. "
+                        f"Required: {MIN_DATA_DAYS} days, "
+                        f"Got: {len(df) if df is not None else 0} days"
+                    )
 
                 # Generate features
                 df_features = self.features.generate(df)
 
                 if df_features is None:
-                    logger.warning(f"Failed to generate features for {ticker}")
-                    continue
+                    raise FeatureGenerationError(
+                        f"Failed to generate features for {ticker}"
+                    )
 
                 # Get latest price
                 latest_price = df["Close"].iloc[-1]
@@ -160,10 +180,11 @@ class ConsoleApp:
                 prediction = self.predictor.predict(latest_features)
 
                 if prediction is None:
-                    logger.warning(f"Failed to make prediction for {ticker}")
-                    continue
+                    raise FeatureGenerationError(
+                        f"Failed to make prediction for {ticker}"
+                    )
 
-                predicted_return, score, rating = prediction
+                predicted_return, score = prediction
 
                 # Add to results
                 results.append(
@@ -171,32 +192,53 @@ class ConsoleApp:
                         "Ticker": ticker,
                         "Price": latest_price,
                         "Date": latest_date,
-                        "Predicted Return": f"{predicted_return:.2%}",
+                        "Return": predicted_return,  # Store raw value for sorting
+                        "Predicted Return": f"{predicted_return:.2%}",  # Formatted for display
                         "Score": f"{score:.2f}",
-                        "Rating": rating,
                     }
                 )
 
+            except (InsufficientDataError, FeatureGenerationError) as e:
+                logger.warning(f"Skipping {ticker}: {e!s}")
+                errors.append({"ticker": ticker, "error": str(e)})
             except Exception as e:
-                logger.error(f"Error processing {ticker}: {e}")
+                logger.error(f"Unexpected error processing {ticker}: {e!s}")
+                errors.append({"ticker": ticker, "error": str(e)})
 
         if not results:
-            logger.error("No prediction results generated")
-            return None
+            raise ConfigurationError(
+                "No valid predictions generated. "
+                f"Errors occurred for {len(errors)} tickers."
+            )
 
         # Convert to DataFrame
         results_df = pd.DataFrame(results)
 
-        # Sort by score
-        results_df.sort_values("Score", ascending=False, inplace=True)
+        # Sort by predicted return (descending)
+        results_df.sort_values("Return", ascending=False, inplace=True)
+
+        # Drop the raw return column used for sorting
+        results_df = results_df.drop("Return", axis=1)
 
         # Output results based on format
         if output_format == "table":
             print("\n" + tabulate(results_df, headers="keys", tablefmt="fancy_grid"))
+
+            # Print errors if any
+            if errors:
+                print("\nErrors occurred:")
+                for error in errors:
+                    print(f"- {error['ticker']}: {error['error']}")
         elif output_format == "csv":
             print(results_df.to_csv(index=False))
         elif output_format == "json":
             print(results_df.to_json(orient="records", indent=2))
+
+        # Log summary
+        logger.debug(
+            f"Generated predictions for {len(results)} tickers "
+            f"(skipped {len(errors)} with errors)"
+        )
 
         return results_df
 
@@ -247,7 +289,7 @@ def main():
     # Load model
     if not app.load_model(args.model):
         # If no model is available, train a sample model
-        logger.info("No model available. Training a sample model...")
+        logger.debug("No model available. Training a sample model...")
         from src.v2.train import train_model
 
         model = train_model(force_sample=True)

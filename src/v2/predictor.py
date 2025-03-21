@@ -108,10 +108,9 @@ class Predictor:
             features (pandas.DataFrame): Features for prediction
 
         Returns:
-            tuple: (predicted_return, score, rating)
+            tuple: (predicted_return, score)
                 - predicted_return (float): Predicted return value
                 - score (float): Normalized score between 0 and 1
-                - rating (str): Rating category (Strong Buy, Buy, Hold, Sell, Strong Sell)
         """
         if self.model is None:
             logger.error("Model not trained yet")
@@ -164,10 +163,7 @@ class Predictor:
             # Calculate normalized score (0-1)
             score = self.normalize_return(predicted_return)
 
-            # Get rating based on thresholds
-            rating = self.get_rating(predicted_return)
-
-            return predicted_return, score, rating
+            return predicted_return, score
 
         except Exception as e:
             logger.error(f"Error making prediction: {e}")
@@ -212,36 +208,6 @@ class Predictor:
             # Default to simple normalization
             # Assume returns within -10% to +10%
             return (return_value + 0.1) / 0.2
-
-    def get_rating(self, return_value):
-        """
-        Convert return to rating category
-
-        Args:
-            return_value (float): Predicted return
-
-        Returns:
-            str: Rating category
-        """
-        # Get thresholds from config
-        thresholds = config.get("model.training.rating_thresholds", {})
-
-        strong_buy = thresholds.get("strong_buy", 0.10)  # Default to 10%
-        buy = thresholds.get("buy", 0.05)  # Default to 5%
-        hold = thresholds.get("hold", -0.05)  # Default to -5%
-        sell = thresholds.get("sell", -0.10)  # Default to -10%
-        strong_sell = thresholds.get("strong_sell", -0.20)  # Default to -20%
-
-        if return_value > strong_buy:
-            return "Strong Buy"
-        elif return_value > buy:
-            return "Buy"
-        elif return_value > hold:
-            return "Hold"
-        elif return_value > sell:
-            return "Sell"
-        else:
-            return "Strong Sell"
 
     def analyze_feature_importance(self):
         """
