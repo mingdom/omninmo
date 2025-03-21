@@ -70,7 +70,7 @@ class Features:
 
             # Add enhanced risk-adjusted features if requested
             if use_enhanced_features:
-                logger.info("Generating enhanced risk-adjusted features")
+                logger.debug("Generating enhanced risk-adjusted features")
 
                 # Add enhanced risk metrics if market data is available
                 if market_data is not None:
@@ -187,7 +187,7 @@ class Features:
 
             result = result[keep_columns]
 
-            logger.info(f"Generated {len(keep_columns)} features")
+            logger.debug(f"Generated {len(keep_columns)} features")
 
             return result
 

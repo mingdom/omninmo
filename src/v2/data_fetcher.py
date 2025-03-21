@@ -63,16 +63,18 @@ class DataFetcher:
 
             # If cache is still valid, use it
             if cache_age < self.cache_ttl:
-                logger.info(f"Loading cached data for {ticker} (age: {cache_age:.0f}s)")
+                logger.debug(
+                    f"Loading cached data for {ticker} (age: {cache_age:.0f}s)"
+                )
                 return pd.read_csv(cache_file, index_col=0, parse_dates=True)
             else:
-                logger.info(
+                logger.debug(
                     f"Cache expired for {ticker} (age: {cache_age:.0f}s > TTL: {self.cache_ttl}s)"
                 )
 
         # If forcing sample data, use sample data
         if force_sample:
-            logger.info(f"Using sample data for {ticker} (forced)")
+            logger.debug(f"Using sample data for {ticker} (forced)")
             return self._generate_sample_data(ticker, period, interval)
 
         # Check for API key
@@ -119,7 +121,7 @@ class DataFetcher:
         Returns:
             pandas.DataFrame: DataFrame with market index data
         """
-        logger.info(f"Fetching market data for {market_index}")
+        logger.debug(f"Fetching market data for {market_index}")
         return self.fetch_data(market_index, period, interval, force_sample)
 
     def _fetch_from_api(self, ticker, period="5y"):
