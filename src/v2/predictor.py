@@ -226,10 +226,11 @@ class Predictor:
         # Get thresholds from config
         thresholds = config.get("model.training.rating_thresholds", {})
 
-        strong_buy = thresholds.get("strong_buy", 0.06)
-        buy = thresholds.get("buy", 0.03)
-        hold = thresholds.get("hold", -0.03)
-        sell = thresholds.get("sell", -0.06)
+        strong_buy = thresholds.get("strong_buy", 0.10)  # Default to 10%
+        buy = thresholds.get("buy", 0.05)  # Default to 5%
+        hold = thresholds.get("hold", -0.05)  # Default to -5%
+        sell = thresholds.get("sell", -0.10)  # Default to -10%
+        strong_sell = thresholds.get("strong_sell", -0.20)  # Default to -20%
 
         if return_value > strong_buy:
             return "Strong Buy"
