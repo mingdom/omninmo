@@ -266,7 +266,10 @@ def main():
     """Main function for console app"""
     parser = argparse.ArgumentParser(description="Stock Prediction Console App")
     parser.add_argument(
-        "--tickers", type=str, nargs="+", help="List of tickers to predict"
+        "--tickers",
+        type=str,
+        nargs="+",
+        help="List of tickers to predict (space or comma-separated)",
     )
     parser.add_argument(
         "--model", type=str, help="Path to model file (uses latest if not specified)"
@@ -298,8 +301,19 @@ def main():
             sys.exit(1)
         app.predictor = model
 
+    # Handle comma-separated tickers if provided
+    if args.tickers:
+        # Split any comma-separated tickers and flatten the list
+        tickers = []
+        for ticker_arg in args.tickers:
+            tickers.extend(ticker_arg.split(","))
+        # Remove any empty strings and strip whitespace
+        tickers = [t.strip() for t in tickers if t.strip()]
+    else:
+        tickers = None
+
     # Run predictions
-    app.run_predictions(args.tickers, args.sample, args.format)
+    app.run_predictions(tickers, args.sample, args.format)
 
 
 if __name__ == "__main__":

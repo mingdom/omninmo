@@ -65,8 +65,9 @@ predict:
 	@echo "Running predictions..."
 	@source $(VENV_DIR)/bin/activate && \
 	if [ -n "$(filter-out $@,$(MAKECMDGOALS))" ]; then \
-		echo "Predicting rating for $(filter-out $@,$(MAKECMDGOALS))..."; \
-		$(PYTHON) $(SCRIPTS_DIR)/v2_predict.py --tickers $(filter-out $@,$(MAKECMDGOALS)); \
+		TICKERS=$$(echo "$(filter-out $@,$(MAKECMDGOALS))" | tr ',' ' '); \
+		echo "Predicting for: $$TICKERS"; \
+		$(PYTHON) $(SCRIPTS_DIR)/v2_predict.py --tickers $$TICKERS; \
 	else \
 		echo "Running predictions on watchlist..."; \
 		$(PYTHON) $(SCRIPTS_DIR)/v2_predict.py; \
