@@ -43,7 +43,6 @@ def train_model(
     period=None,
     interval=None,
     forward_days=None,
-    force_sample=False,
     overwrite=False,
     use_enhanced_features=True,
     use_risk_adjusted_target=True,
@@ -57,7 +56,6 @@ def train_model(
         period (str): Historical data period
         interval (str): Data interval
         forward_days (int): Days to look ahead for returns
-        force_sample (bool): Use sample data instead of API
         overwrite (bool): Overwrite existing model without asking
         use_enhanced_features (bool): Use enhanced features with risk metrics
         use_risk_adjusted_target (bool): Use risk-adjusted target (Sharpe ratio)
@@ -112,7 +110,7 @@ def train_model(
         try:
             logger.info("Fetching market data (S&P 500) for beta calculations")
             market_data = fetcher.fetch_market_data(
-                "SPY", period=period, interval=interval, force_sample=force_sample
+                "SPY", period=period, interval=interval
             )
         except Exception as e:
             logger.warning(
@@ -134,9 +132,7 @@ def train_model(
             logger.info(f"Processing {ticker}...")
 
             # Fetch data
-            df = fetcher.fetch_data(
-                ticker, period=period, interval=interval, force_sample=force_sample
-            )
+            df = fetcher.fetch_data(ticker, period=period, interval=interval)
 
             if df is None or len(df) < MIN_DATA_DAYS:
                 logger.warning(f"Not enough data for {ticker}, skipping")
@@ -269,7 +265,6 @@ def main():
     parser.add_argument(
         "--forward-days", type=int, help="Days to look ahead for returns"
     )
-    parser.add_argument("--force-sample", action="store_true", help="Use sample data")
     parser.add_argument(
         "--overwrite", action="store_true", help="Overwrite existing model"
     )
@@ -298,7 +293,6 @@ def main():
         period=args.period,
         interval=args.interval,
         forward_days=args.forward_days,
-        force_sample=args.force_sample,
         overwrite=args.overwrite,
         use_enhanced_features=args.enhanced_features,
         use_risk_adjusted_target=args.risk_adjusted_target,

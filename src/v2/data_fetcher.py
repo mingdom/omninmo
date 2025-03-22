@@ -4,11 +4,9 @@ Data fetcher for stock data
 
 import logging
 import os
-import random
 import time
 from datetime import datetime, timedelta
 
-import numpy as np
 import pandas as pd
 import requests
 
@@ -23,7 +21,7 @@ HTTP_SUCCESS = 200
 
 
 class DataFetcher:
-    """Class to fetch stock data from API or use sample data"""
+    """Class to fetch stock data from API"""
 
     def __init__(self, cache_dir="cache"):
         """Initialize with cache directory"""
@@ -36,7 +34,14 @@ class DataFetcher:
         # Create cache directory if it doesn't exist
         os.makedirs(cache_dir, exist_ok=True)
 
-    def fetch_data(self, ticker, period="5y", interval="1d", force_sample=False):
+        # Check for API key
+        if not self.api_key:
+            raise ValueError(
+                "No API key found. Please set the FMP_API_KEY environment variable or "
+                "configure it in the config file."
+            )
+
+    def fetch_data(self, ticker, period="5y", interval="1d"):
         """
         Fetch stock data for a ticker
 
@@ -44,13 +49,12 @@ class DataFetcher:
             ticker (str): Stock ticker symbol
             period (str): Time period ('1y', '5y', etc.)
             interval (str): Data interval ('1d', '1wk', etc.)
-            force_sample (bool): Force using sample data instead of API
 
         Returns:
             pandas.DataFrame: DataFrame with stock data
 
         Raises:
-            ValueError: If no API key is set and force_sample is False
+            ValueError: If no data is returned from API
         """
         # Check cache first
         cache_file = os.path.join(self.cache_dir, f"{ticker}_{period}_{interval}.csv")
@@ -72,20 +76,7 @@ class DataFetcher:
                     f"Cache expired for {ticker} (age: {cache_age:.0f}s > TTL: {self.cache_ttl}s)"
                 )
 
-        # If forcing sample data, use sample data
-        if force_sample:
-            logger.debug(f"Using sample data for {ticker} (forced)")
-            return self._generate_sample_data(ticker, period, interval)
-
-        # Check for API key
-        if not self.api_key:
-            raise ValueError(
-                "No API key found. Please set the FMP_API_KEY environment variable or "
-                "configure it in the config file. If you want to use sample data instead, "
-                "explicitly set force_sample=True"
-            )
-
-        # If we have an API key, try to fetch from API
+        # Try to fetch from API
         try:
             logger.info(f"Fetching data for {ticker} from API")
             df = self._fetch_from_api(ticker, period)
@@ -106,9 +97,7 @@ class DataFetcher:
 
             raise
 
-    def fetch_market_data(
-        self, market_index="SPY", period="5y", interval="1d", force_sample=False
-    ):
+    def fetch_market_data(self, market_index="SPY", period="5y", interval="1d"):
         """
         Fetch market index data for beta calculations
 
@@ -116,13 +105,12 @@ class DataFetcher:
             market_index (str): Market index ticker symbol (default: 'SPY' for S&P 500 ETF)
             period (str): Time period ('1y', '5y', etc.)
             interval (str): Data interval ('1d', '1wk', etc.)
-            force_sample (bool): Force using sample data instead of API
 
         Returns:
             pandas.DataFrame: DataFrame with market index data
         """
         logger.debug(f"Fetching market data for {market_index}")
-        return self.fetch_data(market_index, period, interval, force_sample)
+        return self.fetch_data(market_index, period, interval)
 
     def _fetch_from_api(self, ticker, period="5y"):
         """Fetch data from Financial Modeling Prep API"""
@@ -184,69 +172,6 @@ class DataFetcher:
 
         return df
 
-    def _generate_sample_data(self, ticker, period="5y", interval="1d"):
-        """Generate sample data for testing"""
-        # Determine date range based on period
-        end_date = datetime.now()
-
-        if period.endswith("y"):
-            years = int(period[:-1])
-            start_date = end_date - timedelta(days=365 * years)
-        elif period.endswith("m"):
-            months = int(period[:-1])
-            start_date = end_date - timedelta(days=30 * months)
-        else:
-            # Default to 1 year
-            start_date = end_date - timedelta(days=365)
-
-        # Generate date range
-        if interval == "1d":
-            # Business days only
-            date_range = pd.date_range(start=start_date, end=end_date, freq="B")
-        else:
-            # Weekly
-            date_range = pd.date_range(start=start_date, end=end_date, freq="W")
-
-        # Generate random price data
-        n = len(date_range)
-
-        # Start with a random price between 10 and 100
-        start_price = random.uniform(10, 100)
-
-        # Generate random daily returns with a slight upward bias
-        daily_returns = np.random.normal(0.0005, 0.015, n)
-
-        # Calculate cumulative returns
-        cumulative_returns = np.cumprod(1 + daily_returns)
-
-        # Calculate prices
-        prices = start_price * cumulative_returns
-
-        # Generate OHLC data
-        data = {
-            "Open": prices * np.random.uniform(0.99, 1.01, n),
-            "High": prices * np.random.uniform(1.01, 1.03, n),
-            "Low": prices * np.random.uniform(0.97, 0.99, n),
-            "Close": prices,
-            "Volume": np.random.randint(100000, 10000000, n),
-        }
-
-        # Create DataFrame
-        df = pd.DataFrame(data, index=date_range)
-
-        # If this is a market index, make it less volatile
-        if ticker in ["SPY", "^GSPC", "^DJI", "^IXIC"]:
-            df["Open"] = start_price * np.cumprod(
-                1 + np.random.normal(0.0003, 0.008, n)
-            )
-            df["Close"] = start_price * np.cumprod(
-                1 + np.random.normal(0.0003, 0.008, n)
-            )
-            df["High"] = df["Close"] * np.random.uniform(1.005, 1.01, n)
-            df["Low"] = df["Close"] * np.random.uniform(0.99, 0.995, n)
-
-        return df
-
     def _fetch_data(self, url, params=None):
         try:
             response = requests.get(url, params=params)
@@ -263,6 +188,6 @@ class DataFetcher:
 if __name__ == "__main__":
     # Simple test
     fetcher = DataFetcher()
-    data = fetcher.fetch_data("AAPL", period="1y", force_sample=True)
+    data = fetcher.fetch_data("AAPL", period="1y")
     print(data.head())
     print(f"Got {len(data)} rows of data for AAPL")

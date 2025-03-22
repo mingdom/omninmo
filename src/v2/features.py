@@ -568,7 +568,7 @@ if __name__ == "__main__":
     from src.v2.data_fetcher import DataFetcher
 
     fetcher = DataFetcher()
-    data = fetcher.fetch_data("AAPL", period="1y", force_sample=True)
+    data = fetcher.fetch_data("AAPL", period="1y")
 
     features = Features()
     feature_df = features.generate(data, use_enhanced_features=True)

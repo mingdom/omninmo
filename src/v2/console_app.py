@@ -3,12 +3,12 @@ Console application for stock predictions
 """
 
 import argparse
+import json
 import logging
 import os
 import sys
 
 import pandas as pd
-from tabulate import tabulate
 
 from src.v2.config import config
 from src.v2.data_fetcher import DataFetcher
@@ -16,7 +16,6 @@ from src.v2.exceptions import (
     ConfigurationError,
     FeatureGenerationError,
     InsufficientDataError,
-    ModelNotLoadedError,
 )
 from src.v2.features import Features
 from src.v2.predictor import Predictor
@@ -92,60 +91,32 @@ class ConsoleApp:
         logger.debug(f"Model loaded successfully from {model_path}")
         return True
 
-    def run_predictions(
-        self, tickers=None, use_sample_data=False, output_format="table"
-    ):
+    def run_predictions(self, tickers=None, output_format="table"):
         """
-        Run predictions for a list of tickers
+        Run predictions for given tickers
 
         Args:
-            tickers (list): List of ticker symbols, or None to use watchlist
-            use_sample_data (bool): Whether to use sample data instead of API
+            tickers (list): List of tickers to predict (uses default if None)
             output_format (str): Output format ('table', 'csv', or 'json')
 
         Returns:
-            pandas.DataFrame: Prediction results
-
-        Raises:
-            ModelNotLoadedError: If model is not loaded
-            ConfigurationError: If no tickers specified
-            InsufficientDataError: If not enough data for prediction
-            FeatureGenerationError: If feature generation fails
+            str: Formatted prediction results
         """
-        if self.predictor is None:
-            raise ModelNotLoadedError("No model loaded. Call load_model() first")
-
-        # Use watchlist if no tickers provided
+        # Load default tickers if none provided
         if tickers is None:
-            tickers = config.get("app.watchlist.default")
+            tickers = config.get("app.default_tickers")
 
+        # Validate tickers
         if not tickers:
-            raise ConfigurationError(
-                "No tickers specified and no watchlist found in config"
-            )
+            raise ValueError("No tickers provided and no defaults configured")
 
-        # Ensure tickers are unique and sorted alphabetically
-        tickers = sorted(set(tickers))
+        # Clean and validate tickers
+        tickers = [t.strip().upper() for t in tickers if t.strip()]
+        if not tickers:
+            raise ValueError("No valid tickers provided")
 
-        # Display model configuration
-        forward_days = config.get("model.training.forward_days", 30)
-        norm_method = config.get("model.normalization.method", "tanh")
-        norm_k = config.get(f"model.normalization.{norm_method}_k", 10)
-
-        print("\nModel Configuration:")
-        print(f"- Prediction horizon: {forward_days} days")
-        print(f"- Normalization: {norm_method} (k={norm_k})")
-        print("- Score interpretation:")
-        print("  • > 0.5: Positive outlook")
-        print("  • = 0.5: Neutral")
-        print("  • < 0.5: Negative outlook")
-        print()
-
-        logger.debug(f"Running predictions for {len(tickers)} tickers")
-
-        # Prepare results table
+        # Initialize results list
         results = []
-        errors = []
 
         # Process each ticker
         for ticker in tickers:
@@ -153,7 +124,7 @@ class ConsoleApp:
                 logger.debug(f"Processing {ticker}")
 
                 # Fetch data
-                df = self.fetcher.fetch_data(ticker, force_sample=use_sample_data)
+                df = self.fetcher.fetch_data(ticker)
 
                 # Check data sufficiency
                 if df is None or len(df) < MIN_DATA_DAYS:
@@ -198,49 +169,89 @@ class ConsoleApp:
                     }
                 )
 
-            except (InsufficientDataError, FeatureGenerationError) as e:
-                logger.warning(f"Skipping {ticker}: {e!s}")
-                errors.append({"ticker": ticker, "error": str(e)})
             except Exception as e:
-                logger.error(f"Unexpected error processing {ticker}: {e!s}")
-                errors.append({"ticker": ticker, "error": str(e)})
+                logger.error(f"Error processing {ticker}: {e}")
+                results.append(
+                    {
+                        "Ticker": ticker,
+                        "Price": None,
+                        "Date": None,
+                        "Return": None,
+                        "Predicted Return": "Error",
+                        "Score": "N/A",
+                    }
+                )
 
-        if not results:
-            raise ConfigurationError(
-                "No valid predictions generated. "
-                f"Errors occurred for {len(errors)} tickers."
-            )
-
-        # Convert to DataFrame
-        results_df = pd.DataFrame(results)
-
-        # Sort by predicted return (descending)
-        results_df.sort_values("Return", ascending=False, inplace=True)
-
-        # Drop the raw return column used for sorting
-        results_df = results_df.drop("Return", axis=1)
-
-        # Output results based on format
-        if output_format == "table":
-            print("\n" + tabulate(results_df, headers="keys", tablefmt="fancy_grid"))
-
-            # Print errors if any
-            if errors:
-                print("\nErrors occurred:")
-                for error in errors:
-                    print(f"- {error['ticker']}: {error['error']}")
-        elif output_format == "csv":
-            print(results_df.to_csv(index=False))
-        elif output_format == "json":
-            print(results_df.to_json(orient="records", indent=2))
-
-        # Log summary
-        logger.debug(
-            f"Generated predictions for {len(results)} tickers "
-            f"(skipped {len(errors)} with errors)"
+        # Sort results by predicted return (descending)
+        results = sorted(
+            results,
+            key=lambda x: (
+                x["Return"] is None,
+                -x["Return"] if x["Return"] is not None else 0,
+            ),
         )
 
-        return results_df
+        # Format output
+        if output_format == "json":
+            return json.dumps(results, indent=2)
+        elif output_format == "csv":
+            return self._format_csv(results)
+        else:  # table
+            return self._format_table(results)
+
+    def _format_table(self, results):
+        """Format results as a table"""
+        if not results:
+            return "No results to display"
+
+        # Define headers and widths
+        headers = ["Ticker", "Price", "Date", "Predicted Return", "Score"]
+        widths = [10, 12, 12, 16, 8]
+
+        # Create header row
+        header = "  ".join(h.ljust(w) for h, w in zip(headers, widths))
+        separator = "-" * len(header)
+
+        # Create rows
+        rows = []
+        for r in results:
+            row = [
+                r["Ticker"].ljust(widths[0]),
+                f"{r['Price']:.2f}".ljust(widths[1])
+                if r["Price"]
+                else "N/A".ljust(widths[1]),
+                (r["Date"] or "N/A").ljust(widths[2]),
+                r["Predicted Return"].ljust(widths[3]),
+                r["Score"].ljust(widths[4]),
+            ]
+            rows.append("  ".join(row))
+
+        # Combine all parts
+        return f"\n{header}\n{separator}\n" + "\n".join(rows)
+
+    def _format_csv(self, results):
+        """Format results as CSV"""
+        if not results:
+            return "No results to display"
+
+        # Define headers
+        headers = ["Ticker", "Price", "Date", "Predicted Return", "Score"]
+
+        # Create CSV string
+        output = []
+        output.append(",".join(headers))
+
+        for r in results:
+            row = [
+                r["Ticker"],
+                f"{r['Price']:.2f}" if r["Price"] else "",
+                r["Date"] or "",
+                r["Predicted Return"],
+                r["Score"],
+            ]
+            output.append(",".join(row))
+
+        return "\n".join(output)
 
     def _check_recent_data(self, ticker):
         """Check if we have recent data for this ticker."""
@@ -275,9 +286,6 @@ def main():
         "--model", type=str, help="Path to model file (uses latest if not specified)"
     )
     parser.add_argument(
-        "--sample", action="store_true", help="Use sample data instead of API"
-    )
-    parser.add_argument(
         "--format",
         type=str,
         choices=["table", "csv", "json"],
@@ -291,15 +299,7 @@ def main():
 
     # Load model
     if not app.load_model(args.model):
-        # If no model is available, train a sample model
-        logger.debug("No model available. Training a sample model...")
-        from src.v2.train import train_model
-
-        model = train_model(force_sample=True)
-        if model is None:
-            logger.error("Failed to train a sample model")
-            sys.exit(1)
-        app.predictor = model
+        sys.exit(1)
 
     # Handle comma-separated tickers if provided
     if args.tickers:
@@ -313,7 +313,7 @@ def main():
         tickers = None
 
     # Run predictions
-    app.run_predictions(tickers, args.sample, args.format)
+    app.run_predictions(tickers, args.format)
 
 
 if __name__ == "__main__":

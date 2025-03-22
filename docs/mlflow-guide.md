@@ -23,14 +23,14 @@ This guide explains how to use MLflow for tracking model training experiments an
 ### Basic Training Run
 ```python
 # Train model with MLflow tracking
-python -m src.v2.train --force-sample
+python -m src.v2.train
 ```
 
 ### Parameter Tuning
 ```python
 # Try different learning rates
-python -m src.v2.train --force-sample --learning-rate 0.05
-python -m src.v2.train --force-sample --learning-rate 0.1
+python -m src.v2.train --learning-rate 0.05
+python -m src.v2.train --learning-rate 0.1
 ```
 
 ## Viewing Results

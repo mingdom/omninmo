@@ -23,7 +23,6 @@ def main():
     parser.add_argument(
         "--forward-days", type=int, help="Days to look ahead for returns"
     )
-    parser.add_argument("--force-sample", action="store_true", help="Use sample data")
     parser.add_argument(
         "--enhanced-features",
         action="store_true",
@@ -46,10 +45,9 @@ def main():
         period=args.period,
         interval=args.interval,
         forward_days=args.forward_days,
-        force_sample=args.force_sample,
         overwrite=args.yes,
         use_enhanced_features=args.enhanced_features,
-        use_risk_adjusted_target=args.risk_adjusted_target
+        use_risk_adjusted_target=args.risk_adjusted_target,
     )
 
 
