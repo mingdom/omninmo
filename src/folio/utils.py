@@ -9,6 +9,7 @@ from src.lab.option_utils import (
 from src.v2.data_fetcher import DataFetcher
 
 from .data_model import (
+    ExposureBreakdown,
     PortfolioGroup,
     PortfolioSummary,
     create_portfolio_group,
@@ -124,6 +125,7 @@ def process_portfolio_data(
         "Current Value",
         "Percent Of Account",
         "Last Price",
+        "Type",
     ]
     missing_columns = [col for col in required_columns if col not in df.columns]
     if missing_columns:
@@ -136,11 +138,21 @@ def process_portfolio_data(
     df["Type"] = df["Type"].fillna("")
     df["Description"] = df["Description"].fillna("")
 
+    # Function to identify options based on description format
+    def is_option_desc(desc: str) -> bool:
+        """Check if a description matches option format (e.g. 'TSM APR 17 2025 $190 CALL')"""
+        if not isinstance(desc, str):
+            return False
+        parts = desc.strip().split()
+        if len(parts) != 6:
+            return False
+        return parts[4].startswith("$") and parts[5] in ["CALL", "PUT"]
+
     # Basic portfolio statistics
     total_positions = len(df)
     total_value = df["Current Value"].apply(clean_currency_value).sum()
-    unique_stocks = len(df[~df["Symbol"].apply(is_option)]["Symbol"].unique())
-    unique_options = len(df[df["Symbol"].apply(is_option)]["Symbol"].unique())
+    unique_stocks = len(df[~df["Description"].apply(is_option_desc)]["Symbol"].unique())
+    unique_options = len(df[df["Description"].apply(is_option_desc)]["Symbol"].unique())
 
     logger.info("\n=== Portfolio Overview ===")
     logger.info(f"Total Positions: {total_positions}")
@@ -150,7 +162,7 @@ def process_portfolio_data(
 
     # Create a map of stock positions and prices for option delta calculations
     stock_positions = {}
-    for _, row in df[~df["Symbol"].apply(is_option)].iterrows():
+    for _, row in df[~df["Description"].apply(is_option_desc)].iterrows():
         if row["Last Price"] and isinstance(row["Last Price"], str):
             try:
                 price = clean_currency_value(row["Last Price"])
@@ -215,7 +227,7 @@ def process_portfolio_data(
 
             # Process related options
             option_data = []
-            option_rows = df[df["Symbol"].apply(is_option)]
+            option_rows = df[df["Description"].apply(is_option_desc)]
 
             for _, opt in option_rows.iterrows():
                 try:
@@ -264,153 +276,162 @@ def process_portfolio_data(
                             "market_value": market_value,
                             "beta": beta,
                             "beta_adjusted_exposure": delta * notional_value * beta,
-                            "clean_value": market_value,
-                            "weight": float(
-                                str(opt["Percent Of Account"]).replace("%", "")
-                            )
-                            / 100,
-                            "position_beta": beta * delta,
                             "strike": option.strike,
-                            "expiry": str(option.expiry),
+                            "expiry": option.expiry.strftime("%Y-%m-%d"),
                             "option_type": option.option_type,
                             "delta": delta,
                             "delta_exposure": delta * notional_value,
                             "notional_value": notional_value,
-                            "underlying_beta": beta,
                         }
                     )
-
                 except Exception as e:
                     logger.warning(f"Error processing option {opt['Symbol']}: {e}")
                     continue
 
             # Create portfolio group
-            if stock_data or option_data:
-                group = create_portfolio_group(stock_data, option_data)
-                if group:
-                    groups.append(group)
-                else:
-                    logger.warning(f"Failed to create portfolio group for {symbol}")
+            group = create_portfolio_group(stock_data, option_data)
+            if group:
+                groups.append(group)
 
         except Exception as e:
-            logger.warning(f"Error processing group for symbol {symbol}: {e}")
+            logger.error(f"Error processing group for {symbol}: {e}")
             continue
 
     if not groups:
         raise ValueError("No valid portfolio groups created")
 
-    logger.info(f"\nSuccessfully created {len(groups)} portfolio groups")
-
-    # Print portfolio composition summary
-    logger.info("\n=== Portfolio Composition ===")
-    logger.info(
-        f"Long Stock Value: {format_currency(total_long_value)} ({format_percentage(100 * total_long_value/total_value)})"
-    )
-    logger.info(
-        f"Short Stock Value: {format_currency(total_short_value)} ({format_percentage(100 * total_short_value/total_value)})"
-    )
-    logger.info(
-        f"Call Option Value: {format_currency(total_call_value)} ({format_percentage(100 * total_call_value/total_value)})"
-    )
-    logger.info(
-        f"Put Option Value: {format_currency(total_put_value)} ({format_percentage(100 * total_put_value/total_value)})"
-    )
-
     # Calculate portfolio summary
-    logger.info("\n=== Risk Metrics ===")
-    try:
-        summary = calculate_portfolio_summary(df, groups)
+    summary = calculate_portfolio_summary(df, groups)
 
-        # Log key risk metrics
-        logger.info(f"Net Exposure: {format_currency(summary.total_value_net)}")
-        logger.info(f"Gross Exposure: {format_currency(summary.total_value_abs)}")
-        logger.info(f"Portfolio Beta: {format_beta(summary.portfolio_beta)}")
-        logger.info(
-            f"Long/Short Ratio: {format_percentage(100 * (1 - summary.short_percentage))} / {format_percentage(100 * summary.short_percentage)}"
-        )
-        logger.info(
-            f"Exposure Reduction: {format_percentage(100 * summary.exposure_reduction_percentage)}"
-        )
-        logger.info("=== Portfolio Loading Complete ===\n")
-
-        return groups, summary
-    except Exception as e:
-        logger.error(f"Error calculating portfolio summary: {e}")
-        raise
+    return groups, summary
 
 
 def calculate_portfolio_summary(
     df: pd.DataFrame, groups: List[PortfolioGroup]
 ) -> PortfolioSummary:
-    """Calculate various portfolio summary metrics"""
+    """Calculate various portfolio summary metrics with detailed breakdowns"""
     logger.debug("Starting portfolio summary calculations")
 
     try:
+        # Initialize exposure breakdowns
+        long_stocks = {"value": 0, "beta_adjusted": 0}
+        long_options = {"value": 0, "beta_adjusted": 0}
+        short_stocks = {"value": 0, "beta_adjusted": 0}
+        short_options = {"value": 0, "beta_adjusted": 0}
+
+        # Process each group
+        for group in groups:
+            # Process stock position
+            if group.stock_position:
+                if group.stock_position.quantity > 0:
+                    long_stocks["value"] += group.stock_position.market_value
+                    long_stocks["beta_adjusted"] += (
+                        group.stock_position.beta_adjusted_exposure
+                    )
+                else:
+                    short_stocks["value"] += abs(group.stock_position.market_value)
+                    short_stocks["beta_adjusted"] += abs(
+                        group.stock_position.beta_adjusted_exposure
+                    )
+
+            # Process option positions
+            for opt in group.option_positions:
+                # Calculate if option position is effectively long or short
+                is_long = (opt.option_type == "CALL" and opt.quantity > 0) or (
+                    opt.option_type == "PUT" and opt.quantity < 0
+                )
+
+                if is_long:
+                    long_options["value"] += abs(opt.delta_exposure)
+                    long_options["beta_adjusted"] += abs(opt.beta_adjusted_exposure)
+                else:
+                    short_options["value"] += abs(opt.delta_exposure)
+                    short_options["beta_adjusted"] += abs(opt.beta_adjusted_exposure)
+
+        # Create exposure breakdowns
+        long_exposure = ExposureBreakdown(
+            stock_value=long_stocks["value"],
+            stock_beta_adjusted=long_stocks["beta_adjusted"],
+            option_delta_value=long_options["value"],
+            option_beta_adjusted=long_options["beta_adjusted"],
+            total_value=long_stocks["value"] + long_options["value"],
+            total_beta_adjusted=long_stocks["beta_adjusted"]
+            + long_options["beta_adjusted"],
+            description="Long market exposure from stocks and options",
+            formula="Long stocks + Long calls + Short puts",
+            components={
+                "Long Stocks": long_stocks["value"],
+                "Long Options Delta": long_options["value"],
+            },
+        )
+
+        short_exposure = ExposureBreakdown(
+            stock_value=short_stocks["value"],
+            stock_beta_adjusted=short_stocks["beta_adjusted"],
+            option_delta_value=short_options["value"],
+            option_beta_adjusted=short_options["beta_adjusted"],
+            total_value=short_stocks["value"] + short_options["value"],
+            total_beta_adjusted=short_stocks["beta_adjusted"]
+            + short_options["beta_adjusted"],
+            description="Short market exposure from stocks and options",
+            formula="Short stocks + Short calls + Long puts",
+            components={
+                "Short Stocks": short_stocks["value"],
+                "Short Options Delta": short_options["value"],
+            },
+        )
+
+        options_exposure = ExposureBreakdown(
+            stock_value=0,  # Options only
+            stock_beta_adjusted=0,
+            option_delta_value=long_options["value"] + short_options["value"],
+            option_beta_adjusted=long_options["beta_adjusted"]
+            + short_options["beta_adjusted"],
+            total_value=long_options["value"] + short_options["value"],
+            total_beta_adjusted=long_options["beta_adjusted"]
+            + short_options["beta_adjusted"],
+            description="Total option exposure (both long and short)",
+            formula="Sum of all option delta exposures",
+            components={
+                "Long Options": long_options["value"],
+                "Short Options": short_options["value"],
+            },
+        )
+
         # Calculate total values
-        total_value_net = sum(group.net_exposure for group in groups)
-        total_value_abs = sum(abs(group.net_exposure) for group in groups)
-        logger.debug(f"Total portfolio value (net): {total_value_net:,.2f}")
-
-        # Calculate exposures
-        long_value = sum(g.net_exposure for g in groups if g.net_exposure > 0)
-        short_value = abs(sum(g.net_exposure for g in groups if g.net_exposure < 0))
-        options_exposure = sum(
-            g.total_delta_exposure for g in groups if g.option_positions
-        )
-        logger.debug(f"Long value: {long_value:,.2f}, Short value: {short_value:,.2f}")
-
-        # Calculate beta exposures
-        long_beta_exposure = sum(
-            g.beta_adjusted_exposure for g in groups if g.net_exposure > 0
-        )
-        short_beta_exposure = abs(
-            sum(g.beta_adjusted_exposure for g in groups if g.net_exposure < 0)
-        )
-        options_beta_adjusted = sum(
-            g.beta_adjusted_exposure for g in groups if g.option_positions
-        )
-
-        # Calculate betas
-        long_beta = long_beta_exposure / long_value if long_value else 0
-        short_beta = short_beta_exposure / short_value if short_value else 0
-        logger.debug(f"Long beta: {long_beta:.2f}, Short beta: {short_beta:.2f}")
+        total_value_net = long_exposure.total_value - short_exposure.total_value
+        total_value_abs = long_exposure.total_value + short_exposure.total_value
 
         # Calculate portfolio beta
         portfolio_beta = (
-            sum(g.beta_adjusted_exposure for g in groups) / total_value_net
-            if total_value_net
-            else 0
-        )
-        logger.debug(f"Portfolio beta: {portfolio_beta:.2f}")
-
-        # Calculate short percentage and exposure reduction
-        short_percentage = (short_value / total_value_abs) if total_value_abs > 0 else 0
-        exposure_reduction_amount = short_value
-        exposure_reduction_percentage = (
-            (short_value / (long_value + options_exposure))
-            if (long_value + options_exposure) > 0
+            (long_exposure.total_beta_adjusted - short_exposure.total_beta_adjusted)
+            / total_value_net
+            if total_value_net != 0
             else 0
         )
 
-        # Create summary
+        # Calculate exposure percentages
+        short_percentage = (
+            short_exposure.total_value / total_value_abs if total_value_abs > 0 else 0
+        )
+        exposure_reduction = (
+            short_exposure.total_value / long_exposure.total_value
+            if long_exposure.total_value > 0
+            else 0
+        )
+
+        # Create and return summary
         summary = PortfolioSummary(
             total_value_net=total_value_net,
             total_value_abs=total_value_abs,
             portfolio_beta=portfolio_beta,
-            long_value=long_value,
-            long_beta_exposure=long_beta_exposure,
-            long_portfolio_beta=long_beta,
-            short_value=short_value,
-            short_beta_exposure=short_beta_exposure,
-            short_portfolio_beta=short_beta,
+            long_exposure=long_exposure,
+            short_exposure=short_exposure,
+            options_exposure=options_exposure,
             short_percentage=short_percentage,
-            options_delta_exposure=options_exposure,
-            options_beta_adjusted=options_beta_adjusted,
-            total_exposure_before_shorts=long_value + options_exposure,
-            total_exposure_after_shorts=(long_value + options_exposure - short_value),
-            exposure_reduction_amount=exposure_reduction_amount,
-            exposure_reduction_percentage=exposure_reduction_percentage,
+            exposure_reduction_percentage=exposure_reduction,
         )
+
         logger.info("Portfolio summary created successfully")
         return summary
 

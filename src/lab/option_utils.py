@@ -92,23 +92,24 @@ def parse_option_description(
 def calculate_simple_delta(option: OptionPosition, underlying_price: float) -> float:
     """
     Calculate a simple delta based on moneyness.
-    This is a placeholder for more sophisticated delta calculation.
+    TODO: This is a placeholder for more sophisticated delta calculation.
     """
-    moneyness = underlying_price / option.strike
-
     if option.option_type == "CALL":
+        moneyness = underlying_price / option.strike
         if moneyness >= 1.1:  # Deep ITM
             delta = 0.95
         elif moneyness <= 0.9:  # Deep OTM
             delta = 0.05
         else:  # Near the money
             delta = 0.5 + (moneyness - 1) * 2  # Linear approximation
-    elif moneyness >= 1.1:  # Deep OTM
-        delta = -0.05
-    elif moneyness <= 0.9:  # Deep ITM
-        delta = -0.95
-    else:  # Near the money
-        delta = -0.5 - (moneyness - 1) * 2  # Linear approximation
+    else:  # PUT
+        moneyness = option.strike / underlying_price  # Invert moneyness for puts
+        if moneyness >= 1.1:  # Deep ITM for puts
+            delta = -0.95
+        elif moneyness <= 0.9:  # Deep OTM for puts
+            delta = -0.05
+        else:  # Near the money
+            delta = -0.5 - (moneyness - 1) * 2  # Linear approximation
 
     # Ensure delta is within bounds
     delta = max(min(delta, 1.0), -1.0)

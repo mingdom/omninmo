@@ -20,10 +20,11 @@ help:
 	@echo "  train       - Train the model (use --sample for training with sample data)"
 	@echo "  predict     - Run predictions using console app (usage: make predict [NVDA])"
 	@echo "  mlflow      - Start the MLflow UI to view training results (optional: make mlflow PORT=5001)"
-	@echo "  clean       - Clean up generated files"
+	@echo "  clean       - Clean up generated files and caches"
 	@echo "               Options: --cache (also clear data cache)"
-	@echo "  lint        - Run Python linter"
-	@echo "               Options: --fix (auto-fix issues)"
+	@echo "  lint        - Run type checker and linter"
+	@echo "               Options: --fix (auto-fix linting issues)"
+	@echo "  test        - Run all tests in the tests directory"
 
 # Set up virtual environment
 .PHONY: env
@@ -88,6 +89,9 @@ mlflow:
 clean:
 	@echo "Cleaning up generated files..."
 	@bash $(SCRIPTS_DIR)/clean.sh
+	@find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+	@find . -type d -name ".mypy_cache" -exec rm -rf {} + 2>/dev/null || true
+	@find . -type d -name ".ruff_cache" -exec rm -rf {} + 2>/dev/null || true
 	@if [ "$(findstring --cache,$(MAKECMDGOALS))" != "" ]; then \
 		echo "Clearing data cache..."; \
 		rm -rf cache/*; \
@@ -96,49 +100,39 @@ clean:
 	fi
 
 # Lint Python code
-.PHONY: lint lint-fix
+.PHONY: lint
 lint:
-	@echo "Running Python linter..."
+	@echo "Running type checker and linter..."
 	@if [ ! -d "$(VENV_DIR)" ]; then \
 		echo "Virtual environment not found. Please run 'make env' first."; \
 		exit 1; \
 	fi
 	@mkdir -p $(LOGS_DIR)
-	@(echo "=== Lint Check Log $(TIMESTAMP) ===" && \
-	echo "Starting lint check at: $$(date)" && \
+	@(echo "=== Code Check Log $(TIMESTAMP) ===" && \
+	echo "Starting checks at: $$(date)" && \
 	(source $(VENV_DIR)/bin/activate && \
-	echo "Running linter in check-only mode..." && \
-	ruff check .; \
-	EXIT_CODE=$$?; \
-	if [ $$EXIT_CODE -ne 0 ]; then \
-		echo ""; \
-		echo "Linting issues found. To automatically fix issues, run:"; \
-		echo "  make lint-fix"; \
-	fi; \
-	exit $$EXIT_CODE) 2>&1) | tee $(LOGS_DIR)/lint_$(TIMESTAMP).log
-	@echo "Lint check log saved to: $(LOGS_DIR)/lint_$(TIMESTAMP).log"
+	echo "Running type checker..." && \
+	mypy src/folio --strict && \
+	echo "Running linter..." && \
+	ruff check $(if $(findstring --fix,$(MAKECMDGOALS)),--fix,.) \
+	) 2>&1) | tee $(LOGS_DIR)/code_check_$(TIMESTAMP).log
+	@echo "Check log saved to: $(LOGS_DIR)/code_check_$(TIMESTAMP).log"
 
-lint-fix:
-	@echo "Running Python linter with auto-fix..."
-	@if [ ! -d "$(VENV_DIR)" ]; then \
-		echo "Virtual environment not found. Please run 'make env' first."; \
-		exit 1; \
-	fi
-	@mkdir -p $(LOGS_DIR)
-	@(echo "=== Lint Fix Log $(TIMESTAMP) ===" && \
-	echo "Starting lint fix at: $$(date)" && \
-	(source $(VENV_DIR)/bin/activate && \
-	echo "Running linter with auto-fix enabled..." && \
-	ruff check --fix .) 2>&1) | tee $(LOGS_DIR)/lint_$(TIMESTAMP).log
-	@echo "Lint fix log saved to: $(LOGS_DIR)/lint_$(TIMESTAMP).log"
-
-# Allow --sample and --cache as targets without actions
-.PHONY: --sample --cache
---sample:
---cache:
+# Allow --fix as target without actions
+.PHONY: --fix
+--fix:
 
 # Lab Projects
-.PHONY: portfolio folio stop-folio
+.PHONY: portfolio folio stop-folio port
+
+portfolio:
+	@echo "Starting portfolio dashboard with default portfolio.csv..."
+	@if [ ! -d "$(VENV_DIR)" ]; then \
+		echo "Virtual environment not found. Please run 'make env' first."; \
+		exit 1; \
+	fi
+	@source $(VENV_DIR)/bin/activate && \
+	PYTHONPATH=. python3 -m folio --port 8051 --portfolio src/lab/portfolio.csv
 
 port:
 	@echo "Running portfolio analysis..."
@@ -171,6 +165,21 @@ stop-folio:
 	else \
 		echo "No running folio processes found."; \
 	fi
+
+# Test target
+.PHONY: test
+test:
+	@echo "Running tests..."
+	@if [ ! -d "$(VENV_DIR)" ]; then \
+		echo "Virtual environment not found. Please run 'make env' first."; \
+		exit 1; \
+	fi
+	@mkdir -p $(LOGS_DIR)
+	@(echo "=== Test Run Log $(TIMESTAMP) ===" && \
+	echo "Starting tests at: $$(date)" && \
+	(source $(VENV_DIR)/bin/activate && \
+	PYTHONPATH=. pytest tests/ -v) 2>&1) | tee $(LOGS_DIR)/test_$(TIMESTAMP).log
+	@echo "Test log saved to: $(LOGS_DIR)/test_$(TIMESTAMP).log"
 
 %:
 	@: 

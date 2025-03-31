@@ -242,13 +242,16 @@ def create_app(portfolio_file: str = None, debug: bool = False) -> dash.Dash:
         [
             dcc.Location(id="url", refresh=False),  # Add URL component
             html.H2("Folio", className="my-3"),
-            create_upload_section() if not portfolio_file else None,
+            create_upload_section(),  # Always show upload section
             create_header(),
             create_filters(),
             create_main_table(),
             create_position_modal(),
             dcc.Store(id="portfolio-data"),
+            dcc.Store(id="portfolio-summary"),  # Add portfolio summary store
+            dcc.Store(id="portfolio-groups"),  # Add portfolio groups store
             dcc.Store(id="selected-position"),
+            dcc.Store(id="loading-output"),  # Add loading output store
             dcc.Interval(
                 id="interval-component",
                 interval=5 * 60 * 1000,  # 5 minutes in milliseconds
@@ -275,108 +278,76 @@ def create_app(portfolio_file: str = None, debug: bool = False) -> dash.Dash:
     @app.callback(
         [
             Output("portfolio-data", "data"),
+            Output("portfolio-summary", "data"),
+            Output("portfolio-groups", "data"),
+            Output("loading-output", "children"),
             Output("upload-status", "children"),
         ],
         [
-            Input("interval-component", "n_intervals"),
+            Input("initial-trigger", "data"),
+            Input("url", "pathname"),
             Input("upload-portfolio", "contents"),
-            Input("initial-trigger", "data"),  # Add initial trigger input
         ],
         [
             State("upload-portfolio", "filename"),
         ],
     )
-    def update_portfolio_data(n_intervals, contents, initial_trigger, filename):
-        """Update portfolio data from CSV file or upload"""
-        logger.info("Updating portfolio data")
+    def update_portfolio_data(initial_trigger, pathname, contents, filename):
+        """Update portfolio data when triggered"""
         try:
-            if app.portfolio_file:
-                # Use provided portfolio file
-                logger.info(
-                    f"Attempting to load portfolio from file: {app.portfolio_file}"
-                )
-                try:
-                    df = pd.read_csv(app.portfolio_file)
-                    logger.info(
-                        f"Successfully read {len(df)} rows from {app.portfolio_file}"
-                    )
-                    logger.info(f"Columns found: {', '.join(df.columns)}")
-                except Exception as e:
-                    logger.error(f"Failed to read portfolio file: {e}", exc_info=True)
-                    return None, html.Div(
-                        f"Error reading portfolio file: {e!s}", className="text-danger"
-                    )
-            elif contents:
-                # Handle uploaded file
+            logger.info("Loading portfolio data...")
+            ctx = dash.callback_context
+            trigger_id = ctx.triggered[0]["prop_id"] if ctx.triggered else ""
+            logger.info(f"Trigger: {trigger_id}")
+
+            # Handle file upload if provided
+            if contents and "upload-portfolio.contents" in trigger_id:
                 import base64
                 import io
 
-                logger.info(f"Attempting to load uploaded file: {filename}")
+                logger.info(f"Processing uploaded file: {filename}")
                 content_type, content_string = contents.split(",")
                 decoded = base64.b64decode(content_string)
                 df = pd.read_csv(io.StringIO(decoded.decode("utf-8")))
                 logger.info(
                     f"Successfully read {len(df)} rows from uploaded file {filename}"
                 )
-                logger.info(f"Columns found: {', '.join(df.columns)}")
                 status = html.Div(
                     f"Successfully loaded {filename}", className="text-success"
                 )
+            elif app.portfolio_file:
+                # Use default portfolio file
+                df = pd.read_csv(app.portfolio_file)
+                logger.info(f"Successfully read {len(df)} rows from portfolio file")
+                status = html.Div(
+                    "Using default portfolio file", className="text-muted"
+                )
             else:
                 # No data available
-                logger.warning("No portfolio file or upload provided")
-                return None, html.Div(
-                    "Please upload a portfolio CSV file", className="text-muted"
+                return (
+                    [],
+                    {},
+                    [],
+                    "",
+                    html.Div("Please upload a portfolio file", className="text-muted"),
                 )
 
-            # Process data
-            logger.info("Processing portfolio data...")
+            # Process portfolio data
             groups, summary = process_portfolio_data(df)
             logger.info(f"Successfully processed {len(groups)} portfolio groups")
 
-            # Convert to serializable format
-            data = {
-                "groups": [
-                    {
-                        "stock": vars(g.stock_position) if g.stock_position else None,
-                        "options": [vars(opt) for opt in g.option_positions],
-                        "net_exposure": g.net_exposure,
-                        "beta_adjusted_exposure": g.beta_adjusted_exposure,
-                        "total_delta_exposure": g.total_delta_exposure,
-                        "call_count": g.call_count,
-                        "put_count": g.put_count,
-                        "net_option_value": g.net_option_value,
-                    }
-                    for g in groups
-                ],
-                "summary": vars(summary),
-            }
-            status = html.Div(
-                "Portfolio data loaded successfully", className="text-success"
-            )
-            return data, status
+            # Convert to Dash-compatible format
+            groups_data = [g.to_dict() for g in groups]
+            summary_data = summary.to_dict()
+            portfolio_data = df.to_dict("records")
+
+            return portfolio_data, summary_data, groups_data, "", status
 
         except Exception as e:
             logger.error(f"Error updating portfolio data: {e}", exc_info=True)
-            import traceback
-
-            logger.error(f"Traceback: {traceback.format_exc()}")
-            status = html.Div(
-                f"Error loading portfolio data: {e!s}", className="text-danger"
-            )
-            return None, status
-
-    # Trigger initial load if portfolio file is provided
-    if portfolio_file:
-        logger.info("Triggering initial portfolio load")
-        try:
-            df = pd.read_csv(portfolio_file)
-            logger.info(f"Successfully read {len(df)} rows from {portfolio_file}")
-            logger.info(f"Columns found: {', '.join(df.columns)}")
-            groups, summary = process_portfolio_data(df)
-            logger.info(f"Successfully processed {len(groups)} portfolio groups")
-        except Exception as e:
-            logger.error(f"Error during initial portfolio load: {e}", exc_info=True)
+            error_msg = f"Error loading portfolio: {e!s}"
+            error_div = html.Div(error_msg, className="text-danger")
+            return [], {}, [], error_msg, error_div
 
     @app.callback(
         [
@@ -389,25 +360,39 @@ def create_app(portfolio_file: str = None, debug: bool = False) -> dash.Dash:
             Output("options-exposure", "children"),
             Output("options-beta", "children"),
         ],
-        Input("portfolio-data", "data"),
+        Input("portfolio-summary", "data"),
     )
-    def update_summary_cards(data):
+    def update_summary_cards(summary_data):
         """Update summary cards with latest data"""
         logger.debug("Updating summary cards")
         try:
-            if not data or "summary" not in data:
+            if not summary_data:
                 return ["$0.00"] * 4 + ["0.00β"] * 4
 
-            summary = data["summary"]
             return [
-                format_currency(summary["total_value_net"]),
-                format_beta(summary["portfolio_beta"]),
-                format_currency(summary["long_value"]),
-                format_beta(summary["long_portfolio_beta"]),
-                format_currency(summary["short_value"]),
-                format_beta(summary["short_portfolio_beta"]),
-                format_currency(summary["options_delta_exposure"]),
-                format_beta(summary["options_beta_adjusted"]),
+                format_currency(summary_data["total_value_net"]),
+                format_beta(summary_data["portfolio_beta"]),
+                format_currency(summary_data["long_exposure"]["total_value"]),
+                format_beta(
+                    summary_data["long_exposure"]["total_beta_adjusted"]
+                    / summary_data["long_exposure"]["total_value"]
+                    if summary_data["long_exposure"]["total_value"] != 0
+                    else 0
+                ),
+                format_currency(summary_data["short_exposure"]["total_value"]),
+                format_beta(
+                    summary_data["short_exposure"]["total_beta_adjusted"]
+                    / summary_data["short_exposure"]["total_value"]
+                    if summary_data["short_exposure"]["total_value"] != 0
+                    else 0
+                ),
+                format_currency(summary_data["options_exposure"]["total_value"]),
+                format_beta(
+                    summary_data["options_exposure"]["total_beta_adjusted"]
+                    / summary_data["options_exposure"]["total_value"]
+                    if summary_data["options_exposure"]["total_value"] != 0
+                    else 0
+                ),
             ]
 
         except Exception as e:
@@ -417,18 +402,20 @@ def create_app(portfolio_file: str = None, debug: bool = False) -> dash.Dash:
     @app.callback(
         Output("portfolio-table", "children"),
         [
-            Input("portfolio-data", "data"),
+            Input("portfolio-groups", "data"),
             Input("search-input", "value"),
             Input("filter-all", "n_clicks"),
             Input("filter-stocks", "n_clicks"),
             Input("filter-options", "n_clicks"),
         ],
     )
-    def update_portfolio_table(data, search, all_clicks, stocks_clicks, options_clicks):
+    def update_portfolio_table(
+        groups_data, search, all_clicks, stocks_clicks, options_clicks
+    ):
         """Update portfolio table based on filters"""
         logger.debug("Updating portfolio table")
         try:
-            if not data or "groups" not in data:
+            if not groups_data:
                 return html.Tr(
                     html.Td(
                         "No portfolio data available",
@@ -439,12 +426,23 @@ def create_app(portfolio_file: str = None, debug: bool = False) -> dash.Dash:
 
             # Convert data back to PortfolioGroup objects
             groups = []
-            for g in data["groups"]:
-                stock_position = Position(**g["stock"]) if g["stock"] else None
-                option_positions = [OptionPosition(**opt) for opt in g["options"]]
+            for g in groups_data:
+                stock_position = (
+                    Position(**g["stock_position"]) if g["stock_position"] else None
+                )
+                option_positions = [
+                    OptionPosition(**opt) for opt in g["option_positions"]
+                ]
                 group = PortfolioGroup(
+                    ticker=g["ticker"],
                     stock_position=stock_position,
                     option_positions=option_positions,
+                    total_value=g["total_value"],
+                    net_exposure=g["net_exposure"],
+                    beta=g["beta"],
+                    beta_adjusted_exposure=g["beta_adjusted_exposure"],
+                    total_delta_exposure=g["total_delta_exposure"],
+                    options_delta_exposure=g["options_delta_exposure"],
                 )
                 groups.append(group)
 
@@ -482,14 +480,14 @@ def create_app(portfolio_file: str = None, debug: bool = False) -> dash.Dash:
             Input({"type": "position-details", "index": ALL}, "n_clicks"),
         ],
         [
-            State("portfolio-data", "data"),
+            State("portfolio-groups", "data"),
             State("portfolio-table", "active_cell"),
         ],
     )
-    def store_selected_position(active_cell, btn_clicks, data, prev_active_cell):
+    def store_selected_position(active_cell, btn_clicks, groups_data, prev_active_cell):
         """Store selected position data when row is clicked or Details button is clicked"""
         logger.debug("Storing selected position")
-        if not data or "groups" not in data:
+        if not groups_data:
             logger.debug("No portfolio data available for selection")
             return None
 
@@ -511,18 +509,16 @@ def create_app(portfolio_file: str = None, debug: bool = False) -> dash.Dash:
                     return None
 
                 # Find the group with matching ticker
-                for i, group_data in enumerate(data["groups"]):
+                for i, group_data in enumerate(groups_data):
                     try:
                         stock_ticker = (
-                            group_data["stock"]["ticker"]
-                            if group_data["stock"]
+                            group_data["stock_position"]["ticker"]
+                            if group_data["stock_position"]
                             else None
                         )
-                        option_tickers = (
-                            [opt["ticker"] for opt in group_data["options"]]
-                            if group_data["options"]
-                            else []
-                        )
+                        option_tickers = [
+                            opt["ticker"] for opt in group_data["option_positions"]
+                        ]
 
                         if stock_ticker == ticker or ticker in option_tickers:
                             row = i
@@ -545,37 +541,14 @@ def create_app(portfolio_file: str = None, debug: bool = False) -> dash.Dash:
                 logger.debug(f"Table cell clicked at row {row}")
 
             # Validate row index
-            if row < 0 or row >= len(data["groups"]):
+            if row < 0 or row >= len(groups_data):
                 logger.error(
-                    f"Row index out of range: {row}, groups length: {len(data['groups'])}"
+                    f"Row index out of range: {row}, groups length: {len(groups_data)}"
                 )
                 return None
 
-            group_data = data["groups"][row]
-            logger.debug(f"Processing group data at row {row}")
-
-            # Convert to PortfolioGroup
-            stock_position = (
-                Position(**group_data["stock"]) if group_data["stock"] else None
-            )
-            option_positions = [OptionPosition(**opt) for opt in group_data["options"]]
-            group = PortfolioGroup(
-                stock_position=stock_position,
-                option_positions=option_positions,
-            )
-
-            result = {
-                "stock": vars(group.stock_position) if group.stock_position else None,
-                "options": [vars(opt) for opt in group.option_positions],
-                "net_exposure": group.net_exposure,
-                "beta_adjusted_exposure": group.beta_adjusted_exposure,
-                "total_delta_exposure": group.total_delta_exposure,
-                "call_count": group.call_count,
-                "put_count": group.put_count,
-                "net_option_value": group.net_option_value,
-            }
-            logger.debug("Successfully created position data for modal")
-            return result
+            # Return the group data directly since it's already in the right format
+            return groups_data[row]
 
         except Exception as e:
             logger.error(f"Error storing selected position: {e}", exc_info=True)
@@ -615,16 +588,23 @@ def create_app(portfolio_file: str = None, debug: bool = False) -> dash.Dash:
                     )
 
                 stock_position = (
-                    Position(**position_data["stock"])
-                    if position_data["stock"]
+                    Position(**position_data["stock_position"])
+                    if position_data["stock_position"]
                     else None
                 )
                 option_positions = [
-                    OptionPosition(**opt) for opt in position_data["options"]
+                    OptionPosition(**opt) for opt in position_data["option_positions"]
                 ]
                 group = PortfolioGroup(
+                    ticker=position_data["ticker"],
                     stock_position=stock_position,
                     option_positions=option_positions,
+                    total_value=position_data["total_value"],
+                    net_exposure=position_data["net_exposure"],
+                    beta=position_data["beta"],
+                    beta_adjusted_exposure=position_data["beta_adjusted_exposure"],
+                    total_delta_exposure=position_data["total_delta_exposure"],
+                    options_delta_exposure=position_data["options_delta_exposure"],
                 )
                 logger.debug("Successfully created PortfolioGroup from position data")
 
