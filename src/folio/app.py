@@ -316,6 +316,7 @@ def create_app(portfolio_file: str = None, debug: bool = False) -> dash.Dash:
             Output("portfolio-groups", "data"),
             Output("loading-output", "children"),
             Output("upload-status", "children"),
+            Output("portfolio-table", "active_cell"),
         ],
         [
             Input("initial-trigger", "data"),
@@ -364,6 +365,7 @@ def create_app(portfolio_file: str = None, debug: bool = False) -> dash.Dash:
                     [],
                     "",
                     html.Div("Please upload a portfolio file", className="text-muted"),
+                    None,
                 )
 
             # Process portfolio data
@@ -375,13 +377,13 @@ def create_app(portfolio_file: str = None, debug: bool = False) -> dash.Dash:
             summary_data = summary.to_dict()
             portfolio_data = df.to_dict("records")
 
-            return portfolio_data, summary_data, groups_data, "", status
+            return portfolio_data, summary_data, groups_data, "", status, None
 
         except Exception as e:
             logger.error(f"Error updating portfolio data: {e}", exc_info=True)
             error_msg = f"Error loading portfolio: {e!s}"
             error_div = html.Div(error_msg, className="text-danger")
-            return [], {}, [], error_msg, error_div
+            return [], {}, [], error_msg, error_div, None
 
     @app.callback(
         [
@@ -537,9 +539,7 @@ def create_app(portfolio_file: str = None, debug: bool = False) -> dash.Dash:
                     ticker = eval(button_idx)["index"]
                     logger.debug(f"Button clicked for ticker: {ticker}")
                 except Exception as e:
-                    logger.error(
-                        f"Error parsing button index: {e}, button_idx: {button_idx}"
-                    )
+                    logger.error(f"Error parsing button index: {e}")
                     return None
 
                 # Find the group with matching ticker
@@ -567,9 +567,9 @@ def create_app(portfolio_file: str = None, debug: bool = False) -> dash.Dash:
                     logger.error(f"Could not find group for ticker: {ticker}")
                     return None
             else:
-                # Table cell click
-                if not active_cell:
-                    logger.debug("No active cell selected")
+                # Table cell click - only process if it was user-initiated
+                if not active_cell or active_cell == prev_active_cell:
+                    logger.debug("No active cell selected or unchanged")
                     return None
                 row = active_cell["row"]
                 logger.debug(f"Table cell clicked at row {row}")
@@ -600,16 +600,32 @@ def create_app(portfolio_file: str = None, debug: bool = False) -> dash.Dash:
             Input("selected-position", "data"),
             Input("position-modal", "is_open"),
         ],
+        [
+            State("portfolio-table", "active_cell"),
+            State({"type": "position-details", "index": ALL}, "n_clicks"),
+        ],
     )
-    def toggle_position_modal(position_data, is_open):
+    def toggle_position_modal(position_data, is_open, active_cell, btn_clicks):
         """Toggle position details modal"""
         logger.debug("Toggling position modal")
         ctx = dash.callback_context
         trigger_id = ctx.triggered[0]["prop_id"] if ctx.triggered else ""
         logger.debug(f"Modal toggle trigger: {trigger_id}")
 
+        # If modal is open and we click outside, close it
+        if is_open and "position-modal.is_open" in trigger_id:
+            return False, dash.no_update
+
+        # Only open modal if position data changed AND it was from a user action
         if "selected-position" in trigger_id and position_data:
-            # If new position data was loaded, open the modal
+            # Check if this was triggered by a user action (either button click or cell click)
+            was_button_click = any(n for n in btn_clicks if n)  # Any button was clicked
+            was_cell_click = active_cell is not None  # Cell was clicked
+
+            if not (was_button_click or was_cell_click):
+                logger.debug("Position data changed but not from user action")
+                return False, dash.no_update
+
             logger.debug(
                 f"Position data received: {position_data.keys() if position_data else None}"
             )
@@ -657,7 +673,7 @@ def create_app(portfolio_file: str = None, debug: bool = False) -> dash.Dash:
                     className="text-danger p-3",
                 )
 
-        # Keep modal state unchanged if it's not the selected-position trigger
+        # Keep modal state unchanged for all other cases
         logger.debug(f"No action needed, keeping modal state: {is_open}")
         return is_open, dash.no_update
 
