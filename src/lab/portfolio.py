@@ -4,6 +4,10 @@ import re  # Regular expressions for cleaning
 
 import pandas as pd
 
+from src.lab.option_utils import (
+    calculate_simple_delta,
+    parse_option_description,
+)
 from src.v2.data_fetcher import DataFetcher
 
 
@@ -161,6 +165,108 @@ def get_betas(tickers):
     return betas
 
 
+def process_options(df: pd.DataFrame, beta_map: dict) -> tuple[pd.DataFrame, dict]:
+    """Process option positions and calculate exposures."""
+    option_positions = []
+
+    # Filter for option rows
+    option_rows = df[df["Symbol"].apply(is_option)]
+
+    # Create a map of stock positions and prices
+    stock_positions = {}
+    for _, row in df[~df["Symbol"].apply(is_option)].iterrows():
+        if row["Last Price"] and isinstance(row["Last Price"], str):
+            try:
+                price = clean_currency(row["Last Price"])
+                if price > 0:
+                    symbol = row["Cleaned Symbol"]
+                    stock_positions[symbol] = {
+                        "price": price,
+                        "quantity": int(row["Quantity"]),
+                        "value": clean_currency(row["Current Value"]),
+                        "beta": beta_map.get(symbol, 1.0),
+                    }
+            except:
+                continue
+
+    for _, row in option_rows.iterrows():
+        try:
+            # Clean the last price
+            last_price = clean_currency(row["Last Price"])
+
+            # Parse option details
+            option = parse_option_description(
+                row["Description"], int(row["Quantity"]), last_price
+            )
+
+            # Get underlying price
+            stock_info = stock_positions.get(option.underlying)
+            if not stock_info:
+                print(
+                    f"Warning: No price found for underlying {option.underlying} for option {row['Symbol']}"
+                )
+                continue
+
+            underlying_price = stock_info["price"]
+
+            # Calculate delta
+            delta = calculate_simple_delta(option, underlying_price)
+
+            # Store option with its calculations
+            option_positions.append(
+                {
+                    "Symbol": row["Symbol"],
+                    "Underlying": option.underlying,
+                    "Type": f"{option.option_type}",
+                    "Strike": option.strike,
+                    "Expiry": option.expiry.strftime("%Y-%m-%d"),
+                    "Quantity": option.quantity,
+                    "Current Value": option.market_value,
+                    "Notional Value": option.notional_value,
+                    "Delta": delta,
+                    "Delta Exposure": delta * option.notional_value,
+                    "Beta": beta_map.get(option.underlying, 1.0),
+                    "Beta-Adjusted Exposure": delta
+                    * option.notional_value
+                    * beta_map.get(option.underlying, 1.0),
+                }
+            )
+
+        except Exception as e:
+            print(f"Warning: Could not process option {row['Symbol']}: {e}")
+            continue
+
+    # Convert to DataFrame
+    if option_positions:
+        options_df = pd.DataFrame(option_positions)
+        # Group by underlying for summary
+        summary = {}
+        for underlying, group in options_df.groupby("Underlying"):
+            stock_info = stock_positions.get(underlying, {})
+            stock_value = stock_info.get("value", 0)
+            stock_quantity = stock_info.get("quantity", 0)
+            stock_beta = stock_info.get("beta", 1.0)
+
+            total_delta_exposure = group["Delta Exposure"].sum()
+            total_beta_adjusted = group["Beta-Adjusted Exposure"].sum()
+
+            summary[underlying] = {
+                "Stock Position": stock_quantity if stock_quantity != 0 else None,
+                "Stock Value": stock_value,
+                "Stock Beta": stock_beta,
+                "Total Delta Exposure": total_delta_exposure,
+                "Total Beta-Adjusted Exposure": total_beta_adjusted,
+                "Net Exposure": stock_value + total_delta_exposure,
+                "Net Beta-Adjusted": (stock_value * stock_beta) + total_beta_adjusted,
+                "Call Count": len(group[group["Type"] == "CALL"]),
+                "Put Count": len(group[group["Type"] == "PUT"]),
+                "Net Option Value": group["Current Value"].sum(),
+            }
+        return options_df, summary
+    else:
+        return pd.DataFrame(), {}
+
+
 def main():
     """Main function to calculate portfolio beta."""
     args = parse_args()
@@ -247,8 +353,11 @@ def main():
 
     portfolio_beta = df_filtered["Position_Beta"].sum()
 
-    # 6. Display Results
-    print("\n--- Portfolio Beta Calculation Summary ---")
+    # Process options
+    options_df, options_summary = process_options(df, beta_map)
+
+    # Display Results
+    print("\n=== Stock-Only Portfolio Analysis ===")
     display_df = df_filtered[
         ["Cleaned Symbol", "Type", "Clean Value", "Weight", "Beta", "Position_Beta"]
     ].copy()
@@ -297,6 +406,85 @@ def main():
     print("4. Adjust position sizes by option deltas")
     print("5. Use underlying stock betas for option positions")
     print("6. Consider gamma risk for large market moves")
+
+    if not options_df.empty:
+        print("\n=== Options Analysis ===")
+        print("\nOptions Positions:")
+        display_options = options_df[
+            [
+                "Underlying",
+                "Type",
+                "Strike",
+                "Expiry",
+                "Quantity",
+                "Delta",
+                "Delta Exposure",
+                "Beta-Adjusted Exposure",
+            ]
+        ].copy()
+
+        # Format numeric columns
+        display_options["Delta"] = display_options["Delta"].map("{:+.2f}".format)
+        display_options["Delta Exposure"] = display_options["Delta Exposure"].map(
+            "${:+,.2f}".format
+        )
+        display_options["Beta-Adjusted Exposure"] = display_options[
+            "Beta-Adjusted Exposure"
+        ].map("${:+,.2f}".format)
+
+        print(display_options.to_string(index=False))
+
+        print("\nOptions and Stock Summary by Underlying:")
+        for underlying, summary in options_summary.items():
+            print(f"\n{underlying}:")
+            # Show stock position if exists
+            if summary["Stock Position"] is not None:
+                print(
+                    f"  Stock Position: {summary['Stock Position']:+,d} shares (${summary['Stock Value']:,.2f})"
+                )
+                print(f"  Stock Beta: {summary['Stock Beta']:.2f}")
+            else:
+                print("  Stock Position: None")
+
+            print(
+                f"  Options: {summary['Call Count']} calls, {summary['Put Count']} puts"
+            )
+            print(f"  Net Option Value: ${summary['Net Option Value']:,.2f}")
+            print(f"  Option Delta Exposure: ${summary['Total Delta Exposure']:+,.2f}")
+            print(f"  Net Position Exposure: ${summary['Net Exposure']:+,.2f}")
+            print(
+                f"  Net Beta-Adjusted Exposure: ${summary['Net Beta-Adjusted']:+,.2f}"
+            )
+
+        # Calculate combined exposure
+        print("\n=== Combined Portfolio Analysis ===")
+        total_exposure = total_portfolio_value_net
+        total_beta_adjusted = total_portfolio_value_net * portfolio_beta
+
+        for underlying, summary in options_summary.items():
+            total_exposure += summary["Total Delta Exposure"]
+            total_beta_adjusted += summary["Total Beta-Adjusted Exposure"]
+
+        combined_beta = (
+            total_beta_adjusted / total_exposure if total_exposure != 0 else 0
+        )
+
+        print("\nTotal Portfolio Exposure (Stock + Options):")
+        print(f"Net Stock Exposure: ${total_portfolio_value_net:,.2f}")
+        print(
+            f"Net Options Delta Exposure: ${sum(s['Total Delta Exposure'] for s in options_summary.values()):,.2f}"
+        )
+        print(f"Total Net Exposure: ${total_exposure:,.2f}")
+        print(f"Combined Portfolio Beta: {combined_beta:.3f}")
+
+        # Update dollar sensitivities to use combined exposure
+        print("\n--- Dollar Value Sensitivity (All Positions) ---")
+        print("If SPY moves by:      Your portfolio is expected to move by:")
+        for move in spy_moves:
+            dollar_impact = total_exposure * combined_beta * move
+            print(
+                f"  {move:>7.1%}           ${dollar_impact:>12,.2f}  ({(combined_beta * move):>+6.2%})"
+            )
 
 
 if __name__ == "__main__":
