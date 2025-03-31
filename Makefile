@@ -6,7 +6,9 @@ PYTHON := python3
 VENV_DIR := venv
 SCRIPTS_DIR := scripts
 LOGS_DIR := logs
+SRC_DIR := src.v2
 TIMESTAMP := $(shell date +%Y%m%d_%H%M%S)
+PORT := 5000
 
 # Default target
 .PHONY: help
@@ -57,7 +59,7 @@ install:
 train:
 	@echo "Training the model..."
 	@source $(VENV_DIR)/bin/activate && \
-	$(PYTHON) $(SCRIPTS_DIR)/v2_train.py $(if $(findstring --sample,$(MAKECMDGOALS)),--force-sample,)
+	PYTHONPATH=. $(PYTHON) -m $(SRC_DIR).train $(if $(findstring --sample,$(MAKECMDGOALS)),--force-sample,)
 
 # Run predictions
 .PHONY: predict
@@ -67,10 +69,10 @@ predict:
 	if [ -n "$(filter-out $@,$(MAKECMDGOALS))" ]; then \
 		TICKERS=$$(echo "$(filter-out $@,$(MAKECMDGOALS))" | tr ',' ' '); \
 		echo "Predicting for: $$TICKERS"; \
-		$(PYTHON) $(SCRIPTS_DIR)/v2_predict.py --tickers $$TICKERS; \
+		PYTHONPATH=. $(PYTHON) -m $(SRC_DIR).console_app --tickers $$TICKERS; \
 	else \
 		echo "Running predictions on watchlist..."; \
-		$(PYTHON) $(SCRIPTS_DIR)/v2_predict.py; \
+		PYTHONPATH=. $(PYTHON) -m $(SRC_DIR).console_app; \
 	fi
 
 # Start the MLflow UI
