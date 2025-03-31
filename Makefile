@@ -138,9 +138,9 @@ lint-fix:
 --cache:
 
 # Lab Projects
-.PHONY: portfolio
+.PHONY: portfolio folio stop-folio
 
-portfolio:
+port:
 	@echo "Running portfolio analysis..."
 	@if [ ! -d "$(VENV_DIR)" ]; then \
 		echo "Virtual environment not found. Please run 'make env' first."; \
@@ -148,6 +148,29 @@ portfolio:
 	fi
 	@source $(VENV_DIR)/bin/activate && \
 	PYTHONPATH=. python3 src/lab/portfolio.py "$(if $(csv),$(csv),src/lab/portfolio.csv)"
+
+folio:
+	@echo "Starting portfolio dashboard..."
+	@if [ ! -d "$(VENV_DIR)" ]; then \
+		echo "Virtual environment not found. Please run 'make env' first."; \
+		exit 1; \
+	fi
+	@source $(VENV_DIR)/bin/activate && \
+	PYTHONPATH=. python3 -m folio --port 8051 $(if $(portfolio),--portfolio $(portfolio),)
+
+stop-folio:
+	@echo "Stopping portfolio dashboard..."
+	@PIDS=$$(ps aux | grep "[p]ython.*folio" | awk '{print $$2}'); \
+	if [ -n "$$PIDS" ]; then \
+		echo "Found folio processes with PIDs: $$PIDS"; \
+		for PID in $$PIDS; do \
+			echo "Killing process $$PID..."; \
+			kill -9 $$PID 2>/dev/null || echo "Failed to kill process $$PID (might require sudo)"; \
+		done; \
+		echo "All folio processes have been terminated."; \
+	else \
+		echo "No running folio processes found."; \
+	fi
 
 %:
 	@: 
