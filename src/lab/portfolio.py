@@ -458,32 +458,84 @@ def main():
 
         # Calculate combined exposure
         print("\n=== Combined Portfolio Analysis ===")
-        total_exposure = total_portfolio_value_net
-        total_beta_adjusted = total_portfolio_value_net * portfolio_beta
 
-        for underlying, summary in options_summary.items():
-            total_exposure += summary["Total Delta Exposure"]
-            total_beta_adjusted += summary["Total Beta-Adjusted Exposure"]
+        # Calculate long and short exposures
+        long_positions = df_filtered[df_filtered["Clean Value"] > 0]
+        short_positions = df_filtered[df_filtered["Clean Value"] < 0]
 
-        combined_beta = (
-            total_beta_adjusted / total_exposure if total_exposure != 0 else 0
+        # Long exposure calculations
+        total_long_value = long_positions["Clean Value"].sum()
+        total_long_beta_exposure = (
+            long_positions["Clean Value"] * long_positions["Beta"]
+        ).sum()
+        long_beta = (
+            total_long_beta_exposure / total_long_value if total_long_value != 0 else 0
         )
 
-        print("\nTotal Portfolio Exposure (Stock + Options):")
-        print(f"Net Stock Exposure: ${total_portfolio_value_net:,.2f}")
+        # Short exposure calculations
+        total_short_value = abs(short_positions["Clean Value"].sum())
+        total_short_beta_exposure = abs(
+            (short_positions["Clean Value"] * short_positions["Beta"]).sum()
+        )
+        short_beta = (
+            total_short_beta_exposure / total_short_value
+            if total_short_value != 0
+            else 0
+        )
+
+        # Options exposure
+        total_options_delta = sum(
+            s["Total Delta Exposure"] for s in options_summary.values()
+        )
+        total_options_beta_adjusted = sum(
+            s["Total Beta-Adjusted Exposure"] for s in options_summary.values()
+        )
+
+        print("\n=== Exposure Analysis ===")
+        print("\n1. Long Stock Positions:")
+        print(f"Long Value: ${total_long_value:,.2f}")
+        print(f"Beta-Adjusted Long Exposure: ${total_long_beta_exposure:,.2f}")
+        print(f"Long Portfolio Beta: {long_beta:.2f}")
+
+        print("\n2. Short Stock Positions:")
+        print(f"Short Value: ${total_short_value:,.2f}")
+        print(f"Beta-Adjusted Short Exposure: ${total_short_beta_exposure:,.2f}")
+        print(f"Short Portfolio Beta: {short_beta:.2f}")
         print(
-            f"Net Options Delta Exposure: ${sum(s['Total Delta Exposure'] for s in options_summary.values()):,.2f}"
+            f"Short % of Portfolio (by Abs Value): {(total_short_value/total_portfolio_value_abs)*100:.1f}%"
         )
-        print(f"Total Net Exposure: ${total_exposure:,.2f}")
-        print(f"Combined Portfolio Beta: {combined_beta:.3f}")
+
+        print("\n3. Options Positions:")
+        print(f"Net Options Delta Exposure: ${total_options_delta:,.2f}")
+        print(f"Beta-Adjusted Options Exposure: ${total_options_beta_adjusted:,.2f}")
+
+        print("\n4. Net Portfolio Exposure:")
+        print("Before Shorts:")
+        before_shorts = total_long_beta_exposure + total_options_beta_adjusted
+        print(f"Beta-Adjusted Exposure (Long + Options): ${before_shorts:,.2f}")
+
+        print("\nAfter Shorts:")
+        after_shorts = before_shorts - total_short_beta_exposure
+        print(
+            f"Net Beta-Adjusted Exposure (Long + Options - Shorts): ${after_shorts:,.2f}"
+        )
+        print(
+            f"Shorts Reduce Exposure By: ${total_short_beta_exposure:,.2f} ({(total_short_beta_exposure/before_shorts)*100:.1f}%)"
+        )
+
+        print("\nDetailed Short Positions:")
+        for _, row in short_positions.iterrows():
+            print(
+                f"  {row['Cleaned Symbol']}: ${abs(row['Clean Value']):,.2f} (Beta: {row['Beta']:.2f}, Beta-Adjusted: ${abs(row['Clean Value'] * row['Beta']):,.2f})"
+            )
 
         # Update dollar sensitivities to use combined exposure
         print("\n--- Dollar Value Sensitivity (All Positions) ---")
         print("If SPY moves by:      Your portfolio is expected to move by:")
         for move in spy_moves:
-            dollar_impact = total_exposure * combined_beta * move
+            dollar_impact = total_portfolio_value_net * portfolio_beta * move
             print(
-                f"  {move:>7.1%}           ${dollar_impact:>12,.2f}  ({(combined_beta * move):>+6.2%})"
+                f"  {move:>7.1%}           ${dollar_impact:>12,.2f}  ({(portfolio_beta * move):>+6.2%})"
             )
 
 
