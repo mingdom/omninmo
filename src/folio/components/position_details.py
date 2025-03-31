@@ -7,6 +7,7 @@ from ..utils import (
     format_currency,
     format_percentage,
 )
+from .portfolio_table import get_group_ticker
 
 
 def create_stock_section(group: PortfolioGroup) -> dbc.Card:
@@ -28,7 +29,11 @@ def create_stock_section(group: PortfolioGroup) -> dbc.Card:
                                     html.P(
                                         [
                                             html.Strong("Shares: "),
-                                            html.Span(f"{stock.quantity:,}"),
+                                            html.Span(
+                                                f"{stock.quantity:,}"
+                                                if stock.quantity is not None
+                                                else "N/A"
+                                            ),
                                         ]
                                     ),
                                     html.P(
@@ -36,13 +41,19 @@ def create_stock_section(group: PortfolioGroup) -> dbc.Card:
                                             html.Strong("Market Value: "),
                                             html.Span(
                                                 format_currency(stock.market_value)
+                                                if stock.market_value is not None
+                                                else "N/A"
                                             ),
                                         ]
                                     ),
                                     html.P(
                                         [
                                             html.Strong("Beta: "),
-                                            html.Span(format_beta(stock.beta)),
+                                            html.Span(
+                                                format_beta(stock.beta)
+                                                if stock.beta is not None
+                                                else "N/A"
+                                            ),
                                         ]
                                     ),
                                 ],
@@ -56,6 +67,8 @@ def create_stock_section(group: PortfolioGroup) -> dbc.Card:
                                             html.Strong("Portfolio Weight: "),
                                             html.Span(
                                                 format_percentage(stock.weight * 100)
+                                                if stock.weight is not None
+                                                else "N/A"
                                             ),
                                         ]
                                     ),
@@ -66,6 +79,9 @@ def create_stock_section(group: PortfolioGroup) -> dbc.Card:
                                                 format_currency(
                                                     stock.beta_adjusted_exposure
                                                 )
+                                                if stock.beta_adjusted_exposure
+                                                is not None
+                                                else "N/A"
                                             ),
                                         ]
                                     ),
@@ -88,7 +104,7 @@ def create_options_section(group: PortfolioGroup) -> dbc.Card:
     # Group options by expiration
     options_by_expiry = {}
     for opt in group.option_positions:
-        expiry_str = opt.expiry
+        expiry_str = opt.expiry if opt.expiry is not None else "Unknown"
         if expiry_str not in options_by_expiry:
             options_by_expiry[expiry_str] = []
         options_by_expiry[expiry_str].append(opt)
@@ -116,16 +132,40 @@ def create_options_section(group: PortfolioGroup) -> dbc.Card:
                     [
                         html.Tr(
                             [
-                                html.Td(opt.option_type),
-                                html.Td(f"${opt.strike:,.2f}"),
-                                html.Td(f"{opt.quantity:,}"),
-                                html.Td(format_currency(opt.market_value)),
-                                html.Td(format_percentage(opt.delta * 100)),
-                                html.Td(format_currency(opt.delta_exposure)),
+                                html.Td(
+                                    opt.option_type
+                                    if opt.option_type is not None
+                                    else "N/A"
+                                ),
+                                html.Td(
+                                    f"${opt.strike:,.2f}"
+                                    if opt.strike is not None
+                                    else "N/A"
+                                ),
+                                html.Td(
+                                    f"{opt.quantity:,}"
+                                    if opt.quantity is not None
+                                    else "N/A"
+                                ),
+                                html.Td(
+                                    format_currency(opt.market_value)
+                                    if opt.market_value is not None
+                                    else "N/A"
+                                ),
+                                html.Td(
+                                    format_percentage(opt.delta * 100)
+                                    if opt.delta is not None
+                                    else "N/A"
+                                ),
+                                html.Td(
+                                    format_currency(opt.delta_exposure)
+                                    if opt.delta_exposure is not None
+                                    else "N/A"
+                                ),
                             ]
                         )
                         for opt in sorted(
-                            options, key=lambda x: (x.option_type, x.strike)
+                            options, key=lambda x: (x.option_type or "", x.strike or 0)
                         )
                     ]
                 ),
@@ -158,13 +198,21 @@ def create_options_section(group: PortfolioGroup) -> dbc.Card:
                     html.P(
                         [
                             html.Strong("Net Option Value: "),
-                            html.Span(format_currency(group.net_option_value)),
+                            html.Span(
+                                format_currency(group.net_option_value)
+                                if group.net_option_value is not None
+                                else "N/A"
+                            ),
                         ]
                     ),
                     html.P(
                         [
                             html.Strong("Total Delta Exposure: "),
-                            html.Span(format_currency(group.total_delta_exposure)),
+                            html.Span(
+                                format_currency(group.total_delta_exposure)
+                                if group.total_delta_exposure is not None
+                                else "N/A"
+                            ),
                         ]
                     ),
                     html.Hr(),
@@ -192,6 +240,8 @@ def create_combined_metrics(group: PortfolioGroup) -> dbc.Card:
                                             html.Strong("Total Value: "),
                                             html.Span(
                                                 format_currency(group.net_exposure)
+                                                if group.net_exposure is not None
+                                                else "N/A"
                                             ),
                                         ]
                                     ),
@@ -204,8 +254,12 @@ def create_combined_metrics(group: PortfolioGroup) -> dbc.Card:
                                                     / group.net_exposure
                                                     * 100
                                                     if group.net_exposure != 0
+                                                    and group.total_delta_exposure
+                                                    is not None
                                                     else 0
                                                 )
+                                                if group.net_exposure is not None
+                                                else "N/A"
                                             ),
                                         ]
                                     ),
@@ -222,6 +276,9 @@ def create_combined_metrics(group: PortfolioGroup) -> dbc.Card:
                                                 format_currency(
                                                     group.beta_adjusted_exposure
                                                 )
+                                                if group.beta_adjusted_exposure
+                                                is not None
+                                                else "N/A"
                                             ),
                                         ]
                                     ),
@@ -233,8 +290,12 @@ def create_combined_metrics(group: PortfolioGroup) -> dbc.Card:
                                                     group.beta_adjusted_exposure
                                                     / group.net_exposure
                                                     if group.net_exposure != 0
+                                                    and group.beta_adjusted_exposure
+                                                    is not None
                                                     else 0
                                                 )
+                                                if group.net_exposure is not None
+                                                else "N/A"
                                             ),
                                         ]
                                     ),
@@ -253,6 +314,9 @@ def create_position_details(group: PortfolioGroup) -> html.Div:
     """Create the full position details view"""
     sections = []
 
+    # Get the ticker for this group
+    ticker = get_group_ticker(group)
+
     # Add stock section if exists
     stock_section = create_stock_section(group)
     if stock_section:
@@ -268,7 +332,7 @@ def create_position_details(group: PortfolioGroup) -> html.Div:
 
     return html.Div(
         [
-            html.H3(f"{group.ticker} Position Details", className="mb-4"),
+            html.H3(f"{ticker} Position Details", className="mb-4"),
             html.Div(sections, className="position-details"),
         ]
     )

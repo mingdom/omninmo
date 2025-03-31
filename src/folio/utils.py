@@ -2,12 +2,68 @@ from typing import Dict, List, Tuple
 
 import pandas as pd
 
+from src.lab.option_utils import (
+    calculate_simple_delta,
+    parse_option_description,
+)
+from src.v2.data_fetcher import DataFetcher
+
 from .data_model import (
     PortfolioGroup,
     PortfolioSummary,
     create_portfolio_group,
 )
 from .logger import logger
+
+# Initialize data fetcher
+try:
+    data_fetcher = DataFetcher()
+except ValueError as e:
+    logger.error(f"Failed to initialize DataFetcher: {e}")
+    data_fetcher = None
+
+
+def get_beta(ticker: str, description: str = "") -> float:
+    """Get beta for a ticker, handling special cases"""
+    # Handle special cases
+    if ticker == "SPAXX**" or "MONEY MARKET" in description.upper():
+        logger.info(f"Using beta of 0.0 for money market fund {ticker}")
+        return 0.0
+
+    if "ESCROW" in description.upper():
+        logger.info(f"Using beta of 0.0 for escrow shares {ticker}")
+        return 0.0
+
+    if not data_fetcher:
+        raise RuntimeError("DataFetcher not initialized - check API key configuration")
+
+    try:
+        # Fetch stock and market data
+        stock_data = data_fetcher.fetch_data(ticker)
+        market_data = data_fetcher.fetch_market_data()
+
+        if stock_data is None or market_data is None:
+            logger.warning(
+                f"Could not fetch data for {ticker} or market index, using default beta of 1.0"
+            )
+            return 1.0
+
+        # Calculate returns
+        stock_returns = stock_data["Close"].pct_change()
+        market_returns = market_data["Close"].pct_change()
+
+        # Calculate beta
+        covariance = stock_returns.cov(market_returns)
+        market_variance = market_returns.var()
+        beta = covariance / market_variance
+
+        logger.info(f"Calculated beta of {beta:.2f} for {ticker}")
+        return beta
+    except Exception as e:
+        logger.warning(
+            f"Error calculating beta for {ticker}: {e}, using default beta of 1.0"
+        )
+        return 1.0
 
 
 def format_currency(value: float) -> str:
@@ -43,149 +99,241 @@ def clean_currency_value(value_str: str) -> float:
     return float(value_str)
 
 
+def is_option(symbol: str) -> bool:
+    """Check if a symbol represents an option (starts with '-')"""
+    if not isinstance(symbol, str):
+        return False
+    return symbol.strip().startswith("-")
+
+
 def process_portfolio_data(
     df: pd.DataFrame,
 ) -> Tuple[List[PortfolioGroup], PortfolioSummary]:
     """Process portfolio data from DataFrame into PortfolioGroup objects and summary"""
-    logger.info("Starting portfolio data processing")
+    if df is None or df.empty:
+        raise ValueError("Portfolio data is empty or None")
+
+    logger.info("=== Portfolio Loading Started ===")
+    logger.info(f"Processing portfolio with {len(df)} positions")
+
+    # Validate required columns
+    required_columns = [
+        "Symbol",
+        "Description",
+        "Quantity",
+        "Current Value",
+        "Percent Of Account",
+        "Last Price",
+    ]
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    if missing_columns:
+        raise ValueError(f"Missing required columns: {', '.join(missing_columns)}")
 
     # Clean and prepare data
-    logger.debug("Cleaning and preparing data")
+    logger.info("Cleaning and validating data...")
     df = df.copy()
     df["Symbol"] = df["Symbol"].str.strip()
     df["Type"] = df["Type"].fillna("")
+    df["Description"] = df["Description"].fillna("")
 
-    # Group by underlying symbol (strip option symbols to get underlying)
-    logger.debug("Grouping positions by underlying symbol")
+    # Basic portfolio statistics
+    total_positions = len(df)
+    total_value = df["Current Value"].apply(clean_currency_value).sum()
+    unique_stocks = len(df[~df["Symbol"].apply(is_option)]["Symbol"].unique())
+    unique_options = len(df[df["Symbol"].apply(is_option)]["Symbol"].unique())
+
+    logger.info("\n=== Portfolio Overview ===")
+    logger.info(f"Total Positions: {total_positions}")
+    logger.info(f"Total Portfolio Value: {format_currency(total_value)}")
+    logger.info(f"Unique Stocks: {unique_stocks}")
+    logger.info(f"Unique Options: {unique_options}")
+
+    # Create a map of stock positions and prices for option delta calculations
+    stock_positions = {}
+    for _, row in df[~df["Symbol"].apply(is_option)].iterrows():
+        if row["Last Price"] and isinstance(row["Last Price"], str):
+            try:
+                price = clean_currency_value(row["Last Price"])
+                if price > 0:
+                    symbol = row["Symbol"].rstrip("*")  # Remove trailing asterisks
+                    stock_positions[symbol] = {
+                        "price": price,
+                        "quantity": int(row["Quantity"])
+                        if pd.notna(row["Quantity"])
+                        else 0,
+                        "value": clean_currency_value(row["Current Value"]),
+                        "beta": get_beta(symbol, row["Description"]),
+                    }
+            except Exception as e:
+                logger.warning(f"Error processing stock position {row['Symbol']}: {e}")
+                continue
+
+    # Group by underlying symbol (using stock symbols as base)
+    logger.info("\n=== Position Analysis ===")
     groups = []
+    total_long_value = 0
+    total_short_value = 0
+    total_call_value = 0
+    total_put_value = 0
 
-    # Get base symbols (remove option identifiers)
-    df["BaseSymbol"] = df["Symbol"].apply(
-        lambda x: x.split("-")[-1][:4] if "-" in x else x
-    )
-    unique_symbols = df["BaseSymbol"].unique()
-    logger.info(f"Found {len(unique_symbols)} unique base symbols")
-
-    for symbol in unique_symbols:
+    # Process stock positions first
+    for symbol, stock_info in stock_positions.items():
         try:
-            # Get all positions for this symbol
-            positions = df[df["BaseSymbol"] == symbol]
+            logger.info(f"\nProcessing {symbol}")
 
-            # Separate stock and option positions
-            stock_positions = positions[~positions["Symbol"].str.contains("-")]
-            option_positions = positions[positions["Symbol"].str.contains("-")]
+            # Create stock position data
+            value = stock_info["value"]
+            quantity = stock_info["quantity"]
+            beta = stock_info["beta"]
 
-            # Create stock data if exists
-            stock_data = None
-            if not stock_positions.empty:
-                first_stock = stock_positions.iloc[0]
-                stock_data = {
-                    "ticker": first_stock["Symbol"],
-                    "quantity": float(first_stock["Quantity"]),
-                    "market_value": clean_currency_value(first_stock["Current Value"]),
-                    "beta": 1.0,  # Default beta
-                    "beta_adjusted_exposure": clean_currency_value(
-                        first_stock["Current Value"]
-                    ),
-                    "clean_value": clean_currency_value(first_stock["Current Value"]),
-                    "weight": float(
-                        str(first_stock["Percent Of Account"]).replace("%", "")
-                    )
-                    / 100,
-                    "position_beta": 1.0,  # Default position beta
-                }
+            if quantity > 0:
+                total_long_value += value
+            else:
+                total_short_value += abs(value)
 
-            # Create option data list
+            logger.info(f"  Stock: {symbol}")
+            logger.info(f"    Quantity: {quantity:,.0f}")
+            logger.info(f"    Value: {format_currency(value)}")
+            logger.info(f"    Beta: {format_beta(beta)}")
+            logger.info(f"    Beta-Adjusted Exposure: {format_currency(value * beta)}")
+
+            stock_data = {
+                "ticker": symbol,
+                "quantity": quantity,
+                "market_value": value,
+                "beta": beta,
+                "beta_adjusted_exposure": value * beta,
+                "clean_value": value,
+                "weight": float(
+                    str(
+                        df[df["Symbol"] == symbol]["Percent Of Account"].iloc[0]
+                    ).replace("%", "")
+                )
+                / 100,
+                "position_beta": beta,
+            }
+
+            # Process related options
             option_data = []
-            for _, opt in option_positions.iterrows():
+            option_rows = df[df["Symbol"].apply(is_option)]
+
+            for _, opt in option_rows.iterrows():
                 try:
-                    # Parse option symbol for details
-                    opt_symbol = opt["Symbol"]
-                    opt_parts = opt_symbol.split("-")[1]  # e.g., "AAPL250417C220"
-                    ticker = opt_parts[:4]
+                    # Parse option details using option_utils
+                    last_price = clean_currency_value(opt["Last Price"])
+                    option = parse_option_description(
+                        opt["Description"], int(opt["Quantity"]), last_price
+                    )
 
-                    # Handle option expiry date parsing
-                    try:
-                        expiry = (
-                            "20"
-                            + opt_parts[4:6]
-                            + "-"
-                            + opt_parts[6:8]
-                            + "-"
-                            + opt_parts[8:10]
-                        )
-                    except:
-                        # Use a default expiry if parsing fails
-                        expiry = "2025-01-01"
+                    # Skip if not related to this stock
+                    if option.underlying != symbol:
+                        continue
 
-                    # Determine option type
-                    option_type = "CALL" if "C" in opt_parts else "PUT"
-
-                    # Parse strike with error handling
-                    try:
-                        strike_part = opt_parts[
-                            opt_parts.find("C" if "C" in opt_parts else "P") + 1 :
-                        ]
-                        strike = float(strike_part) if strike_part.isdigit() else 100.0
-                    except:
-                        strike = 100.0  # Default strike if parsing fails
-
+                    # Calculate delta using underlying price
+                    delta = calculate_simple_delta(option, stock_info["price"])
                     market_value = clean_currency_value(opt["Current Value"])
-                    quantity = float(opt["Quantity"])
+
+                    # Update option type totals
+                    if option.option_type == "CALL":
+                        total_call_value += abs(market_value)
+                    else:
+                        total_put_value += abs(market_value)
+
+                    logger.info(f"  Option: {opt['Symbol']}")
+                    logger.info(f"    Type: {option.option_type}")
+                    logger.info(f"    Strike: {format_currency(option.strike)}")
+                    logger.info(f"    Expiry: {option.expiry}")
+                    logger.info(f"    Quantity: {option.quantity:,.0f}")
+                    logger.info(f"    Value: {format_currency(market_value)}")
+                    logger.info(f"    Delta: {delta:.2f}")
+                    logger.info(
+                        f"    Delta-Adjusted Exposure: {format_currency(market_value * delta)}"
+                    )
+                    logger.info(
+                        f"    Beta-Adjusted Exposure: {format_currency(market_value * beta * delta)}"
+                    )
 
                     option_data.append(
                         {
-                            "ticker": ticker,
-                            "quantity": quantity,
+                            "ticker": symbol,
+                            "quantity": option.quantity,
                             "market_value": market_value,
-                            "beta": 1.0,  # Default beta
-                            "beta_adjusted_exposure": market_value,  # Simple beta-adjusted exposure
+                            "beta": beta,
+                            "beta_adjusted_exposure": market_value * beta * delta,
                             "clean_value": market_value,
                             "weight": float(
                                 str(opt["Percent Of Account"]).replace("%", "")
                             )
                             / 100,
-                            "position_beta": 1.0,  # Default position beta
-                            "strike": strike,
-                            "expiry": expiry,
-                            "option_type": option_type,
-                            "delta": 0.5
-                            if option_type == "CALL"
-                            else -0.5,  # Default delta
-                            "delta_exposure": market_value,  # Simple delta exposure
-                            "notional_value": strike
-                            * abs(quantity)
-                            * 100,  # Standard option multiplier
-                            "underlying_beta": 1.0,  # Default underlying beta
+                            "position_beta": beta * delta,
+                            "strike": option.strike,
+                            "expiry": str(option.expiry),
+                            "option_type": option.option_type,
+                            "delta": delta,
+                            "delta_exposure": market_value * delta,
+                            "notional_value": option.strike
+                            * abs(option.quantity)
+                            * 100,
+                            "underlying_beta": beta,
                         }
                     )
-                except Exception as e:
-                    logger.error(
-                        f"Error processing option position: {e}", exc_info=True
-                    )
-                    # Continue with next option position
 
-            # Create portfolio group if we have either stock or options
+                except Exception as e:
+                    logger.warning(f"Error processing option {opt['Symbol']}: {e}")
+                    continue
+
+            # Create portfolio group
             if stock_data or option_data:
                 group = create_portfolio_group(stock_data, option_data)
                 if group:
                     groups.append(group)
+                else:
+                    logger.warning(f"Failed to create portfolio group for {symbol}")
 
         except Exception as e:
-            logger.error(
-                f"Error processing group for symbol {symbol}: {e}", exc_info=True
-            )
+            logger.warning(f"Error processing group for symbol {symbol}: {e}")
+            continue
 
-    logger.info(f"Created {len(groups)} portfolio groups")
+    if not groups:
+        raise ValueError("No valid portfolio groups created")
+
+    logger.info(f"\nSuccessfully created {len(groups)} portfolio groups")
+
+    # Print portfolio composition summary
+    logger.info("\n=== Portfolio Composition ===")
+    logger.info(
+        f"Long Stock Value: {format_currency(total_long_value)} ({format_percentage(100 * total_long_value/total_value)})"
+    )
+    logger.info(
+        f"Short Stock Value: {format_currency(total_short_value)} ({format_percentage(100 * total_short_value/total_value)})"
+    )
+    logger.info(
+        f"Call Option Value: {format_currency(total_call_value)} ({format_percentage(100 * total_call_value/total_value)})"
+    )
+    logger.info(
+        f"Put Option Value: {format_currency(total_put_value)} ({format_percentage(100 * total_put_value/total_value)})"
+    )
 
     # Calculate portfolio summary
-    logger.debug("Calculating portfolio summary")
+    logger.info("\n=== Risk Metrics ===")
     try:
         summary = calculate_portfolio_summary(df, groups)
-        logger.info("Portfolio summary calculation complete")
+
+        # Log key risk metrics
+        logger.info(f"Net Exposure: {format_currency(summary.total_value_net)}")
+        logger.info(f"Gross Exposure: {format_currency(summary.total_value_abs)}")
+        logger.info(f"Portfolio Beta: {format_beta(summary.portfolio_beta)}")
+        logger.info(
+            f"Long/Short Ratio: {format_percentage(100 * (1 - summary.short_percentage))} / {format_percentage(100 * summary.short_percentage)}"
+        )
+        logger.info(
+            f"Exposure Reduction: {format_percentage(100 * summary.exposure_reduction_percentage)}"
+        )
+        logger.info("=== Portfolio Loading Complete ===\n")
+
         return groups, summary
     except Exception as e:
-        logger.error(f"Error calculating portfolio summary: {e}", exc_info=True)
+        logger.error(f"Error calculating portfolio summary: {e}")
         raise
 
 

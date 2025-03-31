@@ -5,7 +5,7 @@ from pathlib import Path
 import dash
 import dash_bootstrap_components as dbc
 import pandas as pd
-from dash import Input, Output, State, dcc, html
+from dash import ALL, Input, Output, State, dcc, html
 
 from .components.portfolio_table import create_portfolio_table
 from .components.position_details import create_position_details
@@ -233,9 +233,14 @@ def create_app(portfolio_file: str = None, debug: bool = False) -> dash.Dash:
         title="Folio",
     )
 
+    # Store portfolio file path
+    app.portfolio_file = portfolio_file
+    logger.info(f"Portfolio file path set to: {portfolio_file}")
+
     # Define layout
     app.layout = dbc.Container(
         [
+            dcc.Location(id="url", refresh=False),  # Add URL component
             html.H2("Folio", className="my-3"),
             create_upload_section() if not portfolio_file else None,
             create_header(),
@@ -249,9 +254,22 @@ def create_app(portfolio_file: str = None, debug: bool = False) -> dash.Dash:
                 interval=5 * 60 * 1000,  # 5 minutes in milliseconds
                 n_intervals=0,
             ),
+            # Add initial trigger
+            dcc.Store(id="initial-trigger", data=True),
         ],
         fluid=True,
         className="px-4",
+    )
+
+    # Add clientside callback to ensure initial trigger fires
+    app.clientside_callback(
+        """
+        function(pathname) {
+            return true;
+        }
+        """,
+        Output("initial-trigger", "data"),
+        Input("url", "pathname"),
     )
 
     @app.callback(
@@ -262,40 +280,59 @@ def create_app(portfolio_file: str = None, debug: bool = False) -> dash.Dash:
         [
             Input("interval-component", "n_intervals"),
             Input("upload-portfolio", "contents"),
+            Input("initial-trigger", "data"),  # Add initial trigger input
         ],
         [
             State("upload-portfolio", "filename"),
         ],
     )
-    def update_portfolio_data(n_intervals, contents, filename):
+    def update_portfolio_data(n_intervals, contents, initial_trigger, filename):
         """Update portfolio data from CSV file or upload"""
         logger.info("Updating portfolio data")
         try:
-            if portfolio_file:
+            if app.portfolio_file:
                 # Use provided portfolio file
-                df = pd.read_csv(portfolio_file)
-                logger.debug(f"Read {len(df)} rows from {portfolio_file}")
+                logger.info(
+                    f"Attempting to load portfolio from file: {app.portfolio_file}"
+                )
+                try:
+                    df = pd.read_csv(app.portfolio_file)
+                    logger.info(
+                        f"Successfully read {len(df)} rows from {app.portfolio_file}"
+                    )
+                    logger.info(f"Columns found: {', '.join(df.columns)}")
+                except Exception as e:
+                    logger.error(f"Failed to read portfolio file: {e}", exc_info=True)
+                    return None, html.Div(
+                        f"Error reading portfolio file: {e!s}", className="text-danger"
+                    )
             elif contents:
                 # Handle uploaded file
                 import base64
                 import io
 
+                logger.info(f"Attempting to load uploaded file: {filename}")
                 content_type, content_string = contents.split(",")
                 decoded = base64.b64decode(content_string)
                 df = pd.read_csv(io.StringIO(decoded.decode("utf-8")))
-                logger.debug(f"Read {len(df)} rows from uploaded file {filename}")
+                logger.info(
+                    f"Successfully read {len(df)} rows from uploaded file {filename}"
+                )
+                logger.info(f"Columns found: {', '.join(df.columns)}")
                 status = html.Div(
                     f"Successfully loaded {filename}", className="text-success"
                 )
             else:
                 # No data available
+                logger.warning("No portfolio file or upload provided")
                 return None, html.Div(
                     "Please upload a portfolio CSV file", className="text-muted"
                 )
 
             # Process data
+            logger.info("Processing portfolio data...")
             groups, summary = process_portfolio_data(df)
-            logger.info(f"Processed {len(groups)} portfolio groups")
+            logger.info(f"Successfully processed {len(groups)} portfolio groups")
 
             # Convert to serializable format
             data = {
@@ -321,10 +358,25 @@ def create_app(portfolio_file: str = None, debug: bool = False) -> dash.Dash:
 
         except Exception as e:
             logger.error(f"Error updating portfolio data: {e}", exc_info=True)
+            import traceback
+
+            logger.error(f"Traceback: {traceback.format_exc()}")
             status = html.Div(
                 f"Error loading portfolio data: {e!s}", className="text-danger"
             )
             return None, status
+
+    # Trigger initial load if portfolio file is provided
+    if portfolio_file:
+        logger.info("Triggering initial portfolio load")
+        try:
+            df = pd.read_csv(portfolio_file)
+            logger.info(f"Successfully read {len(df)} rows from {portfolio_file}")
+            logger.info(f"Columns found: {', '.join(df.columns)}")
+            groups, summary = process_portfolio_data(df)
+            logger.info(f"Successfully processed {len(groups)} portfolio groups")
+        except Exception as e:
+            logger.error(f"Error during initial portfolio load: {e}", exc_info=True)
 
     @app.callback(
         [
@@ -425,18 +477,82 @@ def create_app(portfolio_file: str = None, debug: bool = False) -> dash.Dash:
 
     @app.callback(
         Output("selected-position", "data"),
-        Input("portfolio-table", "active_cell"),
-        State("portfolio-data", "data"),
+        [
+            Input("portfolio-table", "active_cell"),
+            Input({"type": "position-details", "index": ALL}, "n_clicks"),
+        ],
+        [
+            State("portfolio-data", "data"),
+            State("portfolio-table", "active_cell"),
+        ],
     )
-    def store_selected_position(active_cell, data):
-        """Store selected position data when row is clicked"""
+    def store_selected_position(active_cell, btn_clicks, data, prev_active_cell):
+        """Store selected position data when row is clicked or Details button is clicked"""
         logger.debug("Storing selected position")
-        if not active_cell or not data or "groups" not in data:
+        if not data or "groups" not in data:
+            logger.debug("No portfolio data available for selection")
             return None
 
+        ctx = dash.callback_context
+        trigger_id = ctx.triggered[0]["prop_id"] if ctx.triggered else ""
+        logger.debug(f"Trigger ID: {trigger_id}")
+
         try:
-            row = active_cell["row"]
+            if "position-details" in trigger_id:
+                # Button click
+                button_idx = ctx.triggered[0]["prop_id"].split(".")[0]
+                try:
+                    ticker = eval(button_idx)["index"]
+                    logger.debug(f"Button clicked for ticker: {ticker}")
+                except Exception as e:
+                    logger.error(
+                        f"Error parsing button index: {e}, button_idx: {button_idx}"
+                    )
+                    return None
+
+                # Find the group with matching ticker
+                for i, group_data in enumerate(data["groups"]):
+                    try:
+                        stock_ticker = (
+                            group_data["stock"]["ticker"]
+                            if group_data["stock"]
+                            else None
+                        )
+                        option_tickers = (
+                            [opt["ticker"] for opt in group_data["options"]]
+                            if group_data["options"]
+                            else []
+                        )
+
+                        if stock_ticker == ticker or ticker in option_tickers:
+                            row = i
+                            logger.debug(
+                                f"Found matching position at row {row} for ticker {ticker}"
+                            )
+                            break
+                    except Exception as e:
+                        logger.error(f"Error processing group {i}: {e}")
+                        continue
+                else:
+                    logger.error(f"Could not find group for ticker: {ticker}")
+                    return None
+            else:
+                # Table cell click
+                if not active_cell:
+                    logger.debug("No active cell selected")
+                    return None
+                row = active_cell["row"]
+                logger.debug(f"Table cell clicked at row {row}")
+
+            # Validate row index
+            if row < 0 or row >= len(data["groups"]):
+                logger.error(
+                    f"Row index out of range: {row}, groups length: {len(data['groups'])}"
+                )
+                return None
+
             group_data = data["groups"][row]
+            logger.debug(f"Processing group data at row {row}")
 
             # Convert to PortfolioGroup
             stock_position = (
@@ -448,7 +564,7 @@ def create_app(portfolio_file: str = None, debug: bool = False) -> dash.Dash:
                 option_positions=option_positions,
             )
 
-            return {
+            result = {
                 "stock": vars(group.stock_position) if group.stock_position else None,
                 "options": [vars(opt) for opt in group.option_positions],
                 "net_exposure": group.net_exposure,
@@ -458,9 +574,14 @@ def create_app(portfolio_file: str = None, debug: bool = False) -> dash.Dash:
                 "put_count": group.put_count,
                 "net_option_value": group.net_option_value,
             }
+            logger.debug("Successfully created position data for modal")
+            return result
 
         except Exception as e:
             logger.error(f"Error storing selected position: {e}", exc_info=True)
+            import traceback
+
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return None
 
     @app.callback(
@@ -476,31 +597,55 @@ def create_app(portfolio_file: str = None, debug: bool = False) -> dash.Dash:
     def toggle_position_modal(position_data, is_open):
         """Toggle position details modal"""
         logger.debug("Toggling position modal")
-        if not position_data:
-            return False, None
+        ctx = dash.callback_context
+        trigger_id = ctx.triggered[0]["prop_id"] if ctx.triggered else ""
+        logger.debug(f"Modal toggle trigger: {trigger_id}")
 
-        try:
-            # Convert data back to PortfolioGroup
-            stock_position = (
-                Position(**position_data["stock"]) if position_data["stock"] else None
+        if "selected-position" in trigger_id and position_data:
+            # If new position data was loaded, open the modal
+            logger.debug(
+                f"Position data received: {position_data.keys() if position_data else None}"
             )
-            option_positions = [
-                OptionPosition(**opt) for opt in position_data["options"]
-            ]
-            group = PortfolioGroup(
-                stock_position=stock_position,
-                option_positions=option_positions,
-            )
+            try:
+                # Convert data back to PortfolioGroup
+                if not position_data:
+                    logger.error("Position data is None")
+                    return False, html.Div(
+                        "No position data available", className="text-danger p-3"
+                    )
 
-            # Create position details
-            return True, create_position_details(group)
+                stock_position = (
+                    Position(**position_data["stock"])
+                    if position_data["stock"]
+                    else None
+                )
+                option_positions = [
+                    OptionPosition(**opt) for opt in position_data["options"]
+                ]
+                group = PortfolioGroup(
+                    stock_position=stock_position,
+                    option_positions=option_positions,
+                )
+                logger.debug("Successfully created PortfolioGroup from position data")
 
-        except Exception as e:
-            logger.error(f"Error creating position details: {e}", exc_info=True)
-            return False, html.Div(
-                "Error loading position details",
-                className="text-danger",
-            )
+                # Create position details
+                details = create_position_details(group)
+                logger.debug("Successfully created position details")
+                return True, details
+
+            except Exception as e:
+                logger.error(f"Error creating position details: {e}", exc_info=True)
+                import traceback
+
+                logger.error(f"Traceback: {traceback.format_exc()}")
+                return True, html.Div(
+                    f"Error loading position details: {e!s}",
+                    className="text-danger p-3",
+                )
+
+        # Keep modal state unchanged if it's not the selected-position trigger
+        logger.debug(f"No action needed, keeping modal state: {is_open}")
+        return is_open, dash.no_update
 
     return app
 
