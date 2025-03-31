@@ -27,88 +27,122 @@ def create_header() -> dbc.Card:
                 dbc.Row(
                     [
                         dbc.Col(
-                            dbc.Card(
-                                dbc.CardBody(
-                                    [
-                                        html.H6(
-                                            "Total Value", className="card-subtitle"
-                                        ),
-                                        html.H5(
-                                            id="total-value",
-                                            className="card-title text-primary",
-                                        ),
-                                        html.P(
-                                            id="total-beta",
-                                            className="card-text text-muted",
-                                        ),
-                                    ]
+                            [
+                                dbc.Card(
+                                    dbc.CardBody(
+                                        [
+                                            html.H6(
+                                                "Total Value", className="card-subtitle"
+                                            ),
+                                            html.H5(
+                                                id="total-value",
+                                                className="card-title text-primary",
+                                            ),
+                                            html.P(
+                                                id="total-beta",
+                                                className="card-text text-muted",
+                                            ),
+                                        ]
+                                    ),
+                                    className="mb-3",
+                                    id="total-value-card",
                                 ),
-                                className="mb-3",
-                            ),
+                                dbc.Tooltip(
+                                    "Net portfolio value (Long - Short). Includes stock positions and option market values.",
+                                    target="total-value-card",
+                                    placement="top",
+                                ),
+                            ],
                             width=3,
                         ),
                         dbc.Col(
-                            dbc.Card(
-                                dbc.CardBody(
-                                    [
-                                        html.H6(
-                                            "Long Exposure", className="card-subtitle"
-                                        ),
-                                        html.H5(
-                                            id="long-exposure",
-                                            className="card-title text-success",
-                                        ),
-                                        html.P(
-                                            id="long-beta",
-                                            className="card-text text-muted",
-                                        ),
-                                    ]
+                            [
+                                dbc.Card(
+                                    dbc.CardBody(
+                                        [
+                                            html.H6(
+                                                "Long Exposure",
+                                                className="card-subtitle",
+                                            ),
+                                            html.H5(
+                                                id="long-exposure",
+                                                className="card-title text-success",
+                                            ),
+                                            html.P(
+                                                id="long-beta",
+                                                className="card-text text-muted",
+                                            ),
+                                        ]
+                                    ),
+                                    className="mb-3",
+                                    id="long-exposure-card",
                                 ),
-                                className="mb-3",
-                            ),
+                                dbc.Tooltip(
+                                    "Long market exposure from stocks and options. Includes long stock positions, long call options (delta-adjusted), and short put options (delta-adjusted).",
+                                    target="long-exposure-card",
+                                    placement="top",
+                                ),
+                            ],
                             width=3,
                         ),
                         dbc.Col(
-                            dbc.Card(
-                                dbc.CardBody(
-                                    [
-                                        html.H6(
-                                            "Short Exposure", className="card-subtitle"
-                                        ),
-                                        html.H5(
-                                            id="short-exposure",
-                                            className="card-title text-danger",
-                                        ),
-                                        html.P(
-                                            id="short-beta",
-                                            className="card-text text-muted",
-                                        ),
-                                    ]
+                            [
+                                dbc.Card(
+                                    dbc.CardBody(
+                                        [
+                                            html.H6(
+                                                "Short Exposure",
+                                                className="card-subtitle",
+                                            ),
+                                            html.H5(
+                                                id="short-exposure",
+                                                className="card-title text-danger",
+                                            ),
+                                            html.P(
+                                                id="short-beta",
+                                                className="card-text text-muted",
+                                            ),
+                                        ]
+                                    ),
+                                    className="mb-3",
+                                    id="short-exposure-card",
                                 ),
-                                className="mb-3",
-                            ),
+                                dbc.Tooltip(
+                                    "Short market exposure from stocks and options. Includes short stock positions, short call options (delta-adjusted), and long put options (delta-adjusted).",
+                                    target="short-exposure-card",
+                                    placement="top",
+                                ),
+                            ],
                             width=3,
                         ),
                         dbc.Col(
-                            dbc.Card(
-                                dbc.CardBody(
-                                    [
-                                        html.H6(
-                                            "Options Exposure",
-                                            className="card-subtitle",
-                                        ),
-                                        html.H5(
-                                            id="options-exposure",
-                                            className="card-title text-info",
-                                        ),
-                                        html.P(
-                                            id="options-beta",
-                                            className="card-text text-muted",
-                                        ),
-                                    ]
+                            [
+                                dbc.Card(
+                                    dbc.CardBody(
+                                        [
+                                            html.H6(
+                                                "Options Exposure",
+                                                className="card-subtitle",
+                                            ),
+                                            html.H5(
+                                                id="options-exposure",
+                                                className="card-title text-info",
+                                            ),
+                                            html.P(
+                                                id="options-beta",
+                                                className="card-text text-muted",
+                                            ),
+                                        ]
+                                    ),
+                                    className="mb-3",
+                                    id="options-exposure-card",
                                 ),
-                                className="mb-3",
-                            ),
+                                dbc.Tooltip(
+                                    "Option positions' market exposure. For calls: +delta * notional for long, -delta * notional for short. For puts: -delta * notional for long, +delta * notional for short.",
+                                    target="options-exposure-card",
+                                    placement="top",
+                                ),
+                            ],
                             width=3,
                         ),
                     ]
