@@ -3,9 +3,13 @@ Configuration utility for omninmo v2
 Supports loading configuration from multiple YAML files
 """
 
+import logging
 import os
 
 import yaml
+
+# Setup logging
+logger = logging.getLogger(__name__)
 
 
 class Config:
@@ -45,6 +49,7 @@ class Config:
                 # Load the main config file
                 with open(main_config_path) as f:
                     main_config = yaml.safe_load(f)
+                logger.debug(f"Loaded main config: {main_config}")
 
                 # Process imports
                 for import_file in main_config.get("imports", []):
@@ -58,18 +63,25 @@ class Config:
                         section_name = os.path.splitext(os.path.basename(import_file))[
                             0
                         ]
+                        logger.debug(
+                            f"Loading {section_name} from {import_file}: {section_config}"
+                        )
 
                         # Add to merged config
                         self.config_data[section_name] = section_config
                     except Exception as e:
-                        print(f"Error loading config file {import_path}: {e}")
+                        logger.error(f"Error loading config file {import_path}: {e}")
             except Exception as e:
-                print(f"Error loading main configuration file {main_config_path}: {e}")
+                logger.error(
+                    f"Error loading main configuration file {main_config_path}: {e}"
+                )
                 # Fall back to legacy mode
                 self._load_legacy_config()
         else:
             # Use legacy single file
             self._load_legacy_config()
+
+        logger.debug(f"Final config_data: {self.config_data}")
 
     def _load_legacy_config(self):
         """Load configuration from legacy single yaml file"""
@@ -77,23 +89,36 @@ class Config:
             with open(self.config_path) as file:
                 self.config_data = yaml.safe_load(file)
         except Exception as e:
-            print(f"Error loading configuration: {e}")
+            logger.error(f"Error loading configuration: {e}")
 
     def get(self, key_path, default=None):
         """
         Get a configuration value using dot notation path
         Example: config.get('model.training.period')
         """
+        logger.debug(f"Getting config for key_path: {key_path}")
         keys = key_path.split(".")
         value = self.config_data
 
-        for key in keys:
-            if isinstance(value, dict) and key in value:
+        try:
+            for key in keys:
+                logger.debug(
+                    f"Processing key: {key}, current value type: {type(value)}, value: {value}"
+                )
+                if not isinstance(value, dict):
+                    logger.debug(f"Value is not a dict, returning default: {default}")
+                    return default
+                if key not in value:
+                    logger.debug(
+                        f"Key {key} not found in value, returning default: {default}"
+                    )
+                    return default
                 value = value[key]
-            else:
-                return default
-
-        return value
+            logger.debug(f"Final value: {value}")
+            return value
+        except Exception as e:
+            logger.error(f"Error accessing config key {key_path}: {e}")
+            return default
 
 
 # Create a singleton config instance
@@ -101,6 +126,7 @@ config = Config()
 
 if __name__ == "__main__":
     # Simple test of the configuration
+    logging.basicConfig(level=logging.DEBUG)
     print("Model training period:", config.get("model.training.period"))
     print("Default tickers:", config.get("model.training.default_tickers"))
-    print("Default watchlist:", config.get("app.watchlist.default"))
+    print("Default watchlist:", config.get("watchlist.default"))

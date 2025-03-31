@@ -39,7 +39,13 @@ def main():
         sys.exit(1)
 
     # Run predictions
-    app.run_predictions(args.tickers, args.format)
+    try:
+        output = app.run_predictions(args.tickers, args.format)
+        print("\nPrediction Results:")
+        print(output)
+    except Exception as e:
+        print(f"Error running predictions: {e}", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

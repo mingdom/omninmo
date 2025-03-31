@@ -22,7 +22,7 @@ from src.v2.predictor import Predictor
 
 # Setup logging
 logging.basicConfig(
-    level=logging.ERROR,
+    level=logging.DEBUG,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[logging.FileHandler("logs/console_app.log"), logging.StreamHandler()],
 )
@@ -104,7 +104,10 @@ class ConsoleApp:
         """
         # Load default tickers if none provided
         if tickers is None:
-            tickers = config.get("app.default_tickers")
+            logger.debug("No tickers provided, attempting to load defaults")
+            default_tickers = config.get("app.watchlist.default")
+            logger.debug(f"Loaded default tickers: {default_tickers}")
+            tickers = default_tickers
 
         # Validate tickers
         if not tickers:
@@ -313,7 +316,13 @@ def main():
         tickers = None
 
     # Run predictions
-    app.run_predictions(tickers, args.format)
+    try:
+        output = app.run_predictions(tickers, args.format)
+        print("\nPrediction Results:")
+        print(output)
+    except Exception as e:
+        logger.error(f"Error running predictions: {e}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
