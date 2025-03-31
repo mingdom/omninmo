@@ -137,5 +137,17 @@ lint-fix:
 --sample:
 --cache:
 
+# Lab Projects
+.PHONY: portfolio
+
+portfolio:
+	@echo "Running portfolio analysis..."
+	@if [ ! -d "$(VENV_DIR)" ]; then \
+		echo "Virtual environment not found. Please run 'make env' first."; \
+		exit 1; \
+	fi
+	@source $(VENV_DIR)/bin/activate && \
+	PYTHONPATH=. python3 src/lab/portfolio.py "$(if $(csv),$(csv),src/lab/portfolio.csv)"
+
 %:
 	@: 
