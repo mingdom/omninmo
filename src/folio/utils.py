@@ -232,6 +232,7 @@ def process_portfolio_data(
                     # Calculate delta using underlying price
                     delta = calculate_simple_delta(option, stock_info["price"])
                     market_value = clean_currency_value(opt["Current Value"])
+                    notional_value = option.strike * abs(option.quantity) * 100
 
                     # Update option type totals
                     if option.option_type == "CALL":
@@ -247,10 +248,13 @@ def process_portfolio_data(
                     logger.info(f"    Value: {format_currency(market_value)}")
                     logger.info(f"    Delta: {delta:.2f}")
                     logger.info(
-                        f"    Delta-Adjusted Exposure: {format_currency(market_value * delta)}"
+                        f"    Notional Value: {format_currency(notional_value)}"
                     )
                     logger.info(
-                        f"    Beta-Adjusted Exposure: {format_currency(market_value * beta * delta)}"
+                        f"    Delta-Adjusted Exposure: {format_currency(delta * notional_value)}"
+                    )
+                    logger.info(
+                        f"    Beta-Adjusted Exposure: {format_currency(delta * notional_value * beta)}"
                     )
 
                     option_data.append(
@@ -259,7 +263,7 @@ def process_portfolio_data(
                             "quantity": option.quantity,
                             "market_value": market_value,
                             "beta": beta,
-                            "beta_adjusted_exposure": market_value * beta * delta,
+                            "beta_adjusted_exposure": delta * notional_value * beta,
                             "clean_value": market_value,
                             "weight": float(
                                 str(opt["Percent Of Account"]).replace("%", "")
@@ -270,10 +274,8 @@ def process_portfolio_data(
                             "expiry": str(option.expiry),
                             "option_type": option.option_type,
                             "delta": delta,
-                            "delta_exposure": market_value * delta,
-                            "notional_value": option.strike
-                            * abs(option.quantity)
-                            * 100,
+                            "delta_exposure": delta * notional_value,
+                            "notional_value": notional_value,
                             "underlying_beta": beta,
                         }
                     )
