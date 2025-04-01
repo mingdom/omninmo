@@ -44,18 +44,12 @@ def utility_function():
 
 import pandas as pd
 
-from src.lab.option_utils import (
-    calculate_option_delta,
-    parse_option_description,
-)
+from src.lab.option_utils import (calculate_option_delta,
+                                  parse_option_description)
 from src.v2.data_fetcher import DataFetcher
 
-from .data_model import (
-    ExposureBreakdown,
-    PortfolioGroup,
-    PortfolioSummary,
-    create_portfolio_group,
-)
+from .data_model import (ExposureBreakdown, PortfolioGroup, PortfolioSummary,
+                         StockPosition, create_portfolio_group)
 from .logger import logger
 
 # Initialize data fetcher
@@ -269,7 +263,7 @@ def is_option(symbol: str) -> bool:
 
 def process_portfolio_data(
     df: pd.DataFrame,
-) -> tuple[list[PortfolioGroup], PortfolioSummary]:
+) -> tuple[list[PortfolioGroup], PortfolioSummary, list[dict]]:
     """Processes a raw portfolio DataFrame to generate structured portfolio data and summary metrics.
 
     This core function takes a DataFrame, typically loaded from a broker's CSV export,
@@ -308,6 +302,7 @@ def process_portfolio_data(
         A tuple containing:
         - list[PortfolioGroup]: A list where each element groups a stock and its related options.
         - PortfolioSummary: An object containing aggregated metrics for the entire portfolio.
+        - list[dict]: A list of cash-like positions identified during processing.
 
     Raises:
         ValueError: If the input DataFrame is None, empty, missing required columns, or if no
@@ -323,8 +318,35 @@ def process_portfolio_data(
         - Refactor the main loop for clarity and potential performance improvements.
     """
     if df is None or df.empty:
-        logger.error("Input DataFrame is empty or None.")
-        raise ValueError("Portfolio data is empty or None")
+        logger.warning("Input DataFrame is empty or None. Returning empty results.")
+        # Return empty results instead of raising an error
+        # Create empty exposure breakdowns with all required fields
+        empty_exposure = ExposureBreakdown(
+            stock_value=0.0,
+            stock_beta_adjusted=0.0,
+            option_delta_value=0.0,
+            option_beta_adjusted=0.0,
+            total_value=0.0,
+            total_beta_adjusted=0.0,
+            description="Empty exposure",
+            formula="N/A",
+            components={}
+        )
+
+        empty_summary = PortfolioSummary(
+            total_value_net=0,
+            total_value_abs=0,
+            portfolio_beta=0,
+            long_exposure=empty_exposure,
+            short_exposure=empty_exposure,
+            options_exposure=empty_exposure,
+            short_percentage=0,
+            exposure_reduction_percentage=0,
+            cash_like_positions=[],
+            cash_like_value=0.0,
+            cash_like_count=0,
+        )
+        return [], empty_summary, []
 
     logger.info("=== Portfolio Loading Started ===")
     logger.info(f"Processing portfolio with {len(df)} initial rows")
@@ -415,6 +437,7 @@ def process_portfolio_data(
 
     # Create a map of stock positions and prices for option delta calculations
     stock_positions = {}
+    cash_like_positions = []
     logger.info("Processing stock-like positions...")
     # Iterate only over rows identified as non-options
     for index, row in stock_df.iterrows():
@@ -423,14 +446,21 @@ def process_portfolio_data(
         row_type = row["Type"]  # Capture type for potential filtering
 
         # --- Explicitly handle CASH type ---
-        # TODO: Refine this logic. Should cash be its own group or just contribute to summary?
         if row_type.upper() == "CASH":
             cash_value = clean_currency_value(row["Current Value"])
             logger.info(
-                f"Identified CASH position: {symbol_raw} ({description}), Value: {format_currency(cash_value)}. Skipping group creation for now."
+                f"Identified CASH position: {symbol_raw} ({description}), Value: {format_currency(cash_value)}"
             )
-            # Potential future enhancement: Add to a separate cash balance or summary field.
-            continue  # Skip adding CASH types to stock_positions for now
+            # Add to cash-like positions
+            cash_like_positions.append({
+                "ticker": symbol_raw,
+                "quantity": 0,  # Cash positions typically don't have quantity
+                "market_value": cash_value,
+                "beta": 0.0,  # Cash has zero beta by definition
+                "beta_adjusted_exposure": 0.0,
+                "description": description
+            })
+            continue  # Skip adding CASH types to stock_positions
 
         # Proceed with processing potentially valid stock/ETF positions
         try:
@@ -517,23 +547,38 @@ def process_portfolio_data(
             # Get Beta - requires valid ticker and fetcher
             beta = get_beta(symbol, description)
 
-            stock_positions[symbol] = {
-                "price": price,
-                "quantity": quantity,
-                "value": value_to_use,
-                "beta": beta,
-                "percent_of_account": float(
-                    str(row["Percent Of Account"]).replace("%", "")
+            # Check if this is a cash-like instrument based on beta
+            is_cash_like = is_cash_or_short_term(symbol, beta=beta)
+
+            if is_cash_like:
+                logger.info(f"Identified cash-like position based on beta: {symbol} (beta: {beta:.4f}), Value: {format_currency(value_to_use)}")
+                cash_like_positions.append({
+                    "ticker": symbol,
+                    "quantity": quantity,
+                    "market_value": value_to_use,
+                    "beta": beta,
+                    "beta_adjusted_exposure": value_to_use * beta,
+                    "description": description
+                })
+            else:
+                # Regular stock position
+                stock_positions[symbol] = {
+                    "price": price,
+                    "quantity": quantity,
+                    "value": value_to_use,
+                    "beta": beta,
+                    "percent_of_account": float(
+                        str(row["Percent Of Account"]).replace("%", "")
+                    )
+                    / 100.0
+                    if pd.notna(row["Percent Of Account"])
+                    and row["Percent Of Account"] != "--"
+                    else 0.0,
+                    "type": row_type,  # Store type for later reference
+                }
+                logger.debug(
+                    f"Successfully processed stock: {symbol}, Qty: {quantity}, Price: {price}, Value: {value_to_use}, Beta: {beta:.2f}"
                 )
-                / 100.0
-                if pd.notna(row["Percent Of Account"])
-                and row["Percent Of Account"] != "--"
-                else 0.0,
-                "type": row_type,  # Store type for later reference
-            }
-            logger.debug(
-                f"Successfully processed stock: {symbol}, Qty: {quantity}, Price: {price}, Value: {value_to_use}, Beta: {beta:.2f}"
-            )
 
         except ValueError as e:
             # More specific exception for data conversion errors (e.g., clean_currency_value)
@@ -801,15 +846,44 @@ def process_portfolio_data(
             logger.warning(f"  - Index {idx}: {option_df.loc[idx, 'Description']}")
 
     if not groups:
-        logger.error("No valid portfolio groups were created after processing.")
-        raise ValueError("No valid portfolio groups created")
+        logger.warning("No valid portfolio groups were created after processing. This may be an all-cash portfolio.")
+        # Instead of raising an error, proceed with just cash-like positions if any exist
+        if not cash_like_positions:
+            logger.warning("No cash-like positions found either. Returning empty summary.")
+            # Create empty exposure breakdowns with all required fields
+            empty_exposure = ExposureBreakdown(
+                stock_value=0.0,
+                stock_beta_adjusted=0.0,
+                option_delta_value=0.0,
+                option_beta_adjusted=0.0,
+                total_value=0.0,
+                total_beta_adjusted=0.0,
+                description="Empty exposure",
+                formula="N/A",
+                components={}
+            )
+
+            empty_summary = PortfolioSummary(
+                total_value_net=0,
+                total_value_abs=0,
+                portfolio_beta=0,
+                long_exposure=empty_exposure,
+                short_exposure=empty_exposure,
+                options_exposure=empty_exposure,
+                short_percentage=0,
+                exposure_reduction_percentage=0,
+                cash_like_positions=[],
+                cash_like_value=0.0,
+                cash_like_count=0,
+            )
+            return [], empty_summary, []
 
     # Calculate portfolio summary using the final list of groups
     logger.info("Calculating final portfolio summary...")
     try:
         summary = calculate_portfolio_summary(
-            df, groups
-        )  # Pass original df if needed, or just groups
+            df, groups, cash_like_positions
+        )
         logger.info("Portfolio summary calculated successfully.")
     except Exception as summary_err:
         logger.error(
@@ -818,12 +892,12 @@ def process_portfolio_data(
         # Decide how to handle summary failure - raise or return groups with None summary?
         raise  # Raising seems safer to indicate incomplete results
 
-    logger.info(f"=== Portfolio Loading Finished: {len(groups)} groups created. ===")
-    return groups, summary
+    logger.info(f"=== Portfolio Loading Finished: {len(groups)} groups created, {len(cash_like_positions)} cash-like positions identified. ===")
+    return groups, summary, cash_like_positions
 
 
 def calculate_portfolio_summary(
-    df: pd.DataFrame, groups: list[PortfolioGroup]
+    df: pd.DataFrame, groups: list[PortfolioGroup], cash_like_positions: list[dict] = None
 ) -> PortfolioSummary:
     """Calculates aggregated summary metrics for the entire portfolio.
 
@@ -844,6 +918,8 @@ def calculate_portfolio_summary(
             overall values or cash balances in the future, currently unused).
         groups: A list of `PortfolioGroup` objects representing the processed
                 and grouped portfolio positions.
+        cash_like_positions: A list of dictionaries representing cash-like positions
+                           identified during portfolio processing.
 
     Returns:
         A `PortfolioSummary` object containing the calculated metrics:
@@ -855,6 +931,9 @@ def calculate_portfolio_summary(
         - `options_exposure`: Breakdown of total option delta exposure (long, short, total, beta-adjusted).
         - `short_percentage`: Short exposure as a percentage of absolute total exposure.
         - `exposure_reduction_percentage`: Short exposure as a percentage of long exposure.
+        - `cash_like_positions`: List of positions with very low beta (< 0.1).
+        - `cash_like_value`: Total value of cash-like positions.
+        - `cash_like_count`: Number of cash-like positions.
 
     Raises:
         Exception: Propagates any exceptions encountered during calculation.
@@ -870,9 +949,13 @@ def calculate_portfolio_summary(
     """
     logger.debug(f"Starting portfolio summary calculations for {len(groups)} groups.")
 
-    if not groups:
+    # Initialize cash-like positions list if None
+    if cash_like_positions is None:
+        cash_like_positions = []
+
+    if not groups and not cash_like_positions:
         logger.warning(
-            "Cannot calculate summary for an empty list of groups. Returning default summary."
+            "Cannot calculate summary for an empty portfolio. Returning default summary."
         )
         # Return a default or empty summary object to avoid downstream errors
         return PortfolioSummary(
@@ -884,6 +967,9 @@ def calculate_portfolio_summary(
             options_exposure=ExposureBreakdown(),
             short_percentage=0,
             exposure_reduction_percentage=0,
+            cash_like_positions=[],
+            cash_like_value=0.0,
+            cash_like_count=0,
         )
 
     try:
@@ -1023,6 +1109,31 @@ def calculate_portfolio_summary(
             else 0.0  # If no long exposure, reduction is 0 or undefined? Treat as 0.
         )
 
+        # --- Process cash-like positions ---
+        cash_like_value = sum(pos["market_value"] for pos in cash_like_positions)
+        cash_like_count = len(cash_like_positions)
+
+        # Create StockPosition objects for cash-like positions
+        cash_like_stock_positions = [
+            StockPosition(
+                ticker=pos["ticker"],
+                quantity=pos["quantity"],
+                market_value=pos["market_value"],
+                beta=pos["beta"],
+                beta_adjusted_exposure=pos["beta_adjusted_exposure"]
+            )
+            for pos in cash_like_positions
+        ]
+
+        logger.info(f"Processed {cash_like_count} cash-like positions with total value: {format_currency(cash_like_value)}")
+
+        # Include cash-like positions in total value
+        if cash_like_value > 0:
+            # Add cash-like value to total_value_abs
+            total_value_abs += cash_like_value
+            # Add cash-like value to total_value_net (cash is always positive)
+            total_value_net += cash_like_value
+
         # --- Create and return summary object ---
         summary = PortfolioSummary(
             total_value_net=total_value_net,
@@ -1032,9 +1143,10 @@ def calculate_portfolio_summary(
             short_exposure=short_exposure,
             options_exposure=options_exposure,
             short_percentage=short_percentage * 100,  # Convert to percentage
-            exposure_reduction_percentage=exposure_reduction
-            * 100,  # Convert to percentage
-            # TODO: Add cash balance here once handled in process_portfolio_data
+            exposure_reduction_percentage=exposure_reduction * 100,  # Convert to percentage
+            cash_like_positions=cash_like_stock_positions,
+            cash_like_value=cash_like_value,
+            cash_like_count=cash_like_count
         )
 
         logger.info("Portfolio summary created successfully.")
@@ -1057,6 +1169,11 @@ def log_summary_details(summary: PortfolioSummary):
     logger.info(
         f"Exposure Reduction % (Short/Long): {summary.exposure_reduction_percentage:.1f}%"
     )
+
+    # Log cash-like information
+    logger.info(f"Cash-Like Value: {format_currency(summary.cash_like_value)}")
+    logger.info(f"Cash-Like Count: {summary.cash_like_count}")
+    logger.info(f"Cash-Like % of Portfolio: {summary.cash_like_value / summary.total_value_abs * 100:.1f}% (of Abs Value)" if summary.total_value_abs > 0 else "Cash-Like % of Portfolio: 0.0%")
 
     logger.info("  Long Exposure Breakdown:")
     logger.info(

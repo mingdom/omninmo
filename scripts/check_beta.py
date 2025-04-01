@@ -44,6 +44,7 @@ project_root = os.path.abspath(os.path.join(script_dir, ".."))
 sys.path.insert(0, project_root)
 
 from src.folio.logger import logger  # Use the same logger if desired
+from src.folio.utils import is_cash_or_short_term
 from src.v2.data_fetcher import DataFetcher
 
 
@@ -143,5 +144,13 @@ if __name__ == "__main__":
             print(f"{symbol:>10}: {result:.4f}")
         else:
             print(f"{symbol:>10}: {result}")
+
+    # Check cash-like classification
+    print("\n--- Cash-Like Classification ---")
+    for symbol, result in results.items():
+        if isinstance(result, float):
+            is_cash = is_cash_or_short_term(symbol, beta=result)
+            classification = "CASH-LIKE" if is_cash else "MARKET-CORRELATED"
+            print(f"{symbol:>10}: Beta = {result:.4f} -> {classification}")
 
     print("\nScript finished.")

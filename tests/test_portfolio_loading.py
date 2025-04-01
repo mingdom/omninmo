@@ -39,13 +39,13 @@ def sample_portfolio_csv():
 
 def test_process_portfolio_data(sample_portfolio_csv):
     """Test that portfolio data can be loaded without errors"""
-    groups, summary = process_portfolio_data(sample_portfolio_csv)
+    groups, summary, cash_like_positions = process_portfolio_data(sample_portfolio_csv)
     assert len(groups) == 1, "Should create one group for TSM"
 
 
 def test_portfolio_group_serialization(sample_portfolio_csv):
     """Test that portfolio groups can be serialized without errors"""
-    groups, _ = process_portfolio_data(sample_portfolio_csv)
+    groups, _, _ = process_portfolio_data(sample_portfolio_csv)
     assert len(groups) == 1
     group_dict = groups[0].to_dict()
     assert group_dict["ticker"] == "TSM"
@@ -64,11 +64,15 @@ def test_invalid_portfolio_data():
     with pytest.raises(ValueError, match="Missing required columns"):
         process_portfolio_data(df)
 
-    # Test empty DataFrame
+    # Test empty DataFrame - now returns empty results instead of raising an error
     df = pd.DataFrame()
-    with pytest.raises(ValueError, match="Portfolio data is empty"):
-        process_portfolio_data(df)
+    groups, summary, cash_like_positions = process_portfolio_data(df)
+    assert len(groups) == 0
+    assert summary.total_value_net == 0
+    assert len(cash_like_positions) == 0
 
-    # Test None DataFrame
-    with pytest.raises(ValueError, match="Portfolio data is empty"):
-        process_portfolio_data(None)
+    # Test None DataFrame - now returns empty results instead of raising an error
+    groups, summary, cash_like_positions = process_portfolio_data(None)
+    assert len(groups) == 0
+    assert summary.total_value_net == 0
+    assert len(cash_like_positions) == 0

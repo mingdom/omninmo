@@ -80,6 +80,9 @@ class PortfolioSummaryDict(TypedDict):
     options_exposure: ExposureBreakdownDict
     short_percentage: float
     exposure_reduction_percentage: float
+    cash_like_positions: list[StockPositionDict]
+    cash_like_value: float
+    cash_like_count: int
     help_text: dict[str, str]
 
 
@@ -306,6 +309,11 @@ class PortfolioSummary:
     short_percentage: float
     exposure_reduction_percentage: float
 
+    # Cash-like instruments
+    cash_like_positions: list[StockPosition] = None
+    cash_like_value: float = 0.0
+    cash_like_count: int = 0
+
     # Help text for each metric
     help_text: Optional[dict[str, str]] = None
 
@@ -360,12 +368,31 @@ class PortfolioSummary:
                 Formula: |Short exposure| / Long exposure
                 Shows effectiveness of hedging
             """,
+            "cash_like_positions": """
+                List of positions with very low beta (< 0.1)
+                Includes: Money market funds, short-term treasuries, etc.
+                These positions have minimal market correlation
+            """,
+            "cash_like_value": """
+                Total value of cash-like positions
+                Formula: Sum of market values of cash-like positions
+                Represents low-risk portion of portfolio
+            """,
+            "cash_like_count": """
+                Number of cash-like positions in portfolio
+                Helps track diversification of low-risk assets
+            """,
         }
 
     def to_dict(self) -> PortfolioSummaryDict:
         """Convert to a Dash-compatible dictionary"""
         if self.help_text is None:
             self.__post_init__()
+
+        # Initialize empty list if None
+        if self.cash_like_positions is None:
+            self.cash_like_positions = []
+
         return {
             "total_value_net": self.total_value_net,
             "total_value_abs": self.total_value_abs,
@@ -375,6 +402,9 @@ class PortfolioSummary:
             "options_exposure": self.options_exposure.to_dict(),
             "short_percentage": self.short_percentage,
             "exposure_reduction_percentage": self.exposure_reduction_percentage,
+            "cash_like_positions": [pos.to_dict() for pos in self.cash_like_positions],
+            "cash_like_value": self.cash_like_value,
+            "cash_like_count": self.cash_like_count,
             "help_text": self.help_text if self.help_text is not None else {},
         }
 

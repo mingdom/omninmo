@@ -12,11 +12,7 @@ from .components.portfolio_table import create_portfolio_table
 from .components.position_details import create_position_details
 from .data_model import OptionPosition, PortfolioGroup, Position
 from .logger import logger
-from .utils import (
-    format_beta,
-    format_currency,
-    process_portfolio_data,
-)
+from .utils import format_beta, format_currency, process_portfolio_data
 
 
 def create_header() -> dbc.Card:
@@ -141,6 +137,41 @@ def create_header() -> dbc.Card:
                                 dbc.Tooltip(
                                     "Option positions' market exposure. For calls: +delta * notional for long, -delta * notional for short. For puts: -delta * notional for long, +delta * notional for short.",
                                     target="options-exposure-card",
+                                    placement="top",
+                                ),
+                            ],
+                            width=3,
+                        ),
+                    ]
+                ),
+                # Add a new row for cash-like positions
+                dbc.Row(
+                    [
+                        dbc.Col(
+                            [
+                                dbc.Card(
+                                    dbc.CardBody(
+                                        [
+                                            html.H6(
+                                                "Cash-Like Positions",
+                                                className="card-subtitle",
+                                            ),
+                                            html.H5(
+                                                id="cash-like-value",
+                                                className="card-title text-info",
+                                            ),
+                                            html.P(
+                                                id="cash-like-percent",
+                                                className="card-text text-muted",
+                                            ),
+                                        ]
+                                    ),
+                                    className="mb-3",
+                                    id="cash-like-card",
+                                ),
+                                dbc.Tooltip(
+                                    "Positions with very low beta (< 0.1). Includes money market funds, short-term treasuries, and other cash-like instruments.",
+                                    target="cash-like-card",
                                     placement="top",
                                 ),
                             ],
@@ -403,8 +434,8 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
                 )
 
             # Process portfolio data
-            groups, summary = process_portfolio_data(df)
-            logger.info(f"Successfully processed {len(groups)} portfolio groups")
+            groups, summary, cash_like_positions = process_portfolio_data(df)
+            logger.info(f"Successfully processed {len(groups)} portfolio groups and {len(cash_like_positions)} cash-like positions")
 
             # Convert to Dash-compatible format
             groups_data = [g.to_dict() for g in groups]
@@ -429,6 +460,8 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
             Output("short-beta", "children"),
             Output("options-exposure", "children"),
             Output("options-beta", "children"),
+            Output("cash-like-value", "children"),
+            Output("cash-like-percent", "children"),
         ],
         Input("portfolio-summary", "data"),
     )
@@ -437,7 +470,14 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
         logger.debug("Updating summary cards")
         try:
             if not summary_data:
-                return ["$0.00"] * 4 + ["0.00β"] * 4
+                return ["$0.00"] * 4 + ["0.00β"] * 4 + ["$0.00", "0.0%"]
+
+            # Calculate cash-like percentage
+            cash_like_percent = (
+                summary_data["cash_like_value"] / summary_data["total_value_abs"] * 100
+                if summary_data["total_value_abs"] != 0
+                else 0.0
+            )
 
             return [
                 format_currency(summary_data["total_value_net"]),
@@ -463,11 +503,13 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
                     if summary_data["options_exposure"]["total_value"] != 0
                     else 0
                 ),
+                format_currency(summary_data["cash_like_value"]),
+                f"{cash_like_percent:.1f}%",
             ]
 
         except Exception as e:
             logger.error(f"Error updating summary cards: {e}", exc_info=True)
-            return ["$0.00"] * 4 + ["0.00β"] * 4
+            return ["$0.00"] * 4 + ["0.00β"] * 4 + ["$0.00", "0.0%"]
 
     @app.callback(
         Output("portfolio-table", "children"),

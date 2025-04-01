@@ -1,0 +1,153 @@
+"""Tests for cash-like instrument grouping functionality."""
+
+import pandas as pd
+import pytest
+
+from src.folio.data_model import PortfolioSummary, StockPosition
+from src.folio.utils import (
+    calculate_portfolio_summary,
+    is_cash_or_short_term,
+    process_portfolio_data,
+)
+
+
+def test_is_cash_or_short_term():
+    """Test the is_cash_or_short_term function."""
+    # Test with beta values
+    assert is_cash_or_short_term("SPAXX", beta=0.0) is True
+    assert is_cash_or_short_term("FDRXX", beta=0.05) is True
+    assert is_cash_or_short_term("SHY", beta=0.09) is True
+    assert is_cash_or_short_term("SPY", beta=1.0) is False
+    assert is_cash_or_short_term("AAPL", beta=1.2) is False
+    
+    # Test with negative beta (should still be considered cash-like if abs < 0.1)
+    assert is_cash_or_short_term("GOVT", beta=-0.05) is True
+    assert is_cash_or_short_term("TLT", beta=-0.2) is False
+
+
+def test_cash_like_positions_identification():
+    """Test that cash-like positions are correctly identified during processing."""
+    # Create a simple test portfolio with cash-like and non-cash-like positions
+    data = {
+        "Symbol": ["SPAXX", "SPY", "AAPL", "SHY", "CASH"],
+        "Description": [
+            "FIDELITY GOVERNMENT MONEY MARKET",
+            "SPDR S&P 500 ETF TRUST",
+            "APPLE INC",
+            "ISHARES 1-3 YEAR TREASURY BOND ETF",
+            "CASH",
+        ],
+        "Quantity": [1000, 10, 20, 50, 0],
+        "Last Price": [1.00, 450.00, 180.00, 80.00, 0],
+        "Current Value": [1000.00, 4500.00, 3600.00, 4000.00, 2000.00],
+        "Type": ["Cash", "ETF", "Stock", "ETF", "CASH"],
+        "Percent Of Account": ["5%", "22.5%", "18%", "20%", "10%"],
+    }
+    df = pd.DataFrame(data)
+    
+    # Process the portfolio
+    groups, summary, cash_like_positions = process_portfolio_data(df)
+    
+    # Check that cash-like positions were identified correctly
+    assert len(cash_like_positions) == 3  # SPAXX, SHY, and CASH
+    
+    # Check that the tickers are correct
+    cash_like_tickers = [pos["ticker"] for pos in cash_like_positions]
+    assert "SPAXX" in cash_like_tickers
+    assert "SHY" in cash_like_tickers
+    assert "CASH" in cash_like_tickers
+    assert "SPY" not in cash_like_tickers
+    assert "AAPL" not in cash_like_tickers
+    
+    # Check that the values are correct
+    cash_like_values = {pos["ticker"]: pos["market_value"] for pos in cash_like_positions}
+    assert cash_like_values["SPAXX"] == 1000.00
+    assert cash_like_values["SHY"] == 4000.00
+    assert cash_like_values["CASH"] == 2000.00
+
+
+def test_portfolio_summary_cash_like_metrics():
+    """Test that the portfolio summary includes cash-like metrics."""
+    # Create a simple test portfolio
+    data = {
+        "Symbol": ["SPAXX", "SPY", "AAPL"],
+        "Description": [
+            "FIDELITY GOVERNMENT MONEY MARKET",
+            "SPDR S&P 500 ETF TRUST",
+            "APPLE INC",
+        ],
+        "Quantity": [1000, 10, 20],
+        "Last Price": [1.00, 450.00, 180.00],
+        "Current Value": [1000.00, 4500.00, 3600.00],
+        "Type": ["Cash", "ETF", "Stock"],
+        "Percent Of Account": ["10%", "45%", "36%"],
+    }
+    df = pd.DataFrame(data)
+    
+    # Process the portfolio
+    groups, summary, cash_like_positions = process_portfolio_data(df)
+    
+    # Check that the summary includes cash-like metrics
+    assert summary.cash_like_count == 1  # Only SPAXX
+    assert summary.cash_like_value == 1000.00
+    assert len(summary.cash_like_positions) == 1
+    assert summary.cash_like_positions[0].ticker == "SPAXX"
+    assert summary.cash_like_positions[0].market_value == 1000.00
+    
+    # Check that the cash-like value is included in the total value
+    assert summary.total_value_abs >= summary.cash_like_value
+
+
+def test_empty_portfolio():
+    """Test handling of an empty portfolio."""
+    # Create an empty DataFrame
+    df = pd.DataFrame(columns=[
+        "Symbol", "Description", "Quantity", "Last Price", 
+        "Current Value", "Type", "Percent Of Account"
+    ])
+    
+    # Process the empty portfolio
+    groups, summary, cash_like_positions = process_portfolio_data(df)
+    
+    # Check that there are no cash-like positions
+    assert len(cash_like_positions) == 0
+    assert summary.cash_like_count == 0
+    assert summary.cash_like_value == 0.0
+    assert len(summary.cash_like_positions) == 0
+
+
+def test_only_cash_portfolio():
+    """Test a portfolio with only cash-like positions."""
+    # Create a portfolio with only cash-like positions
+    data = {
+        "Symbol": ["SPAXX", "FDRXX", "CASH"],
+        "Description": [
+            "FIDELITY GOVERNMENT MONEY MARKET",
+            "FIDELITY CASH RESERVES",
+            "CASH",
+        ],
+        "Quantity": [1000, 2000, 0],
+        "Last Price": [1.00, 1.00, 0],
+        "Current Value": [1000.00, 2000.00, 3000.00],
+        "Type": ["Cash", "Cash", "CASH"],
+        "Percent Of Account": ["16.7%", "33.3%", "50%"],
+    }
+    df = pd.DataFrame(data)
+    
+    # Process the portfolio
+    groups, summary, cash_like_positions = process_portfolio_data(df)
+    
+    # Check that all positions are identified as cash-like
+    assert len(cash_like_positions) == 3
+    assert summary.cash_like_count == 3
+    assert summary.cash_like_value == 6000.00  # Sum of all values
+    
+    # Check that the total value equals the cash-like value
+    assert summary.total_value_abs == summary.cash_like_value
+    
+    # Check that the portfolio beta is 0
+    assert summary.portfolio_beta == 0.0
+
+
+if __name__ == "__main__":
+    pytest.main(["-xvs", __file__])
