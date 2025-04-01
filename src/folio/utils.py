@@ -145,7 +145,17 @@ def process_portfolio_data(
 
     # Function to identify options based on description format
     def is_option_desc(desc: str) -> bool:
-        """Check if a description matches option format (e.g. 'TSM APR 17 2025 $190 CALL')"""
+        """Check if a description matches option format (e.g. 'TSM APR 17 2025 $190 CALL')
+
+        TODO: Implement more robust option description detection that handles different formats
+        and edge cases.
+
+        Args:
+            desc: The description string to check
+
+        Returns:
+            True if the description appears to be an option, False otherwise
+        """
         if not isinstance(desc, str):
             return False
         parts = desc.strip().split()

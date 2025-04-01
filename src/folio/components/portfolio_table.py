@@ -21,7 +21,16 @@ def get_group_ticker(group: PortfolioGroup) -> str:
 
 
 def create_position_row(group: PortfolioGroup, metrics: dict) -> dbc.Row:
-    """Create a row for a position in the portfolio table"""
+    """Create a row for a position in the portfolio table
+
+    Args:
+        group: PortfolioGroup containing position data
+        metrics: Dictionary of additional metrics to display (currently unused)
+               TODO: Implement metrics usage or remove parameter if not needed
+
+    Returns:
+        Dash Bootstrap Components Row for the portfolio table
+    """
     ticker = get_group_ticker(group)
     return dbc.Row(
         [
@@ -80,7 +89,9 @@ def create_position_row(group: PortfolioGroup, metrics: dict) -> dbc.Row:
 
 
 def create_portfolio_table(
-    groups: list[PortfolioGroup], search: Optional[str] = None, sort_by: str = "value-desc"
+    groups: list[PortfolioGroup],
+    search: Optional[str] = None,
+    sort_by: str = "value-desc",
 ) -> html.Div:
     """Create the portfolio table with all positions"""
     # Filter groups based on search

@@ -449,7 +449,10 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
     def update_portfolio_table(
         groups_data, search, all_clicks, stocks_clicks, options_clicks
     ):
-        """Update portfolio table based on filters"""
+        """Update portfolio table based on filters
+
+        TODO: Implement filter logic for all_clicks, stocks_clicks, and options_clicks buttons
+        """
         logger.debug("Updating portfolio table")
         try:
             if not groups_data:
