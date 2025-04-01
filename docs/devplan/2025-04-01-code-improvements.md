@@ -1,8 +1,32 @@
 # Code Improvement Plan: Enhancing Reliability and Conciseness
 
-**Date:** 2025-04-01  
-**Author:** Auggie  
+**Date:** 2025-04-01
+**Author:** Auggie
 **Focus:** Improving code reliability, maintainability, and conciseness
+
+## Improvement Checklist
+
+### Module Refactoring
+- [ ] Split `utils.py` into `beta_utils.py`
+- [ ] Split `utils.py` into `formatting.py`
+- [ ] Split `utils.py` into `portfolio_processor.py`
+- [ ] Split `utils.py` into `logging_utils.py`
+- [ ] Update imports in dependent files
+- [ ] Verify all tests pass after refactoring
+
+### Function Refactoring
+- [ ] Refactor `process_portfolio_data()` into smaller functions
+- [ ] Improve error handling in `get_beta()`
+- [ ] Create generic formatting functions to reduce duplication
+- [ ] Refactor pattern-based detection for money market funds
+
+### Quality Improvements
+- [ ] Add comprehensive type hints
+- [ ] Improve function documentation
+- [ ] Create configuration system for hardcoded values
+- [ ] Add tests for edge cases in formatting functions
+- [ ] Add tests for pattern-based detection
+- [ ] Add integration tests for portfolio processing
 
 ## Overview
 
