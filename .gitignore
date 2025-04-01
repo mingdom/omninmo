@@ -68,3 +68,6 @@ models/
 # Lab private files
 src/lab/portfolio.csv
 **/portfolio.csv  # Ignore any portfolio.csv files in any directory
+
+# augment specific
+.augment/

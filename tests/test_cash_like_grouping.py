@@ -3,9 +3,10 @@
 import pandas as pd
 import pytest
 
-from src.folio.data_model import PortfolioSummary, StockPosition
-from src.folio.utils import (calculate_portfolio_summary,
-                             is_cash_or_short_term, process_portfolio_data)
+from src.folio.utils import (
+    is_cash_or_short_term,
+    process_portfolio_data,
+)
 
 
 def test_is_cash_or_short_term():

@@ -43,15 +43,20 @@ def utility_function():
 """
 
 import re
+from typing import Optional
 
 import pandas as pd
 
-from src.lab.option_utils import (calculate_option_delta,
-                                  parse_option_description)
+from src.lab.option_utils import calculate_option_delta, parse_option_description
 from src.v2.data_fetcher import DataFetcher
 
-from .data_model import (ExposureBreakdown, PortfolioGroup, PortfolioSummary,
-                         StockPosition, create_portfolio_group)
+from .data_model import (
+    ExposureBreakdown,
+    PortfolioGroup,
+    PortfolioSummary,
+    StockPosition,
+    create_portfolio_group,
+)
 from .logger import logger
 
 # Initialize data fetcher
@@ -915,7 +920,7 @@ def process_portfolio_data(
 
 
 def calculate_portfolio_summary(
-    groups: list[PortfolioGroup], cash_like_positions: list[dict] = None
+    groups: list[PortfolioGroup], cash_like_positions: Optional[list[dict]] = None
 ) -> PortfolioSummary:
     """Calculates aggregated summary metrics for the entire portfolio.
 

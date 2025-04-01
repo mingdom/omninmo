@@ -10,11 +10,18 @@ from dash import ALL, Input, Output, State, dcc, html
 
 from .components.portfolio_table import create_portfolio_table
 from .components.position_details import create_position_details
-from .data_model import (OptionPosition, PortfolioGroup, PortfolioSummary,
-                         Position, StockPosition)
+from .data_model import (
+    OptionPosition,
+    PortfolioGroup,
+    Position,
+    StockPosition,
+)
 from .logger import logger
-from .utils import (format_beta, format_currency, format_percentage,
-                    process_portfolio_data)
+from .utils import (
+    format_beta,
+    format_currency,
+    process_portfolio_data,
+)
 
 
 def create_header() -> dbc.Card:

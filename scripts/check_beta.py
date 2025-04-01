@@ -39,9 +39,10 @@ import sys
 import pandas as pd
 
 # Adjust path to import from src
-script_dir = os.path.dirname(__file__)
-project_root = os.path.abspath(os.path.join(script_dir, ".."))
-sys.path.insert(0, project_root)
+if __name__ == "__main__":
+    script_dir = os.path.dirname(__file__)
+    project_root = os.path.abspath(os.path.join(script_dir, ".."))
+    sys.path.insert(0, project_root)
 
 from src.folio.logger import logger  # Use the same logger if desired
 from src.folio.utils import is_cash_or_short_term
@@ -52,18 +53,21 @@ def calculate_raw_beta(
     ticker: str, fetcher: DataFetcher, market_data: pd.DataFrame | None
 ) -> float | str:
     """Fetches data and calculates raw beta without special handling."""
+    # Early validation
     if market_data is None:
         return "Error: Market data not available"
 
     try:
+        # Fetch and validate stock data
         logger.info(f"Fetching data for {ticker}...")
         stock_data = fetcher.fetch_data(ticker)
 
-        if stock_data is None or stock_data.empty:
-            return f"Error: No data fetched for {ticker}"
-        if len(stock_data) < 2:
-            return f"Error: Not enough data points for {ticker} (need >= 2)"
+        # Data validation checks
+        error_msg = _validate_data(ticker, stock_data)
+        if error_msg:
+            return error_msg
 
+        # Calculate returns
         logger.info(f"Calculating returns for {ticker}...")
         stock_returns = stock_data["Close"].pct_change().dropna()
         market_returns = market_data["Close"].pct_change().dropna()
@@ -73,23 +77,44 @@ def calculate_raw_beta(
             market_returns, join="inner"
         )
 
+        # Validate aligned data
         if aligned_stock.empty or len(aligned_stock) < 2:
             return f"Error: Not enough overlapping data points after alignment for {ticker} (need >= 2)"
 
+        # Calculate beta
         logger.info(f"Calculating variance/covariance for {ticker}...")
         market_variance = aligned_market.var()
         covariance = aligned_stock.cov(aligned_market)
 
-        if pd.isna(market_variance) or abs(market_variance) < 1e-12:
-            return f"Error: Market variance is zero or near-zero ({market_variance})"
-        if pd.isna(covariance):
-            return "Error: Covariance calculation resulted in NaN"
+        # Validate variance and covariance
+        error_msg = _validate_variance_covariance(market_variance, covariance)
+        if error_msg:
+            return error_msg
 
+        # Calculate and return beta
         beta = covariance / market_variance
         return beta
 
     except Exception as e:
         return f"Error calculating beta for {ticker}: {e}"
+
+
+def _validate_data(ticker: str, stock_data: pd.DataFrame | None) -> str | None:
+    """Validates stock data and returns error message if invalid."""
+    if stock_data is None or stock_data.empty:
+        return f"Error: No data fetched for {ticker}"
+    if len(stock_data) < 2:
+        return f"Error: Not enough data points for {ticker} (need >= 2)"
+    return None
+
+
+def _validate_variance_covariance(market_variance: float, covariance: float) -> str | None:
+    """Validates variance and covariance calculations and returns error message if invalid."""
+    if pd.isna(market_variance) or abs(market_variance) < 1e-12:
+        return f"Error: Market variance is zero or near-zero ({market_variance})"
+    if pd.isna(covariance):
+        return "Error: Covariance calculation resulted in NaN"
+    return None
 
 
 if __name__ == "__main__":
