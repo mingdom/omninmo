@@ -538,10 +538,27 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
                     # Button click
                     button_idx = ctx.triggered[0]["prop_id"].split(".")[0]
                     try:
-                        ticker = eval(button_idx)["index"]
+                        # Parse the button index JSON-like string without using eval
+                        # Example format: {"type":"position-details","index":"AAPL"}
+                        if not button_idx or not button_idx.startswith("{"):
+                            logger.error(f"Invalid button index format: {button_idx}")
+                            return None
+
+                        # Extract the index part safely using string manipulation
+                        import json
+
+                        button_data = json.loads(button_idx.replace("'", '"'))
+                        ticker = button_data.get("index")
+
+                        if not ticker:
+                            logger.error("No ticker found in button data")
+                            return None
+
                         logger.debug(f"Button clicked for ticker: {ticker}")
-                    except Exception as e:
-                        logger.error(f"Error parsing button index: {e}")
+                    except (json.JSONDecodeError, KeyError) as e:
+                        logger.error(
+                            f"Error parsing button index: {e}, button_idx: {button_idx}"
+                        )
                         return None
 
                     # Find the group with matching ticker

@@ -17,9 +17,16 @@ from .logger import logger
 # Initialize data fetcher
 try:
     data_fetcher = DataFetcher()
+    if data_fetcher is None:
+        raise RuntimeError(
+            "DataFetcher initialization failed but didn't raise an exception"
+        )
 except ValueError as e:
     logger.error(f"Failed to initialize DataFetcher: {e}")
-    data_fetcher = None
+    # Re-raise to fail fast rather than continuing with a null reference
+    raise RuntimeError(
+        f"Critical component DataFetcher could not be initialized: {e}"
+    ) from e
 
 
 def get_beta(ticker: str, description: str = "") -> float:
@@ -163,19 +170,42 @@ def process_portfolio_data(
     for _, row in df[~df["Description"].apply(is_option_desc)].iterrows():
         if row["Last Price"] and isinstance(row["Last Price"], str):
             try:
+                symbol = row["Symbol"].rstrip("*")  # Remove trailing asterisks
+
+                # Validate critical data is present
+                if not symbol:
+                    logger.warning(f"Empty symbol found in row: {row}")
+                    continue
+
+                if pd.isna(row["Quantity"]):
+                    logger.warning(f"Missing quantity for stock {symbol}")
+                    continue
+
                 price = clean_currency_value(row["Last Price"])
-                if price > 0:
-                    symbol = row["Symbol"].rstrip("*")  # Remove trailing asterisks
-                    stock_positions[symbol] = {
-                        "price": price,
-                        "quantity": int(row["Quantity"])
-                        if pd.notna(row["Quantity"])
-                        else 0,
-                        "value": clean_currency_value(row["Current Value"]),
-                        "beta": get_beta(symbol, row["Description"]),
-                    }
+                if price <= 0:
+                    logger.warning(f"Invalid price (≤0) for stock {symbol}: {price}")
+                    continue
+
+                stock_positions[symbol] = {
+                    "price": price,
+                    "quantity": int(row["Quantity"]),
+                    "value": clean_currency_value(row["Current Value"]),
+                    "beta": get_beta(symbol, row["Description"]),
+                }
+            except ValueError as e:
+                # More specific exception for data conversion errors
+                logger.warning(f"Data conversion error for stock {row['Symbol']}: {e}")
+                continue
+            except TypeError as e:
+                # More specific exception for type errors
+                logger.warning(f"Type error for stock {row['Symbol']}: {e}")
+                continue
             except Exception as e:
-                logger.warning(f"Error processing stock position {row['Symbol']}: {e}")
+                # Still catch everything else but with better logging
+                logger.error(
+                    f"Unexpected error processing stock {row['Symbol']}: {e}",
+                    exc_info=True,
+                )
                 continue
 
     # Group by underlying symbol (using stock symbols as base)
@@ -229,11 +259,30 @@ def process_portfolio_data(
 
             for _, opt in option_rows.iterrows():
                 try:
+                    # Validate critical fields first
+                    if not opt["Symbol"] or pd.isna(opt["Symbol"]):
+                        logger.warning("Missing option symbol, skipping")
+                        continue
+
+                    if pd.isna(opt["Last Price"]) or pd.isna(opt["Quantity"]):
+                        logger.warning(
+                            f"Missing price or quantity for option {opt['Symbol']}"
+                        )
+                        continue
+
                     # Parse option details using option_utils
                     last_price = clean_currency_value(opt["Last Price"])
-                    option = parse_option_description(
-                        opt["Description"], int(opt["Quantity"]), last_price
-                    )
+
+                    # More specific try blocks for parsing vs calculation
+                    try:
+                        option = parse_option_description(
+                            opt["Description"], int(opt["Quantity"]), last_price
+                        )
+                    except ValueError as e:
+                        logger.warning(
+                            f"Could not parse option description for {opt['Symbol']}: {e}"
+                        )
+                        continue
 
                     # Skip if not related to this stock
                     if option.underlying != symbol:
@@ -282,8 +331,15 @@ def process_portfolio_data(
                             "notional_value": notional_value,
                         }
                     )
+                except TypeError as e:
+                    logger.warning(f"Type error processing option {opt['Symbol']}: {e}")
+                    continue
                 except Exception as e:
-                    logger.warning(f"Error processing option {opt['Symbol']}: {e}")
+                    # Still catch generic exceptions but with better logging
+                    logger.error(
+                        f"Unexpected error processing option {opt.get('Symbol', 'unknown')}: {e}",
+                        exc_info=True,
+                    )
                     continue
 
             # Create portfolio group
@@ -292,7 +348,15 @@ def process_portfolio_data(
                 groups.append(group)
 
         except Exception as e:
-            logger.error(f"Error processing group for {symbol}: {e}")
+            # This is critical functionality, so let's log a lot more detail
+            logger.error(f"Error processing group for {symbol}: {e}", exc_info=True)
+            # If we have no groups yet and this is the first one failing, we should raise
+            # to avoid returning an empty portfolio
+            if not groups:
+                logger.critical(
+                    "First portfolio group failed, cannot continue with empty portfolio"
+                )
+                raise
             continue
 
     if not groups:
@@ -441,6 +505,11 @@ def calculate_portfolio_summary(
 def calculate_position_metrics(group: PortfolioGroup) -> dict:
     """Calculate additional metrics for a position"""
     logger.debug(f"Calculating metrics for group {group.ticker}")
+
+    if not group:
+        logger.error("Cannot calculate metrics for None group")
+        raise ValueError("Cannot calculate metrics for None group")
+
     try:
         return {
             "total_value": format_currency(group.total_value),
@@ -454,9 +523,5 @@ def calculate_position_metrics(group: PortfolioGroup) -> dict:
         logger.error(
             f"Error calculating metrics for {group.ticker}: {e}", exc_info=True
         )
-        return {
-            "total_value": "Error",
-            "beta": "Error",
-            "beta_adjusted_exposure": "Error",
-            "options_delta_exposure": "Error",
-        }
+        # Raise to avoid silently showing incorrect data
+        raise ValueError(f"Error calculating position metrics: {e}") from e
