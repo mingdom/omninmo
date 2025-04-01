@@ -23,7 +23,11 @@ class StockPositionDict(PositionDict):
 
 
 class OptionPositionDict(PositionDict):
-    """Type definition for option position dictionary"""
+    """Type definition for option position dictionary
+
+    TODO: Extend with additional option Greeks (gamma, theta, vega, implied_volatility)
+    to match the planned OptionPosition class enhancements.
+    """
 
     strike: float
     expiry: str
@@ -110,7 +114,14 @@ class Position:
 
 @dataclass
 class OptionPosition(Position):
-    """Class for option positions"""
+    """Class for option positions
+
+    TODO: Extend with additional option Greeks:
+    - gamma: Measures sensitivity of delta to changes in the underlying price
+    - theta: Time decay, measures change in option value as time passes
+    - vega: Measures sensitivity to implied volatility changes
+    - implied_volatility: The market's expectation of future volatility
+    """
 
     strike: float
     expiry: str

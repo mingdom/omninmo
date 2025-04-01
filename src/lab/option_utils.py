@@ -2,8 +2,11 @@
 Utilities for handling option positions and calculations.
 """
 
+import math
 from dataclasses import dataclass
 from datetime import datetime
+
+from scipy.stats import norm
 
 
 @dataclass
@@ -121,6 +124,82 @@ def calculate_simple_delta(option: OptionPosition, underlying_price: float) -> f
     return delta
 
 
+def calculate_black_scholes_delta(
+    option: OptionPosition,
+    underlying_price: float,
+    risk_free_rate: float = 0.05,
+    implied_volatility: float = 0.30,
+) -> float:
+    """
+    Calculate option delta using the Black-Scholes model.
+
+    Args:
+        option: OptionPosition object containing option details
+        underlying_price: Current price of the underlying asset
+        risk_free_rate: Risk-free interest rate (default: 5%)
+        implied_volatility: Implied volatility of the option (default: 30%)
+
+    Returns:
+        Delta value of the option
+    """
+    # Calculate time to expiration in years
+    now = datetime.now()
+    time_to_expiry = (option.expiry - now).total_seconds() / (365.25 * 24 * 60 * 60)
+
+    # Handle expired options
+    if time_to_expiry <= 0:
+        if option.option_type == "CALL":
+            return 1.0 if underlying_price > option.strike else 0.0
+        else:  # PUT
+            return -1.0 if underlying_price < option.strike else 0.0
+
+    # Calculate d1 from Black-Scholes formula
+    d1 = (
+        math.log(underlying_price / option.strike)
+        + (risk_free_rate + 0.5 * implied_volatility**2) * time_to_expiry
+    ) / (implied_volatility * math.sqrt(time_to_expiry))
+
+    # Calculate delta based on option type
+    if option.option_type == "CALL":
+        delta = norm.cdf(d1)
+    else:  # PUT
+        delta = norm.cdf(d1) - 1
+
+    # Adjust for position direction
+    if option.is_short:
+        delta = -delta
+
+    return delta
+
+
+def calculate_option_delta(
+    option: OptionPosition,
+    underlying_price: float,
+    use_black_scholes: bool = True,
+    risk_free_rate: float = 0.05,
+    implied_volatility: float = 0.30,
+) -> float:
+    """
+    Calculate option delta using either Black-Scholes model or simple approximation.
+
+    Args:
+        option: OptionPosition object containing option details
+        underlying_price: Current price of the underlying asset
+        use_black_scholes: Whether to use Black-Scholes model (True) or simple approximation (False)
+        risk_free_rate: Risk-free interest rate (only used for Black-Scholes)
+        implied_volatility: Implied volatility of the option (only used for Black-Scholes)
+
+    Returns:
+        Delta value of the option
+    """
+    if use_black_scholes:
+        return calculate_black_scholes_delta(
+            option, underlying_price, risk_free_rate, implied_volatility
+        )
+    else:
+        return calculate_simple_delta(option, underlying_price)
+
+
 def group_options_by_underlying(options: list[OptionPosition]) -> dict:
     """Group option positions by underlying symbol."""
     grouped = {}
@@ -142,3 +221,13 @@ if __name__ == "__main__":
     delta = calculate_simple_delta(test_option, underlying_price)
     print(f"Simple delta: {delta:.2f}")
     print(f"Delta-adjusted exposure: ${test_option.notional_value * delta:,.2f}")
+
+    # Test Black-Scholes delta calculation
+    bs_delta = calculate_black_scholes_delta(test_option, underlying_price)
+    print(f"Black-Scholes delta: {bs_delta:.4f}")
+    print(
+        f"Black-Scholes delta-adjusted exposure: ${test_option.notional_value * bs_delta:,.2f}"
+    )
+
+    print("\nFor comprehensive testing of option delta calculations, run:")
+    print("python -m pytest tests/test_option_delta.py -v")

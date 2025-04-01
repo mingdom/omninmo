@@ -6,7 +6,7 @@ import sys
 import pandas as pd
 
 from src.lab.option_utils import (
-    calculate_simple_delta,
+    calculate_option_delta,
     parse_option_description,
 )
 from src.v2.data_fetcher import DataFetcher
@@ -209,8 +209,14 @@ def process_options(df: pd.DataFrame, beta_map: dict) -> tuple[pd.DataFrame, dic
 
             underlying_price = stock_info["price"]
 
-            # Calculate delta
-            delta = calculate_simple_delta(option, underlying_price)
+            # Calculate delta using Black-Scholes model
+            delta = calculate_option_delta(
+                option,
+                underlying_price,
+                use_black_scholes=True,
+                risk_free_rate=0.05,  # Using 5% as default risk-free rate
+                implied_volatility=0.30,  # Using 30% as default implied volatility
+            )
 
             # Store option with its calculations
             option_positions.append(

@@ -26,6 +26,7 @@ setup(
         "dash>=2.14.2",
         "dash-bootstrap-components>=1.5.0",
         "plotly>=5.19.0",
+        "scipy>=1.11.0",
     ],
     python_requires=">=3.8",
     entry_points={

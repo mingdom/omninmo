@@ -1,7 +1,7 @@
 import pandas as pd
 
 from src.lab.option_utils import (
-    calculate_simple_delta,
+    calculate_option_delta,
     parse_option_description,
 )
 from src.v2.data_fetcher import DataFetcher
@@ -148,7 +148,8 @@ def process_portfolio_data(
         """Check if a description matches option format (e.g. 'TSM APR 17 2025 $190 CALL')
 
         TODO: Implement more robust option description detection that handles different formats
-        and edge cases.
+        and edge cases, including weekly options, non-standard date formats, and LEAPS.
+        Current implementation is very brittle and only works with one specific format.
 
         Args:
             desc: The description string to check
@@ -299,7 +300,16 @@ def process_portfolio_data(
                         continue
 
                     # Calculate delta using underlying price
-                    delta = calculate_simple_delta(option, stock_info["price"])
+                    delta = calculate_option_delta(
+                        option,
+                        stock_info["price"],
+                        use_black_scholes=True,
+                        risk_free_rate=0.05,  # Using 5% as default risk-free rate
+                        implied_volatility=0.30,  # Using 30% as default implied volatility
+                    )
+                    # This now uses the proper Black-Scholes model that accounts
+                    # for implied volatility, time to expiration, and interest rates.
+
                     market_value = clean_currency_value(opt["Current Value"])
                     notional_value = option.strike * abs(option.quantity) * 100
 
@@ -326,6 +336,9 @@ def process_portfolio_data(
                         f"    Beta-Adjusted Exposure: {format_currency(delta * notional_value * beta)}"
                     )
 
+                    # TODO: Calculate and log additional Greeks (gamma, theta, vega) to provide
+                    # more comprehensive risk metrics for option positions.
+
                     option_data.append(
                         {
                             "ticker": symbol,
@@ -339,6 +352,8 @@ def process_portfolio_data(
                             "delta": delta,
                             "delta_exposure": delta * notional_value,
                             "notional_value": notional_value,
+                            # TODO: Add additional Greeks (gamma, theta, vega) to option data
+                            # to enable more sophisticated risk analysis and exposure calculations.
                         }
                     )
                 except TypeError as e:
@@ -381,7 +396,22 @@ def process_portfolio_data(
 def calculate_portfolio_summary(
     df: pd.DataFrame, groups: list[PortfolioGroup]
 ) -> PortfolioSummary:
-    """Calculate various portfolio summary metrics with detailed breakdowns"""
+    """Calculate various portfolio summary metrics with detailed breakdowns
+
+    TODO: Enhance portfolio summary to include:
+    - Implied volatility exposure (vega)
+    - Time decay exposure (theta)
+    - Portfolio gamma for measuring convexity risk
+    - Scenario analysis for different market movements
+    - Stress testing for extreme market conditions
+
+    Args:
+        df: Raw portfolio dataframe
+        groups: List of PortfolioGroup objects
+
+    Returns:
+        PortfolioSummary object with detailed exposure breakdowns
+    """
     logger.debug("Starting portfolio summary calculations")
 
     try:
@@ -413,12 +443,20 @@ def calculate_portfolio_summary(
                     opt.option_type == "PUT" and opt.quantity < 0
                 )
 
+                # TODO: This long/short classification is overly simplistic.
+                # Consider option moneyness, implied vol, and time to expiration
+                # when classifying exposure. Deep ITM calls behave differently
+                # from OTM calls, and this affects portfolio risk.
+
                 if is_long:
                     long_options["value"] += abs(opt.delta_exposure)
                     long_options["beta_adjusted"] += abs(opt.beta_adjusted_exposure)
                 else:
                     short_options["value"] += abs(opt.delta_exposure)
                     short_options["beta_adjusted"] += abs(opt.beta_adjusted_exposure)
+
+                # TODO: Add calculation for gamma exposure bucketing by expiration
+                # to better understand convexity risk across different timeframes
 
         # Create exposure breakdowns
         long_exposure = ExposureBreakdown(
