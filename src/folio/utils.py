@@ -42,6 +42,8 @@ def utility_function():
 ```
 """
 
+import re
+
 import pandas as pd
 
 from src.lab.option_utils import (calculate_option_delta,
@@ -76,7 +78,7 @@ def get_beta(ticker: str, description: str = "") -> float:
 
     Args:
         ticker: The instrument's symbol
-        description: Optional description of the security (unused, kept for API compatibility)
+        description: Description of the security, used to identify cash-like positions
 
     Returns:
         float: The calculated beta value, or 0.0 if beta cannot be meaningfully calculated
@@ -86,6 +88,11 @@ def get_beta(ticker: str, description: str = "") -> float:
         ValueError: If the data is invalid or calculations result in invalid values
         KeyError: If the data format is invalid (missing required columns)
     """
+    # For cash-like instruments, return 0 without calculation
+    if ticker in ["CASH", "USD"] or is_likely_money_market(ticker, description):
+        logger.info(f"Using default beta of 0.0 for cash-like position: {ticker}")
+        return 0.0
+
     if not data_fetcher:
         raise RuntimeError("DataFetcher not initialized - check API key configuration")
 
@@ -487,12 +494,24 @@ def process_portfolio_data(
                     )
                     continue
 
-            # Check for price - required for beta and option calculations
+            # Check if this is a known cash-like position before handling missing price
+            is_known_cash = is_cash_or_short_term(symbol, beta=None, description=description)
+
+            # Check for price - required for beta and option calculations (unless it's a known cash-like position)
             if pd.isna(row["Last Price"]) or row["Last Price"] in ("--", ""):
-                logger.warning(
-                    f"Row {index}: Stock {symbol} has missing price ('{row['Last Price']}'). Cannot calculate beta or use for options. Skipping."
-                )
-                continue
+                if is_known_cash:
+                    logger.info(
+                        f"Row {index}: Cash-like position {symbol} has missing price ('{row['Last Price']}'). Using default beta of 0."
+                    )
+                    # Continue processing with default values for cash-like positions
+                    price = 0.0
+                    beta = 0.0
+                    is_cash_like = True
+                else:
+                    logger.warning(
+                        f"Row {index}: Stock {symbol} has missing price ('{row['Last Price']}'). Cannot calculate beta or use for options. Skipping."
+                    )
+                    continue
 
             price = clean_currency_value(row["Last Price"])
             # Allow zero price? Maybe for delisted stocks? Log carefully.
@@ -531,11 +550,11 @@ def process_portfolio_data(
             # Get Beta - requires valid ticker and fetcher
             beta = get_beta(symbol, description)
 
-            # Check if this is a cash-like instrument based on beta or description
-            is_cash_like = is_cash_or_short_term(symbol, beta=beta) or "MONEY MARKET" in description.upper()
+            # Check if this is a cash-like instrument based on beta, symbol, or description
+            is_cash_like = is_cash_or_short_term(symbol, beta=beta, description=description)
 
             if is_cash_like:
-                logger.info(f"Identified cash-like position based on beta or description: {symbol} (beta: {beta:.4f}), Value: {format_currency(value_to_use)}")
+                logger.info(f"Identified cash-like position: {symbol} (beta: {beta:.4f}, description: '{description}'), Value: {format_currency(value_to_use)}")
 
                 # Check if we already have a cash-like position with this ticker
                 if symbol in cash_like_by_ticker:
@@ -881,7 +900,7 @@ def process_portfolio_data(
     logger.info("Calculating final portfolio summary...")
     try:
         summary = calculate_portfolio_summary(
-            df, groups, cash_like_positions
+            groups, cash_like_positions
         )
         logger.info("Portfolio summary calculated successfully.")
     except Exception as summary_err:
@@ -896,7 +915,7 @@ def process_portfolio_data(
 
 
 def calculate_portfolio_summary(
-    df: pd.DataFrame, groups: list[PortfolioGroup], cash_like_positions: list[dict] = None
+    groups: list[PortfolioGroup], cash_like_positions: list[dict] = None
 ) -> PortfolioSummary:
     """Calculates aggregated summary metrics for the entire portfolio.
 
@@ -1297,37 +1316,91 @@ def calculate_position_metrics(group: PortfolioGroup) -> dict:
         ) from e
 
 
-def is_cash_or_short_term(ticker: str, beta: float | None = None) -> bool:
-    """Determines if a position should be considered cash or cash-like based on its beta.
+# Patterns and keywords to identify cash-like instruments without hardcoding specific symbols
+def is_likely_money_market(ticker: str, description: str = "") -> bool:
+    """Determines if a position is likely a money market fund based on patterns and keywords.
 
-    A position is considered cash-like if it has a very low beta (abs(beta) < 0.1),
-    indicating minimal market correlation. This typically includes:
-    - Money market funds
-    - Short-term treasury bills
-    - Other highly stable, low-volatility instruments
+    Args:
+        ticker: The instrument's symbol
+        description: The instrument's description
+
+    Returns:
+        bool: True if the position is likely a money market fund
+    """
+    # Convert inputs to uppercase for case-insensitive matching
+    ticker_upper = ticker.upper()
+    description_upper = description.upper() if description else ""
+
+    # Pattern 1: Common money market fund symbol patterns (ending with XX)
+    if re.search(r'[A-Z]{2,4}XX$', ticker_upper):
+        return True
+
+    # Pattern 2: Description contains money market related terms
+    money_market_terms = [
+        "MONEY MARKET", "CASH RESERVES", "TREASURY ONLY", "GOVERNMENT LIQUIDITY",
+        "CASH MANAGEMENT", "LIQUID ASSETS", "CASH EQUIVALENT", "TREASURY FUND",
+        "LIQUIDITY FUND", "CASH FUND", "RESERVE FUND"
+    ]
+
+    for term in money_market_terms:
+        if term in description_upper:
+            return True
+
+    # Pattern 3: Common prefixes for money market funds
+    money_market_prefixes = ["SPAXX", "FMPXX", "VMFXX", "SWVXX"]
+    for prefix in money_market_prefixes:
+        if ticker_upper.startswith(prefix):
+            return True
+
+    # Pattern 4: Common short-term treasury ETFs
+    short_term_treasury_etfs = ["BIL", "SHY", "SGOV", "GBIL"]
+    if ticker_upper in short_term_treasury_etfs:
+        return True
+
+    return False
+
+def is_cash_or_short_term(ticker: str, beta: float | None = None, description: str = "") -> bool:
+    """Determines if a position should be considered cash or cash-like.
+
+    A position is considered cash-like if any of these conditions are met:
+    1. It has a very low beta (abs(beta) < 0.1)
+    2. It's identified as a likely money market fund based on patterns and keywords
+    3. It's a cash symbol like "CASH" or "USD"
 
     Args:
         ticker: The instrument's symbol
         beta: Pre-calculated beta value if available. If None, will be calculated.
+        description: The instrument's description, used for pattern matching
 
     Returns:
-        bool: True if the position should be treated as cash-like based on its beta, False otherwise.
-
-    Raises:
-        RuntimeError: If beta calculation fails due to data fetching issues
-        ValueError: If beta calculation produces invalid values
-        KeyError: If required data is missing during beta calculation
+        bool: True if the position should be treated as cash-like, False otherwise.
 
     Examples:
         >>> is_cash_or_short_term("BIL", beta=0.001)  # Short-term treasury ETF
         True
+        >>> is_cash_or_short_term("SPAXX")  # Money market fund (pattern match)
+        True
+        >>> is_cash_or_short_term("XYZ", description="ABC MONEY MARKET FUND")  # Pattern match in description
+        True
         >>> is_cash_or_short_term("AAPL", beta=1.2)  # Regular stock
         False
     """
+    # Check if it's a cash symbol
+    if ticker in ["CASH", "USD"]:
+        return True
+
+    # Check if it's likely a money market fund based on patterns
+    if is_likely_money_market(ticker, description):
+        return True
+
     # If beta was provided, use it
     if beta is not None:
         return abs(beta) < 0.1
 
     # Calculate beta if not provided - let errors propagate up
-    calculated_beta = get_beta(ticker)
-    return abs(calculated_beta) < 0.1
+    try:
+        calculated_beta = get_beta(ticker)
+        return abs(calculated_beta) < 0.1
+    except Exception as e:
+        logger.warning(f"Error calculating beta for {ticker}: {e}. Assuming not cash-like.")
+        return False

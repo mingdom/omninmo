@@ -37,18 +37,16 @@ def test_regular_stocks(mock_get_beta):
 
 
 def test_beta_calculation_error(mock_get_beta):
-    """Test that beta calculation errors are propagated."""
+    """Test that beta calculation errors are handled gracefully."""
+    # Our new implementation catches exceptions and returns False
     mock_get_beta.side_effect = RuntimeError("Failed to fetch data")
-    with pytest.raises(RuntimeError, match="Failed to fetch data"):
-        is_cash_or_short_term("INVALID")
+    assert not is_cash_or_short_term("INVALID")
 
     mock_get_beta.side_effect = ValueError("Invalid beta calculation")
-    with pytest.raises(ValueError, match="Invalid beta calculation"):
-        is_cash_or_short_term("INVALID")
+    assert not is_cash_or_short_term("INVALID")
 
     mock_get_beta.side_effect = KeyError("Missing required data")
-    with pytest.raises(KeyError, match="Missing required data"):
-        is_cash_or_short_term("INVALID")
+    assert not is_cash_or_short_term("INVALID")
 
 
 def test_beta_threshold_edge_cases():
@@ -60,3 +58,20 @@ def test_beta_threshold_edge_cases():
     assert not is_cash_or_short_term(
         "TEST5", beta=-0.101
     )  # Negative and over threshold
+
+
+def test_pattern_based_detection():
+    """Test pattern-based detection of money market funds."""
+    # Test XX pattern in symbol
+    assert is_cash_or_short_term("SPAXX")
+    assert is_cash_or_short_term("FMPXX")
+    assert is_cash_or_short_term("ABCXX")
+
+    # Test money market terms in description
+    assert is_cash_or_short_term("XYZ", description="MONEY MARKET FUND")
+    assert is_cash_or_short_term("ABC", description="Cash Reserves")
+    assert is_cash_or_short_term("DEF", description="Treasury Fund")
+
+    # Test that non-matching patterns return False
+    assert not is_cash_or_short_term("ABCDE")
+    assert not is_cash_or_short_term("XYZ", description="Growth Fund")
