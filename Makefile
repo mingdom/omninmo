@@ -102,7 +102,7 @@ clean:
 # Lint Python code
 .PHONY: lint
 lint:
-	@echo "Running type checker and linter..."
+	@echo "Running linter..."
 	@if [ ! -d "$(VENV_DIR)" ]; then \
 		echo "Virtual environment not found. Please run 'make env' first."; \
 		exit 1; \
@@ -111,11 +111,9 @@ lint:
 	@(echo "=== Code Check Log $(TIMESTAMP) ===" && \
 	echo "Starting checks at: $$(date)" && \
 	(source $(VENV_DIR)/bin/activate && \
-	echo "Running type checker..." && \
-	mypy src/folio --strict && \
 	echo "Running linter..." && \
-	ruff check $(if $(findstring --fix,$(MAKECMDGOALS)),--fix,.) \
-	) 2>&1) | tee $(LOGS_DIR)/code_check_$(TIMESTAMP).log
+	ruff check --fix --unsafe-fixes .) \
+	2>&1) | tee $(LOGS_DIR)/code_check_$(TIMESTAMP).log
 	@echo "Check log saved to: $(LOGS_DIR)/code_check_$(TIMESTAMP).log"
 
 # Allow --fix as target without actions

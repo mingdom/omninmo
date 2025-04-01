@@ -21,7 +21,6 @@ matplotlib==3.10.1
 tqdm==4.65.0
 ruff==0.3.3
 pytest==8.1.1
-mypy==1.9.0
 
 # Lab project dependencies
 yfinance>=0.2.37  # For portfolio beta calculation

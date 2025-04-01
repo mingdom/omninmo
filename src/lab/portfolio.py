@@ -1,6 +1,7 @@
 import argparse
 import os
 import re  # Regular expressions for cleaning
+import sys
 
 import pandas as pd
 
@@ -274,7 +275,7 @@ def main():
     # Check if file exists
     if not os.path.exists(args.portfolio_csv):
         print(f"Error: File not found: {args.portfolio_csv}")
-        exit(1)
+        sys.exit(1)
 
     # 1. Load data from CSV file
     try:
@@ -291,7 +292,7 @@ def main():
     except Exception as e:
         print(f"Error reading CSV file: {e}")
         print("Please ensure the file exists and starts with the header row.")
-        exit(1)  # Stop execution if CSV parsing fails
+        sys.exit(1)  # Stop execution if CSV parsing fails
 
     # 2. Clean values and symbols
     df["Clean Value"] = df["Current Value"].apply(clean_currency)
@@ -328,7 +329,7 @@ def main():
         print(
             "\nNo valid stock/ETF positions found after filtering. Cannot calculate beta."
         )
-        exit(1)
+        sys.exit(1)
 
     # 4. Fetch Betas (for cleaned stock symbols)
     # Use the 'Cleaned Symbol' column for fetching beta
@@ -345,7 +346,7 @@ def main():
 
     if total_portfolio_value_net == 0:
         print("\nNet portfolio value is zero. Cannot calculate beta.")
-        exit(1)
+        sys.exit(1)
 
     # Use net value for weights to properly represent position impact
     df_filtered["Weight"] = df_filtered["Clean Value"] / total_portfolio_value_net

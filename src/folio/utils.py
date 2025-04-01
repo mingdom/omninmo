@@ -1,4 +1,3 @@
-from typing import Dict, List, Tuple
 
 import pandas as pd
 
@@ -87,7 +86,7 @@ def clean_currency_value(value_str: str) -> float:
     value_str = str(value_str)  # Convert to string in case it's already a numeric type
 
     # Handle empty or dash values
-    if value_str == "--" or value_str == "":
+    if value_str in ("--", ""):
         return 0.0
 
     # Remove currency symbols and commas
@@ -109,7 +108,7 @@ def is_option(symbol: str) -> bool:
 
 def process_portfolio_data(
     df: pd.DataFrame,
-) -> Tuple[List[PortfolioGroup], PortfolioSummary]:
+) -> tuple[list[PortfolioGroup], PortfolioSummary]:
     """Process portfolio data from DataFrame into PortfolioGroup objects and summary"""
     if df is None or df.empty:
         raise ValueError("Portfolio data is empty or None")
@@ -307,7 +306,7 @@ def process_portfolio_data(
 
 
 def calculate_portfolio_summary(
-    df: pd.DataFrame, groups: List[PortfolioGroup]
+    df: pd.DataFrame, groups: list[PortfolioGroup]
 ) -> PortfolioSummary:
     """Calculate various portfolio summary metrics with detailed breakdowns"""
     logger.debug("Starting portfolio summary calculations")
@@ -440,7 +439,7 @@ def calculate_portfolio_summary(
         raise
 
 
-def calculate_position_metrics(group: PortfolioGroup) -> Dict:
+def calculate_position_metrics(group: PortfolioGroup) -> dict:
     """Calculate additional metrics for a position"""
     logger.debug(f"Calculating metrics for group {group.ticker}")
     try:

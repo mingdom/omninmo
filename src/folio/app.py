@@ -1,6 +1,7 @@
 import argparse
 import sys
 from pathlib import Path
+from typing import Optional
 
 import dash
 import dash_bootstrap_components as dbc
@@ -253,7 +254,7 @@ def create_position_modal() -> dbc.Modal:
     )
 
 
-def create_app(portfolio_file: str = None, debug: bool = False) -> dash.Dash:
+def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> dash.Dash:
     """Create and configure the Dash application"""
     logger.info("Initializing Dash application")
 

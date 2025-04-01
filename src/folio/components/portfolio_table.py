@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Optional
 
 import dash_bootstrap_components as dbc
 from dash import html
@@ -20,7 +20,7 @@ def get_group_ticker(group: PortfolioGroup) -> str:
     return "Unknown"
 
 
-def create_position_row(group: PortfolioGroup, metrics: Dict) -> dbc.Row:
+def create_position_row(group: PortfolioGroup, metrics: dict) -> dbc.Row:
     """Create a row for a position in the portfolio table"""
     ticker = get_group_ticker(group)
     return dbc.Row(
@@ -80,7 +80,7 @@ def create_position_row(group: PortfolioGroup, metrics: Dict) -> dbc.Row:
 
 
 def create_portfolio_table(
-    groups: List[PortfolioGroup], search: str = None, sort_by: str = "value-desc"
+    groups: list[PortfolioGroup], search: Optional[str] = None, sort_by: str = "value-desc"
 ) -> html.Div:
     """Create the portfolio table with all positions"""
     # Filter groups based on search

@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Dict, List, Literal, NotRequired, Optional, TypedDict, Union
+from typing import Literal, NotRequired, Optional, TypedDict, Union
 
 
 class PositionDict(TypedDict):
@@ -45,7 +45,7 @@ class ExposureBreakdownDict(TypedDict):
     total_beta_adjusted: float
     description: str
     formula: str
-    components: Dict[str, float]
+    components: dict[str, float]
 
 
 class PortfolioGroupDict(TypedDict):
@@ -53,7 +53,7 @@ class PortfolioGroupDict(TypedDict):
 
     ticker: str
     stock_position: NotRequired[Union[StockPositionDict, None]]
-    option_positions: List[OptionPositionDict]
+    option_positions: list[OptionPositionDict]
     total_value: float
     net_exposure: float
     beta: float
@@ -76,7 +76,7 @@ class PortfolioSummaryDict(TypedDict):
     options_exposure: ExposureBreakdownDict
     short_percentage: float
     exposure_reduction_percentage: float
-    help_text: Dict[str, str]
+    help_text: dict[str, str]
 
 
 @dataclass
@@ -171,7 +171,7 @@ class PortfolioGroup:
 
     ticker: str
     stock_position: Optional[StockPosition]
-    option_positions: List[OptionPosition]
+    option_positions: list[OptionPosition]
 
     # Group metrics
     total_value: float
@@ -217,7 +217,7 @@ class PortfolioGroup:
 
     def get_details(
         self,
-    ) -> Dict[str, Union[Dict[str, float], List[Dict[str, Union[str, float]]]]]:
+    ) -> dict[str, Union[dict[str, float], list[dict[str, Union[str, float]]]]]:
         """Get detailed breakdown of the group's exposures"""
         return {
             "Stock Position": {
@@ -256,7 +256,7 @@ class ExposureBreakdown:
     total_beta_adjusted: float
     description: str
     formula: str
-    components: Dict[str, float]
+    components: dict[str, float]
 
     def to_dict(self) -> ExposureBreakdownDict:
         """Convert to a Dash-compatible dictionary"""
@@ -296,7 +296,7 @@ class PortfolioSummary:
     exposure_reduction_percentage: float
 
     # Help text for each metric
-    help_text: Optional[Dict[str, str]] = None
+    help_text: Optional[dict[str, str]] = None
 
     def __post_init__(self):
         """Initialize help text for metrics"""
@@ -369,8 +369,8 @@ class PortfolioSummary:
 
 
 def create_portfolio_group(
-    stock_data: Optional[Dict[str, Union[str, int, float]]] = None,
-    option_data: Optional[List[Dict[str, Union[str, int, float]]]] = None,
+    stock_data: Optional[dict[str, Union[str, int, float]]] = None,
+    option_data: Optional[list[dict[str, Union[str, int, float]]]] = None,
 ) -> Optional[PortfolioGroup]:
     """Create a PortfolioGroup from stock and option data"""
     if not stock_data and not option_data:
