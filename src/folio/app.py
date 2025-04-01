@@ -10,9 +10,11 @@ from dash import ALL, Input, Output, State, dcc, html
 
 from .components.portfolio_table import create_portfolio_table
 from .components.position_details import create_position_details
-from .data_model import OptionPosition, PortfolioGroup, Position
+from .data_model import (OptionPosition, PortfolioGroup, PortfolioSummary,
+                         Position, StockPosition)
 from .logger import logger
-from .utils import format_beta, format_currency, process_portfolio_data
+from .utils import (format_beta, format_currency, format_percentage,
+                    process_portfolio_data)
 
 
 def create_header() -> dbc.Card:
@@ -249,6 +251,13 @@ def create_filters() -> dbc.InputGroup:
             dbc.Button(
                 "Options",
                 id="filter-options",
+                color="primary",
+                outline=True,
+                className="ms-2",
+            ),
+            dbc.Button(
+                "Cash",
+                id="filter-cash",
                 color="primary",
                 outline=True,
                 className="ms-2",
@@ -519,11 +528,13 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
             Input("filter-all", "n_clicks"),
             Input("filter-stocks", "n_clicks"),
             Input("filter-options", "n_clicks"),
+            Input("filter-cash", "n_clicks"),
             Input("sort-state", "data"),  # Add sort state input
         ],
+        [State("portfolio-summary", "data")],  # Add portfolio summary as state
     )
     def update_portfolio_table(
-        groups_data, search, all_clicks, stocks_clicks, options_clicks, sort_state
+        groups_data, search, all_clicks, stocks_clicks, options_clicks, cash_clicks, sort_state, summary_data
     ):
         """Update portfolio table based on filters and sorting"""
         logger.debug("Updating portfolio table")
@@ -559,12 +570,66 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
                 )
                 groups.append(group)
 
-            # Apply filters
+            # Determine which filter button was clicked
+            ctx = dash.callback_context
+            if ctx.triggered:
+                button_id = ctx.triggered[0]["prop_id"].split(".")[0]
+                logger.debug(f"Filter button clicked: {button_id}")
+            else:
+                button_id = "filter-all"  # Default to showing all
+
+            # Get cash-like positions from summary data
+            cash_like_positions = []
+            if summary_data and "cash_like_positions" in summary_data:
+                # Convert cash-like positions to PortfolioGroup objects
+                for pos in summary_data["cash_like_positions"]:
+                    # Create a StockPosition
+                    stock_pos = StockPosition(
+                        ticker=pos["ticker"],
+                        quantity=pos["quantity"],
+                        market_value=pos["market_value"],
+                        beta=pos["beta"],
+                        beta_adjusted_exposure=pos["beta_adjusted_exposure"]
+                    )
+
+                    # Create a PortfolioGroup with just this stock position
+                    cash_group = PortfolioGroup(
+                        ticker=pos["ticker"],
+                        stock_position=stock_pos,
+                        option_positions=[],
+                        total_value=pos["market_value"],
+                        net_exposure=pos["market_value"],
+                        beta=pos["beta"],
+                        beta_adjusted_exposure=pos["beta_adjusted_exposure"],
+                        total_delta_exposure=0.0,
+                        options_delta_exposure=0.0
+                    )
+                    cash_like_positions.append(cash_group)
+
+            # Apply filters based on button clicked
+            filtered_groups = []
+            if button_id == "filter-all":
+                # Include all positions (including cash-like)
+                filtered_groups = groups + cash_like_positions
+            elif button_id == "filter-stocks":
+                # Only include groups with stock positions (excluding cash-like)
+                filtered_groups = [g for g in groups if g.stock_position]
+            elif button_id == "filter-options":
+                # Only include groups with option positions
+                filtered_groups = [g for g in groups if g.option_positions]
+            elif button_id == "filter-cash":
+                # Only include cash-like positions
+                filtered_groups = cash_like_positions
+            else:
+                # Default to all positions
+                filtered_groups = groups + cash_like_positions
+
+            # Apply search filter if provided
             if search:
                 search = search.lower()
-                groups = [
+                filtered_groups = [
                     g
-                    for g in groups
+                    for g in filtered_groups
                     if (
                         (g.stock_position and search in g.stock_position.ticker.lower())
                         or any(
@@ -579,7 +644,7 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
             sort_by = f"{sort_column}-{sort_direction}"
 
             # Create table with sorting applied
-            return create_portfolio_table(groups, search, sort_by)
+            return create_portfolio_table(filtered_groups, search, sort_by)
 
         except Exception as e:
             logger.error(f"Error updating portfolio table: {e}", exc_info=True)

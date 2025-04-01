@@ -296,7 +296,7 @@ def process_portfolio_data(
 
     Args:
         df: A pandas DataFrame containing the portfolio positions, expected to have columns like
-            'Symbol', 'Description', 'Quantity', 'Current Value', 'Last Price', 'Type', etc.
+            'Symbol', 'Description', 'Quantity', 'Current Value', 'Last Price', 'Type' (account type: Cash/Margin), etc.
 
     Returns:
         A tuple containing:
@@ -438,29 +438,13 @@ def process_portfolio_data(
     # Create a map of stock positions and prices for option delta calculations
     stock_positions = {}
     cash_like_positions = []
+    # Create a dictionary to track cash-like positions by ticker for deduplication
+    cash_like_by_ticker = {}
     logger.info("Processing stock-like positions...")
     # Iterate only over rows identified as non-options
     for index, row in stock_df.iterrows():
         symbol_raw = row["Symbol"]
         description = row["Description"]
-        row_type = row["Type"]  # Capture type for potential filtering
-
-        # --- Explicitly handle CASH type ---
-        if row_type.upper() == "CASH":
-            cash_value = clean_currency_value(row["Current Value"])
-            logger.info(
-                f"Identified CASH position: {symbol_raw} ({description}), Value: {format_currency(cash_value)}"
-            )
-            # Add to cash-like positions
-            cash_like_positions.append({
-                "ticker": symbol_raw,
-                "quantity": 0,  # Cash positions typically don't have quantity
-                "market_value": cash_value,
-                "beta": 0.0,  # Cash has zero beta by definition
-                "beta_adjusted_exposure": 0.0,
-                "description": description
-            })
-            continue  # Skip adding CASH types to stock_positions
 
         # Proceed with processing potentially valid stock/ETF positions
         try:
@@ -547,19 +531,34 @@ def process_portfolio_data(
             # Get Beta - requires valid ticker and fetcher
             beta = get_beta(symbol, description)
 
-            # Check if this is a cash-like instrument based on beta
-            is_cash_like = is_cash_or_short_term(symbol, beta=beta)
+            # Check if this is a cash-like instrument based on beta or description
+            is_cash_like = is_cash_or_short_term(symbol, beta=beta) or "MONEY MARKET" in description.upper()
 
             if is_cash_like:
-                logger.info(f"Identified cash-like position based on beta: {symbol} (beta: {beta:.4f}), Value: {format_currency(value_to_use)}")
-                cash_like_positions.append({
-                    "ticker": symbol,
-                    "quantity": quantity,
-                    "market_value": value_to_use,
-                    "beta": beta,
-                    "beta_adjusted_exposure": value_to_use * beta,
-                    "description": description
-                })
+                logger.info(f"Identified cash-like position based on beta or description: {symbol} (beta: {beta:.4f}), Value: {format_currency(value_to_use)}")
+
+                # Check if we already have a cash-like position with this ticker
+                if symbol in cash_like_by_ticker:
+                    # Add to existing position's market value
+                    cash_like_by_ticker[symbol]["market_value"] += value_to_use
+                    # Update quantity if applicable
+                    if quantity != 0:  # Only update if the new quantity is non-zero
+                        cash_like_by_ticker[symbol]["quantity"] += quantity
+                    # Recalculate beta-adjusted exposure
+                    cash_like_by_ticker[symbol]["beta_adjusted_exposure"] = cash_like_by_ticker[symbol]["market_value"] * beta
+                    logger.info(f"Combined with existing cash-like position for {symbol}. New total: {format_currency(cash_like_by_ticker[symbol]['market_value'])}")
+                else:
+                    # Create new cash-like position
+                    cash_like_position = {
+                        "ticker": symbol,
+                        "quantity": quantity,
+                        "market_value": value_to_use,
+                        "beta": beta,
+                        "beta_adjusted_exposure": value_to_use * beta,
+                        "description": description
+                    }
+                    cash_like_by_ticker[symbol] = cash_like_position
+                    cash_like_positions.append(cash_like_position)
             else:
                 # Regular stock position
                 stock_positions[symbol] = {
@@ -574,7 +573,7 @@ def process_portfolio_data(
                     if pd.notna(row["Percent Of Account"])
                     and row["Percent Of Account"] != "--"
                     else 0.0,
-                    "type": row_type,  # Store type for later reference
+                    "account_type": row["Type"],  # Store account type (Cash/Margin) for reference - not related to position type
                 }
                 logger.debug(
                     f"Successfully processed stock: {symbol}, Qty: {quantity}, Price: {price}, Value: {value_to_use}, Beta: {beta:.2f}"
@@ -839,11 +838,11 @@ def process_portfolio_data(
     # Log any options that were not processed (didn't match any stock group)
     unprocessed_options = set(option_df.index) - processed_option_indices
     if unprocessed_options:
-        logger.warning(
-            f"{len(unprocessed_options)} options were not assigned to any stock group:"
+        logger.info(
+            f"{len(unprocessed_options)} options without matching stock positions found (normal for some strategies):"
         )
         for idx in unprocessed_options:
-            logger.warning(f"  - Index {idx}: {option_df.loc[idx, 'Description']}")
+            logger.info(f"  - Index {idx}: {option_df.loc[idx, 'Description']}")
 
     if not groups:
         logger.warning("No valid portfolio groups were created after processing. This may be an all-cash portfolio.")
