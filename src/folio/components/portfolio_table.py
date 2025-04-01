@@ -88,6 +88,41 @@ def create_position_row(group: PortfolioGroup, metrics: dict) -> dbc.Row:
     )
 
 
+def create_sortable_header(label: str, column_id: str, current_sort: str) -> html.Div:
+    """Create a sortable header for the portfolio table
+
+    Args:
+        label: The text to display in the header
+        column_id: The id of the column, used for sorting
+        current_sort: The current sort state in format 'column-direction'
+
+    Returns:
+        A clickable header with sort indicator
+    """
+    current_column, current_direction = (
+        current_sort.split("-") if "-" in current_sort else (current_sort, "desc")
+    )
+
+    # Determine if this column is currently sorted
+    is_sorted = current_column == column_id
+
+    # Add sort indicator
+    if is_sorted:
+        if current_direction == "desc":
+            indicator = html.I(className="fas fa-sort-down ms-1")
+        else:
+            indicator = html.I(className="fas fa-sort-up ms-1")
+    else:
+        indicator = html.I(className="fas fa-sort ms-1 text-muted")
+
+    return html.Div(
+        [html.Strong(label), indicator],
+        id={"type": "sort-header", "column": column_id},
+        className="d-flex align-items-center justify-content-between sort-header",
+        style={"cursor": "pointer"},
+    )
+
+
 def create_portfolio_table(
     groups: list[PortfolioGroup],
     search: Optional[str] = None,
@@ -109,25 +144,41 @@ def create_portfolio_table(
         sort_by.split("-") if "-" in sort_by else (sort_by, "desc")
     )
     if sort_key == "value":
-        groups.sort(key=lambda x: abs(x.net_exposure), reverse=sort_direction == "desc")
+        # Sort by the net exposure value
+        groups.sort(key=lambda x: x.net_exposure, reverse=sort_direction == "desc")
     elif sort_key == "beta":
+        # Sort by actual beta value (beta_adjusted_exposure / net_exposure)
         groups.sort(
-            key=lambda x: abs(x.beta_adjusted_exposure),
+            key=lambda x: x.beta_adjusted_exposure / x.net_exposure
+            if x.net_exposure != 0
+            else 0,
             reverse=sort_direction == "desc",
         )
     elif sort_key == "exposure":
+        # Sort by beta-adjusted exposure since that's the main number shown
         groups.sort(
-            key=lambda x: abs(x.total_delta_exposure), reverse=sort_direction == "desc"
+            key=lambda x: x.beta_adjusted_exposure,
+            reverse=sort_direction == "desc",
+        )
+    elif sort_key == "ticker":
+        groups.sort(
+            key=lambda x: get_group_ticker(x).lower(), reverse=sort_direction == "desc"
+        )
+    elif sort_key == "type":
+        # Sort by type - first stocks, then options-only positions
+        groups.sort(
+            key=lambda x: "1" if x.stock_position else "2",
+            reverse=sort_direction == "desc",
         )
 
     # Create table header
     header = dbc.Row(
         [
-            dbc.Col(html.Strong("Ticker"), width=2),
-            dbc.Col(html.Strong("Type"), width=2),
-            dbc.Col(html.Strong("Value"), width=2),
-            dbc.Col(html.Strong("Beta"), width=2),
-            dbc.Col(html.Strong("Exposure"), width=2),
+            dbc.Col(create_sortable_header("Ticker", "ticker", sort_by), width=2),
+            dbc.Col(create_sortable_header("Type", "type", sort_by), width=2),
+            dbc.Col(create_sortable_header("Value", "value", sort_by), width=2),
+            dbc.Col(create_sortable_header("Beta", "beta", sort_by), width=2),
+            dbc.Col(create_sortable_header("Exposure", "exposure", sort_by), width=2),
             dbc.Col("", width=2),
         ],
         className="g-0 border-bottom py-2 bg-light",

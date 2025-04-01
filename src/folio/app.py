@@ -235,6 +235,8 @@ def create_main_table() -> html.Div:
                 id="portfolio-table",
                 className="portfolio-table",
             ),
+            # Add a Store to track sort state
+            dcc.Store(id="sort-state", data={"column": "value", "direction": "desc"}),
         ]
     )
 
@@ -267,6 +269,37 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
         ],
         title="Folio",
     )
+
+    # Define custom CSS
+    app.index_string = """
+    <!DOCTYPE html>
+    <html>
+        <head>
+            {%metas%}
+            <title>{%title%}</title>
+            {%favicon%}
+            {%css%}
+            <style>
+                .sort-header:hover {
+                    background-color: rgba(0,0,0,0.05);
+                }
+                .sort-header {
+                    transition: background-color 0.2s;
+                    padding: 8px 4px;
+                    border-radius: 4px;
+                }
+            </style>
+        </head>
+        <body>
+            {%app_entry%}
+            <footer>
+                {%config%}
+                {%scripts%}
+                {%renderer%}
+            </footer>
+        </body>
+    </html>
+    """
 
     # Store portfolio file path
     app.portfolio_file = portfolio_file
@@ -444,15 +477,13 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
             Input("filter-all", "n_clicks"),
             Input("filter-stocks", "n_clicks"),
             Input("filter-options", "n_clicks"),
+            Input("sort-state", "data"),  # Add sort state input
         ],
     )
     def update_portfolio_table(
-        groups_data, search, all_clicks, stocks_clicks, options_clicks
+        groups_data, search, all_clicks, stocks_clicks, options_clicks, sort_state
     ):
-        """Update portfolio table based on filters
-
-        TODO: Implement filter logic for all_clicks, stocks_clicks, and options_clicks buttons
-        """
+        """Update portfolio table based on filters and sorting"""
         logger.debug("Updating portfolio table")
         try:
             if not groups_data:
@@ -500,8 +531,13 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
                     )
                 ]
 
-            # Create table
-            return create_portfolio_table(groups)
+            # Get sort information
+            sort_column = sort_state.get("column", "value")
+            sort_direction = sort_state.get("direction", "desc")
+            sort_by = f"{sort_column}-{sort_direction}"
+
+            # Create table with sorting applied
+            return create_portfolio_table(groups, search, sort_by)
 
         except Exception as e:
             logger.error(f"Error updating portfolio table: {e}", exc_info=True)
@@ -692,6 +728,42 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
         # Keep modal state unchanged for all other cases
         logger.debug(f"No action needed, keeping modal state: {is_open}")
         return is_open, dash.no_update
+
+    # Add callback to handle column sorting
+    @app.callback(
+        Output("sort-state", "data"),
+        [Input({"type": "sort-header", "column": ALL}, "n_clicks")],
+        [State("sort-state", "data")],
+    )
+    def update_sort_state(header_clicks, current_sort_state):
+        """Update sort state when a column header is clicked"""
+        ctx = dash.callback_context
+
+        if not ctx.triggered:
+            return current_sort_state
+
+        trigger_id = ctx.triggered[0]["prop_id"]
+        if not trigger_id or "sort-header" not in trigger_id:
+            return current_sort_state
+
+        # Extract column name from trigger ID (in format {"type":"sort-header","column":"value"}.n_clicks)
+        import json
+
+        column_data = json.loads(trigger_id.split(".")[0])
+        clicked_column = column_data.get("column")
+
+        if not clicked_column:
+            return current_sort_state
+
+        # Update sort direction if same column clicked, otherwise reset to descending
+        if clicked_column == current_sort_state.get("column"):
+            new_direction = (
+                "asc" if current_sort_state.get("direction") == "desc" else "desc"
+            )
+        else:
+            new_direction = "desc"
+
+        return {"column": clicked_column, "direction": new_direction}
 
     return app
 
