@@ -30,47 +30,28 @@ except ValueError as e:
 
 
 def get_beta(ticker: str, description: str = "") -> float:
-    """Calculates the beta (systematic risk) for a given stock ticker.
+    """Calculates the beta (systematic risk) for a given financial instrument.
 
-    Beta measures the volatility of a stock in relation to the overall market.
-    A beta of 1 indicates the stock's price tends to move with the market.
-    A beta greater than 1 indicates higher volatility than the market.
-    A beta less than 1 indicates lower volatility.
-
-    This function handles special cases like money market funds (SPAXX**)
-    and escrow shares by assigning them a beta of 0.0.
+    Beta measures the volatility of an instrument in relation to the overall market.
+    Returns 0.0 when beta cannot be meaningfully calculated (e.g., for money market funds,
+    or instruments with insufficient price history).
 
     Args:
-        ticker: The stock symbol (e.g., "AAPL", "GOOGL").
-        description: An optional description of the security, used to identify
-            special cases like money market funds or escrow shares. Defaults to "".
+        ticker: The instrument's symbol
+        description: Optional description of the security (unused, kept for API compatibility)
 
     Returns:
-        The calculated beta value as a float.
+        float: The calculated beta value, or 0.0 if beta cannot be meaningfully calculated
 
     Raises:
         RuntimeError: If the DataFetcher has not been initialized or fails to fetch data
-        ValueError: If market variance is zero or data is invalid
-        requests.exceptions.RequestException: If there are network issues fetching data
-        pd.errors.EmptyDataError: If fetched data is empty
-
-    TODO:
-        - Allow configuration of the market index used (e.g., NASDAQ, Russell 2000)
-        - Cache beta values to avoid repeated calculations and API calls
+        ValueError: If the data is invalid or calculations result in invalid values
+        KeyError: If the data format is invalid (missing required columns)
     """
-    # Handle special cases
-    if ticker == "SPAXX**" or "MONEY MARKET" in description.upper():
-        logger.info(f"Using beta of 0.0 for money market fund {ticker}")
-        return 0.0
-
-    if "ESCROW" in description.upper():
-        logger.info(f"Using beta of 0.0 for escrow shares {ticker}")
-        return 0.0
-
     if not data_fetcher:
         raise RuntimeError("DataFetcher not initialized - check API key configuration")
 
-    # Fetch stock and market data
+    # Fetch required data
     stock_data = data_fetcher.fetch_data(ticker)
     market_data = data_fetcher.fetch_market_data()
 
@@ -79,21 +60,49 @@ def get_beta(ticker: str, description: str = "") -> float:
     if market_data is None:
         raise RuntimeError("Failed to fetch market index data")
 
-    # Calculate returns
-    stock_returns = stock_data["Close"].pct_change()
-    market_returns = market_data["Close"].pct_change()
+    try:
+        # Calculate returns - let KeyError propagate if 'Close' column missing
+        stock_returns = stock_data["Close"].pct_change(fill_method=None).dropna()
+        market_returns = market_data["Close"].pct_change(fill_method=None).dropna()
 
-    # Calculate beta
-    covariance = stock_returns.cov(market_returns)
-    market_variance = market_returns.var()
+        # Align data by index
+        aligned_stock, aligned_market = stock_returns.align(
+            market_returns, join="inner"
+        )
 
-    # Avoid division by zero if market variance is zero
-    if market_variance == 0:
-        raise ValueError(f"Market variance is zero, cannot calculate beta for {ticker}")
+        if aligned_stock.empty or len(aligned_stock) < 2:
+            logger.debug(
+                f"Insufficient overlapping data points for {ticker}, cannot calculate meaningful beta"
+            )
+            return 0.0
 
-    beta = covariance / market_variance
-    logger.info(f"Calculated beta of {beta:.2f} for {ticker}")
-    return beta
+        # Calculate beta components
+        market_variance = aligned_market.var()
+        covariance = aligned_stock.cov(aligned_market)
+
+        if pd.isna(market_variance):
+            raise ValueError(
+                f"Market variance calculation resulted in NaN for {ticker}"
+            )
+        if abs(market_variance) < 1e-12:
+            logger.debug(
+                f"Market variance is near-zero for {ticker}, cannot calculate meaningful beta"
+            )
+            return 0.0
+        if pd.isna(covariance):
+            raise ValueError(f"Covariance calculation resulted in NaN for {ticker}")
+
+        beta = covariance / market_variance
+        if pd.isna(beta):
+            raise ValueError(f"Beta calculation resulted in NaN for {ticker}")
+
+        logger.info(f"Calculated beta of {beta:.2f} for {ticker}")
+        return beta
+
+    except (ValueError, pd.errors.InvalidIndexError) as e:
+        # Only catch calculation-related errors
+        logger.error(f"Error calculating beta for {ticker}: {e}")
+        raise
 
 
 def format_currency(value: float) -> str:
