@@ -172,12 +172,228 @@ def calculate_black_scholes_delta(
     return delta
 
 
+def calculate_bs_price(
+    option: OptionPosition,
+    underlying_price: float,
+    risk_free_rate: float = 0.05,
+    implied_volatility: float = 0.30,
+) -> float:
+    """
+    Calculate the theoretical option price using the Black-Scholes model.
+
+    Args:
+        option: OptionPosition object containing option details
+        underlying_price: Current price of the underlying asset
+        risk_free_rate: Risk-free interest rate (default: 5%)
+        implied_volatility: Implied volatility of the option (default: 30%)
+
+    Returns:
+        Theoretical option price
+    """
+    # Calculate time to expiration in years
+    now = datetime.now()
+    time_to_expiry = (option.expiry - now).total_seconds() / (365.25 * 24 * 60 * 60)
+
+    # Handle expired options
+    if time_to_expiry <= 0:
+        if option.option_type == "CALL":
+            return max(0, underlying_price - option.strike)
+        else:  # PUT
+            return max(0, option.strike - underlying_price)
+
+    # Calculate d1 and d2 from Black-Scholes formula
+    d1 = (
+        math.log(underlying_price / option.strike)
+        + (risk_free_rate + 0.5 * implied_volatility**2) * time_to_expiry
+    ) / (implied_volatility * math.sqrt(time_to_expiry))
+
+    d2 = d1 - implied_volatility * math.sqrt(time_to_expiry)
+
+    # Calculate option price based on type
+    if option.option_type == "CALL":
+        price = underlying_price * norm.cdf(d1) - option.strike * math.exp(
+            -risk_free_rate * time_to_expiry
+        ) * norm.cdf(d2)
+    else:  # PUT
+        price = option.strike * math.exp(-risk_free_rate * time_to_expiry) * norm.cdf(
+            -d2
+        ) - underlying_price * norm.cdf(-d1)
+
+    return price
+
+
+def calculate_implied_volatility(
+    option: OptionPosition,
+    underlying_price: float,
+    market_price: float = None,
+    risk_free_rate: float = 0.05,
+    max_iterations: int = 100,
+    precision: float = 0.0001,
+) -> float:
+    """
+    Calculate implied volatility by iteratively solving the Black-Scholes formula.
+
+    Args:
+        option: OptionPosition object containing option details
+        underlying_price: Current price of the underlying asset
+        market_price: Market price of the option (if None, use option.current_price)
+        risk_free_rate: Risk-free interest rate (default: 5%)
+        max_iterations: Maximum number of iterations for the solver
+        precision: Desired precision for the result
+
+    Returns:
+        Implied volatility value
+    """
+    # Use the provided market price or the option's current price
+    market_price = market_price if market_price is not None else option.current_price
+
+    # Calculate time to expiration in years
+    now = datetime.now()
+    time_to_expiry = (option.expiry - now).total_seconds() / (365.25 * 24 * 60 * 60)
+
+    # Check for expired options or zero time to expiry
+    if time_to_expiry <= 0:
+        return 0.0
+
+    # Handle intrinsic value cases to avoid division by zero
+    intrinsic_value = 0
+    if option.option_type == "CALL":
+        intrinsic_value = max(0, underlying_price - option.strike)
+    else:  # PUT
+        intrinsic_value = max(0, option.strike - underlying_price)
+
+    if market_price <= intrinsic_value:
+        # For options trading at or below intrinsic value, use a high IV
+        return 0.9  # 90% as a default for deep ITM options with no time value
+
+    # Initialize volatility search range
+    vol_low = 0.001  # 0.1%
+    vol_high = 3.0  # 300%
+
+    # Bisection method to find implied volatility
+    for _ in range(max_iterations):
+        vol_mid = (vol_low + vol_high) / 2.0
+        price = calculate_bs_price(option, underlying_price, risk_free_rate, vol_mid)
+
+        # If we're close enough to the market price, return the current volatility
+        if abs(price - market_price) < precision:
+            return vol_mid
+
+        # Adjust the search range based on the result
+        if price > market_price:
+            vol_high = vol_mid
+        else:
+            vol_low = vol_mid
+
+        # If the range gets too small, we've found our best approximation
+        if abs(vol_high - vol_low) < precision:
+            break
+
+    # Return the midpoint of our final search range
+    return (vol_low + vol_high) / 2.0
+
+
+def estimate_volatility_with_skew(
+    option: OptionPosition,
+    underlying_price: float,
+    base_volatility: float = 0.3,
+) -> float:
+    """
+    Estimate implied volatility using a volatility skew model if market price isn't available.
+
+    Args:
+        option: OptionPosition object containing option details
+        underlying_price: Current price of the underlying asset
+        base_volatility: Base volatility to adjust (default: 30%)
+
+    Returns:
+        Estimated implied volatility considering volatility skew
+    """
+    # Calculate moneyness (how far ITM/OTM the option is)
+    # K/S for puts, S/K for calls
+    if option.option_type == "CALL":
+        moneyness = underlying_price / option.strike
+    else:  # PUT
+        moneyness = option.strike / underlying_price
+
+    # Calculate time to expiration in years
+    now = datetime.now()
+    time_to_expiry = (option.expiry - now).total_seconds() / (365.25 * 24 * 60 * 60)
+
+    # Apply a simple volatility smile (higher IV for OTM options)
+    if moneyness < 0.8:  # Deep OTM
+        skew_factor = 1.4  # Increase IV for deep OTM
+    elif moneyness < 0.95:  # OTM
+        skew_factor = 1.2  # Slight increase for OTM
+    elif moneyness > 1.2:  # Deep ITM
+        skew_factor = 1.1  # Slight increase for deep ITM
+    elif moneyness > 1.05:  # ITM
+        skew_factor = 1.05  # Minimal increase for ITM
+    else:  # ATM
+        skew_factor = 1.0  # No adjustment for ATM
+
+    # Adjust for time to expiration (term structure)
+    # Shorter-term options typically have higher IV
+    if time_to_expiry < 0.1:  # Less than ~1 month
+        term_factor = 1.2
+    elif time_to_expiry < 0.25:  # Less than 3 months
+        term_factor = 1.1
+    elif time_to_expiry > 1.0:  # More than a year
+        term_factor = 0.9
+    else:
+        term_factor = 1.0
+
+    # Apply both adjustments to the base volatility
+    estimated_iv = base_volatility * skew_factor * term_factor
+
+    # Cap the maximum IV to avoid unrealistic values
+    return min(estimated_iv, 1.5)
+
+
+def get_implied_volatility(
+    option: OptionPosition, underlying_price: float, risk_free_rate: float = 0.05
+) -> float:
+    """
+    Get the implied volatility for an option using market price if available,
+    or estimate it using a volatility skew model.
+
+    Args:
+        option: OptionPosition object containing option details
+        underlying_price: Current price of the underlying asset
+        risk_free_rate: Risk-free interest rate (default: 5%)
+
+    Returns:
+        Implied volatility value
+    """
+    try:
+        # First try to calculate IV from the option's market price
+        if hasattr(option, "current_price") and option.current_price > 0:
+            iv = calculate_implied_volatility(
+                option, underlying_price, option.current_price, risk_free_rate
+            )
+
+            # If we got a reasonable result, return it
+            if 0.01 <= iv <= 2.0:  # IV between 1% and 200%
+                return iv
+
+        # If we couldn't calculate IV from price or got an unreasonable value,
+        # use the volatility skew model
+        return estimate_volatility_with_skew(option, underlying_price)
+
+    except Exception as e:
+        # If anything fails, fall back to a reasonable default
+        print(
+            f"Error calculating IV for {option.underlying} {option.option_type} ${option.strike}: {e}"
+        )
+        return 0.3  # 30% as a conservative default
+
+
 def calculate_option_delta(
     option: OptionPosition,
     underlying_price: float,
     use_black_scholes: bool = True,
     risk_free_rate: float = 0.05,
-    implied_volatility: float = 0.30,
+    implied_volatility: float = None,
 ) -> float:
     """
     Calculate option delta using either Black-Scholes model or simple approximation.
@@ -187,12 +403,18 @@ def calculate_option_delta(
         underlying_price: Current price of the underlying asset
         use_black_scholes: Whether to use Black-Scholes model (True) or simple approximation (False)
         risk_free_rate: Risk-free interest rate (only used for Black-Scholes)
-        implied_volatility: Implied volatility of the option (only used for Black-Scholes)
+        implied_volatility: Implied volatility of the option (if None, will be estimated)
 
     Returns:
         Delta value of the option
     """
     if use_black_scholes:
+        # If implied_volatility isn't provided, estimate it
+        if implied_volatility is None:
+            implied_volatility = get_implied_volatility(
+                option, underlying_price, risk_free_rate
+            )
+
         return calculate_black_scholes_delta(
             option, underlying_price, risk_free_rate, implied_volatility
         )

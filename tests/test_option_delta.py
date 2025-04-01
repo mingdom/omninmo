@@ -7,6 +7,7 @@ from src.lab.option_utils import (
     calculate_black_scholes_delta,
     calculate_option_delta,
     calculate_simple_delta,
+    get_implied_volatility,
     parse_option_description,
 )
 
@@ -273,7 +274,7 @@ def test_delta_calculator_interface():
         description="Test Call",
     )
 
-    # Using Black-Scholes
+    # Using Black-Scholes with explicit IV
     bs_delta = calculate_option_delta(
         test_option,
         100.0,
@@ -285,13 +286,26 @@ def test_delta_calculator_interface():
     # Using simple delta
     simple_delta = calculate_option_delta(test_option, 100.0, use_black_scholes=False)
 
-    # Using default (should be Black-Scholes)
+    # Using default (should be Black-Scholes but with estimated IV)
     default_delta = calculate_option_delta(test_option, 100.0)
 
-    # Verify behavior - use approximate equality for floating point
+    # Verify behavior - the default should use BS but with estimated IV, so only verify type
+    assert isinstance(default_delta, float), "Default delta should be a float"
+    assert 0 <= default_delta <= 1, "Default delta should be between 0 and 1"
     assert (
-        abs(bs_delta - default_delta) < 1e-10
-    ), "Default delta should use Black-Scholes"
+        abs(bs_delta - simple_delta) > 0.01
+    ), "BS and simple delta should differ significantly"
+
+    # Test that passing the same IV produces consistent results
+    # First get the estimated IV used by default
+    estimated_iv = get_implied_volatility(test_option, 100.0, 0.05)
+
+    # Now use this IV explicitly
+    bs_delta_with_estimated_iv = calculate_option_delta(
+        test_option, 100.0, use_black_scholes=True, implied_volatility=estimated_iv
+    )
+
+    # This should match the default delta
     assert (
-        abs(bs_delta - simple_delta) > 1e-10
-    ), "Black-Scholes and simple delta should be different"
+        abs(default_delta - bs_delta_with_estimated_iv) < 1e-10
+    ), "Default should use BS with estimated IV"
