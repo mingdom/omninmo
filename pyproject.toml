@@ -48,6 +48,7 @@ ignore = [
     "PLR0913",  # too many arguments - common in ML functions with many parameters
     "PLR0912",  # too many branches - common in ML data processing and training loops
     "PLR0915",  # too many statements - common in ML training and evaluation functions
+    "PLR2004",  # magic value used in comparison - common in data processing code
 ]
 
 # Allow autofix for all enabled rules (when `--fix`) is provided

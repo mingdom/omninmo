@@ -524,73 +524,68 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
     def store_selected_position(active_cell, btn_clicks, groups_data, prev_active_cell):
         """Store selected position data when row is clicked or Details button is clicked"""
         logger.debug("Storing selected position")
-        if not groups_data:
-            logger.debug("No portfolio data available for selection")
-            return None
+        position_data = None
 
-        ctx = dash.callback_context
-        trigger_id = ctx.triggered[0]["prop_id"] if ctx.triggered else ""
-        logger.debug(f"Trigger ID: {trigger_id}")
+        if groups_data:
+            ctx = dash.callback_context
+            trigger_id = ctx.triggered[0]["prop_id"] if ctx.triggered else ""
+            logger.debug(f"Trigger ID: {trigger_id}")
 
-        try:
-            if "position-details" in trigger_id:
-                # Button click
-                button_idx = ctx.triggered[0]["prop_id"].split(".")[0]
-                try:
-                    ticker = eval(button_idx)["index"]
-                    logger.debug(f"Button clicked for ticker: {ticker}")
-                except Exception as e:
-                    logger.error(f"Error parsing button index: {e}")
-                    return None
+            try:
+                row = None
 
-                # Find the group with matching ticker
-                for i, group_data in enumerate(groups_data):
+                if "position-details" in trigger_id:
+                    # Button click
+                    button_idx = ctx.triggered[0]["prop_id"].split(".")[0]
                     try:
-                        stock_ticker = (
-                            group_data["stock_position"]["ticker"]
-                            if group_data["stock_position"]
-                            else None
-                        )
-                        option_tickers = [
-                            opt["ticker"] for opt in group_data["option_positions"]
-                        ]
-
-                        if stock_ticker == ticker or ticker in option_tickers:
-                            row = i
-                            logger.debug(
-                                f"Found matching position at row {row} for ticker {ticker}"
-                            )
-                            break
+                        ticker = eval(button_idx)["index"]
+                        logger.debug(f"Button clicked for ticker: {ticker}")
                     except Exception as e:
-                        logger.error(f"Error processing group {i}: {e}")
-                        continue
+                        logger.error(f"Error parsing button index: {e}")
+                        return None
+
+                    # Find the group with matching ticker
+                    for i, group_data in enumerate(groups_data):
+                        try:
+                            stock_ticker = (
+                                group_data["stock_position"]["ticker"]
+                                if group_data["stock_position"]
+                                else None
+                            )
+                            option_tickers = [
+                                opt["ticker"] for opt in group_data["option_positions"]
+                            ]
+
+                            if stock_ticker == ticker or ticker in option_tickers:
+                                row = i
+                                logger.debug(
+                                    f"Found matching position at row {row} for ticker {ticker}"
+                                )
+                                break
+                        except Exception as e:
+                            logger.error(f"Error processing group {i}: {e}")
+                            continue
+                elif active_cell and active_cell != prev_active_cell:
+                    row = active_cell["row"]
+                    logger.debug(f"Table cell clicked at row {row}")
+
+                # Validate and return row data if found
+                if row is not None and 0 <= row < len(groups_data):
+                    position_data = groups_data[row]
                 else:
-                    logger.error(f"Could not find group for ticker: {ticker}")
-                    return None
-            else:
-                # Table cell click - only process if it was user-initiated
-                if not active_cell or active_cell == prev_active_cell:
-                    logger.debug("No active cell selected or unchanged")
-                    return None
-                row = active_cell["row"]
-                logger.debug(f"Table cell clicked at row {row}")
+                    logger.error(
+                        f"Row index out of range or not found: {row}, groups length: {len(groups_data)}"
+                    )
 
-            # Validate row index
-            if row < 0 or row >= len(groups_data):
-                logger.error(
-                    f"Row index out of range: {row}, groups length: {len(groups_data)}"
-                )
-                return None
+            except Exception as e:
+                logger.error(f"Error storing selected position: {e}", exc_info=True)
+                import traceback
 
-            # Return the group data directly since it's already in the right format
-            return groups_data[row]
+                logger.error(f"Traceback: {traceback.format_exc()}")
+        else:
+            logger.debug("No portfolio data available for selection")
 
-        except Exception as e:
-            logger.error(f"Error storing selected position: {e}", exc_info=True)
-            import traceback
-
-            logger.error(f"Traceback: {traceback.format_exc()}")
-            return None
+        return position_data
 
     @app.callback(
         [

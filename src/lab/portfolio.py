@@ -176,19 +176,18 @@ def process_options(df: pd.DataFrame, beta_map: dict) -> tuple[pd.DataFrame, dic
     # Create a map of stock positions and prices
     stock_positions = {}
     for _, row in df[~df["Symbol"].apply(is_option)].iterrows():
-        if row["Last Price"] and isinstance(row["Last Price"], str):
-            try:
-                price = clean_currency(row["Last Price"])
-                if price > 0:
-                    symbol = row["Cleaned Symbol"]
-                    stock_positions[symbol] = {
-                        "price": price,
-                        "quantity": int(row["Quantity"]),
-                        "value": clean_currency(row["Current Value"]),
-                        "beta": beta_map.get(symbol, 1.0),
-                    }
-            except:
-                continue
+        try:
+            price = clean_currency(row["Last Price"])
+            if price > 0:
+                symbol = row["Cleaned Symbol"]
+                stock_positions[symbol] = {
+                    "price": price,
+                    "quantity": int(row["Quantity"]),
+                    "value": clean_currency(row["Current Value"]),
+                    "beta": beta_map.get(symbol, 1.0),
+                }
+        except Exception:
+            continue
 
     for _, row in option_rows.iterrows():
         try:
