@@ -1,3 +1,47 @@
+"""Utility functions for portfolio analysis and data processing.
+
+This module provides core functionality for portfolio analysis, including:
+- Beta calculation and cash-like instrument detection
+- Portfolio data processing and grouping
+- Currency and number formatting
+- Portfolio metrics and summary calculations
+
+Error Handling Principles:
+-------------------------
+1. DO NOT swallow errors unless absolutely critical to the application's stability.
+2. Functions should propagate errors up the call stack to allow proper handling at the appropriate level.
+3. If error handling is needed, it should be:
+   - Explicitly documented in the function's docstring
+   - Limited to specific, known error cases
+   - Accompanied by detailed logging
+   - Justified by a critical need (e.g., preventing application crash in a core service)
+
+Example of good error handling:
+```python
+def critical_service_function():
+    try:
+        result = potentially_failing_operation()
+        return result
+    except KnownError as e:
+        # Log detailed error info
+        logger.error(f"Critical operation failed: {e}")
+        # Re-raise with context
+        raise ServiceError("Service cannot continue") from e
+```
+
+Example of bad error handling (avoid this):
+```python
+def utility_function():
+    try:
+        result = operation()
+        return result
+    except Exception as e:
+        # DON'T DO THIS - swallowing errors silently
+        logger.warning(f"Operation failed: {e}")
+        return None  # or some default value
+```
+"""
+
 import pandas as pd
 
 from src.lab.option_utils import (
@@ -1135,3 +1179,39 @@ def calculate_position_metrics(group: PortfolioGroup) -> dict:
         raise ValueError(
             f"Error calculating position metrics for {group.ticker}"
         ) from e
+
+
+def is_cash_or_short_term(ticker: str, beta: float | None = None) -> bool:
+    """Determines if a position should be considered cash or cash-like based on its beta.
+
+    A position is considered cash-like if it has a very low beta (abs(beta) < 0.1),
+    indicating minimal market correlation. This typically includes:
+    - Money market funds
+    - Short-term treasury bills
+    - Other highly stable, low-volatility instruments
+
+    Args:
+        ticker: The instrument's symbol
+        beta: Pre-calculated beta value if available. If None, will be calculated.
+
+    Returns:
+        bool: True if the position should be treated as cash-like based on its beta, False otherwise.
+
+    Raises:
+        RuntimeError: If beta calculation fails due to data fetching issues
+        ValueError: If beta calculation produces invalid values
+        KeyError: If required data is missing during beta calculation
+
+    Examples:
+        >>> is_cash_or_short_term("BIL", beta=0.001)  # Short-term treasury ETF
+        True
+        >>> is_cash_or_short_term("AAPL", beta=1.2)  # Regular stock
+        False
+    """
+    # If beta was provided, use it
+    if beta is not None:
+        return abs(beta) < 0.1
+
+    # Calculate beta if not provided - let errors propagate up
+    calculated_beta = get_beta(ticker)
+    return abs(calculated_beta) < 0.1
