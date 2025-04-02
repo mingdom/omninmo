@@ -44,3 +44,6 @@ This document is the single source of truth for the Folio project's best practic
 - **Performance**: Optimize only after identifying actual bottlenecks
 - **Running the Application**: Use `make portfolio` to test with sample data or `make folio` for a clean start
 - **Testing Changes**: Always verify UI changes by running the application and interacting with it
+- **Version Control**: Update .gitignore when adding new temporary files or directories
+- **Temporary Files**: Store temporary files in the .tmp directory
+- **Cache Files**: Use hidden directories (.cache_*) for cache files

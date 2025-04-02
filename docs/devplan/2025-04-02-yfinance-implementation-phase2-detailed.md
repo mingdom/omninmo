@@ -1,8 +1,8 @@
 # YFinance Implementation Phase 2: Detailed Plan
 
-**Date:** 2025-04-01  
-**Author:** Auggie  
-**Status:** Proposed  
+**Date:** 2025-04-02
+**Author:** Auggie
+**Status:** Proposed
 
 ## Overview
 
@@ -124,16 +124,16 @@ class YFinanceDataFetcher:
     def __init__(self, cache_dir="cache", cache_ttl=None):
         """
         Initialize the YFinanceDataFetcher.
-        
+
         Args:
             cache_dir (str): Directory to store cached data
             cache_ttl (int, optional): Cache TTL in seconds. If None, uses config or default.
         """
         self.cache_dir = cache_dir
-        
+
         # Create cache directory if it doesn't exist
         os.makedirs(cache_dir, exist_ok=True)
-        
+
         # Get cache TTL from config or use default (1 day)
         if cache_ttl is None:
             try:
@@ -147,18 +147,18 @@ class YFinanceDataFetcher:
     def fetch_data(self, ticker, period="1y", interval="1d"):
         """
         Fetch stock data for a ticker from Yahoo Finance.
-        
+
         Args:
             ticker (str): Stock ticker symbol
             period (str): Time period ('1y', '5y', etc.)
             interval (str): Data interval ('1d', '1wk', etc.)
-            
+
         Returns:
             pandas.DataFrame: DataFrame with stock data
         """
         # Check cache first
         cache_path = self._get_cache_path(ticker, period, interval)
-        
+
         if os.path.exists(cache_path):
             # Check if cache is still valid
             cache_age = time.time() - os.path.getmtime(cache_path)
@@ -171,19 +171,19 @@ class YFinanceDataFetcher:
                     # Continue to fetch from API
             else:
                 logger.info(f"Cache for {ticker} is expired")
-        
+
         # Fetch from yfinance
         try:
             logger.info(f"Fetching data for {ticker} from Yahoo Finance")
             df = self._fetch_from_yfinance(ticker, period, interval)
-            
+
             # Save to cache
             df.to_csv(cache_path)
-            
+
             return df
         except Exception as e:
             logger.error(f"Error fetching data for {ticker}: {e}")
-            
+
             # Try to use expired cache as fallback
             if os.path.exists(cache_path):
                 logger.warning(f"Using expired cache for {ticker} as fallback")
@@ -191,19 +191,19 @@ class YFinanceDataFetcher:
                     return pd.read_csv(cache_path, index_col=0, parse_dates=True)
                 except Exception as cache_e:
                     logger.error(f"Error reading cache for {ticker}: {cache_e}")
-            
+
             # Re-raise the original exception
             raise
 
     def fetch_market_data(self, market_index="SPY", period="1y", interval="1d"):
         """
         Fetch market index data for beta calculations.
-        
+
         Args:
             market_index (str): Market index ticker symbol (default: 'SPY' for S&P 500 ETF)
             period (str): Time period ('1y', '5y', etc.)
             interval (str): Data interval ('1d', '1wk', etc.)
-            
+
         Returns:
             pandas.DataFrame: DataFrame with market index data
         """
@@ -213,25 +213,25 @@ class YFinanceDataFetcher:
     def _fetch_from_yfinance(self, ticker, period="1y", interval="1d"):
         """
         Fetch data from Yahoo Finance using yfinance.
-        
+
         Args:
             ticker (str): Stock ticker symbol
             period (str): Time period ('1y', '5y', etc.)
             interval (str): Data interval ('1d', '1wk', etc.)
-            
+
         Returns:
             pandas.DataFrame: DataFrame with stock data
         """
         # Map period to yfinance format if needed
         # yfinance already accepts '1y', '5y', etc.
-        
+
         # Fetch data
         ticker_obj = yf.Ticker(ticker)
         df = ticker_obj.history(period=period, interval=interval)
-        
+
         if df.empty:
             raise ValueError(f"No historical data found for {ticker}")
-        
+
         # Rename columns to match expected format
         df = df.rename(columns={
             'Open': 'Open',
@@ -242,25 +242,25 @@ class YFinanceDataFetcher:
             'Dividends': 'Dividends',
             'Stock Splits': 'Stock Splits'
         })
-        
+
         # Ensure index is named 'date'
         df.index.name = 'date'
-        
+
         # Convert timezone-aware timestamps to naive timestamps
         # This is important for compatibility with the current implementation
         df.index = df.index.tz_localize(None)
-        
+
         return df
 
     def _get_cache_path(self, ticker, period, interval):
         """
         Get the path to the cache file for a ticker.
-        
+
         Args:
             ticker (str): Stock ticker symbol
             period (str): Time period
             interval (str): Data interval
-            
+
         Returns:
             str: Path to cache file
         """

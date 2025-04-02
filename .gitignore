@@ -5,7 +5,7 @@ ENV/
 .env
 
 # Cache directories
-cache/
+.cache*/
 __pycache__/
 *.py[cod]
 *$py.class
@@ -61,6 +61,7 @@ models/
 .archive/
 
 # Temporary files
+.tmp/
 *.tmp
 *~
 *.bak
