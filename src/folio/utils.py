@@ -47,16 +47,12 @@ from typing import Optional
 
 import pandas as pd
 
-from src.lab.option_utils import calculate_option_delta, parse_option_description
+from src.lab.option_utils import (calculate_option_delta,
+                                  parse_option_description)
 from src.v2.data_fetcher import DataFetcher
 
-from .data_model import (
-    ExposureBreakdown,
-    PortfolioGroup,
-    PortfolioSummary,
-    StockPosition,
-    create_portfolio_group,
-)
+from .data_model import (ExposureBreakdown, PortfolioGroup, PortfolioSummary,
+                         StockPosition, create_portfolio_group)
 from .logger import logger
 
 # Initialize data fetcher
@@ -151,8 +147,14 @@ def get_beta(ticker: str, description: str = "") -> float:
 
     except (ValueError, pd.errors.InvalidIndexError) as e:
         # Only catch calculation-related errors
-        logger.error(f"Error calculating beta for {ticker}: {e}")
-        raise
+        if "No historical data found" in str(e):
+            # This is not a critical error - just log a warning
+            logger.warning(f"Error calculating beta for {ticker}: {e}. Assuming not cash-like.")
+            return 0.0
+        else:
+            # Log other calculation errors as errors
+            logger.error(f"Error calculating beta for {ticker}: {e}")
+            raise
 
 
 def format_currency(value: float) -> str:
@@ -385,6 +387,16 @@ def process_portfolio_data(
     df["Type"] = df["Type"].fillna("")  # Ensure Type is never NaN
     df["Description"] = df["Description"].fillna("")  # Ensure Description is never NaN
 
+    # Filter out invalid entries like "Pending Activity" which aren't actual positions
+    invalid_symbols = ["Pending Activity", "021ESC017"]
+    valid_rows = ~df["Symbol"].isin(invalid_symbols)
+    if (~valid_rows).any():
+        filtered_count = (~valid_rows).sum()
+        filtered_symbols = df.loc[~valid_rows, "Symbol"].tolist()
+        logger.info(f"Filtered out {filtered_count} invalid entries: {filtered_symbols}")
+        df = df[valid_rows].reset_index(drop=True)
+        logger.info(f"Continuing with {len(df)} remaining rows")
+
     # Function to identify options based on description format
     def is_option_desc(desc: str) -> bool:
         """Checks if a description string matches a specific option format.
@@ -460,6 +472,13 @@ def process_portfolio_data(
 
         # Proceed with processing potentially valid stock/ETF positions
         try:
+            # Handle NaN or non-string symbols
+            if pd.isna(symbol_raw) or not isinstance(symbol_raw, str):
+                logger.warning(
+                    f"Row {index}: Invalid symbol type: {type(symbol_raw)}. Skipping."
+                )
+                continue
+
             symbol = symbol_raw.rstrip(
                 "*"
             )  # Remove trailing asterisks (common for preferred shares etc.)
@@ -1322,7 +1341,7 @@ def calculate_position_metrics(group: PortfolioGroup) -> dict:
 
 
 # Patterns and keywords to identify cash-like instruments without hardcoding specific symbols
-def is_likely_money_market(ticker: str, description: str = "") -> bool:
+def is_likely_money_market(ticker: str | float | None, description: str | float | None = "") -> bool:
     """Determines if a position is likely a money market fund based on patterns and keywords.
 
     Args:
@@ -1332,6 +1351,26 @@ def is_likely_money_market(ticker: str, description: str = "") -> bool:
     Returns:
         bool: True if the position is likely a money market fund
     """
+    # Handle NaN, None, or non-string inputs
+    if pd.isna(ticker) or ticker is None:
+        return False
+
+    # Convert to string if needed
+    if not isinstance(ticker, str):
+        try:
+            ticker = str(ticker)
+        except:
+            return False
+
+    # Handle description similarly
+    if pd.isna(description) or description is None:
+        description = ""
+    elif not isinstance(description, str):
+        try:
+            description = str(description)
+        except:
+            description = ""
+
     # Convert inputs to uppercase for case-insensitive matching
     ticker_upper = ticker.upper()
     description_upper = description.upper() if description else ""
@@ -1364,7 +1403,7 @@ def is_likely_money_market(ticker: str, description: str = "") -> bool:
 
     return False
 
-def is_cash_or_short_term(ticker: str, beta: float | None = None, description: str = "") -> bool:
+def is_cash_or_short_term(ticker: str | float | None, beta: float | None = None, description: str | float | None = "") -> bool:
     """Determines if a position should be considered cash or cash-like.
 
     A position is considered cash-like if any of these conditions are met:
@@ -1390,6 +1429,26 @@ def is_cash_or_short_term(ticker: str, beta: float | None = None, description: s
         >>> is_cash_or_short_term("AAPL", beta=1.2)  # Regular stock
         False
     """
+    # Handle NaN, None, or non-string inputs
+    if pd.isna(ticker) or ticker is None:
+        return False
+
+    # Convert to string if needed
+    if not isinstance(ticker, str):
+        try:
+            ticker = str(ticker)
+        except:
+            return False
+
+    # Handle description similarly
+    if pd.isna(description) or description is None:
+        description = ""
+    elif not isinstance(description, str):
+        try:
+            description = str(description)
+        except:
+            description = ""
+
     # Check if it's a cash symbol
     if ticker in ["CASH", "USD"]:
         return True

@@ -22,12 +22,26 @@ This document is the single source of truth for the Folio project's best practic
 ### Implementation
 - **Avoid Hardcoding**: Use pattern-based detection instead of hardcoding specific values
 - **Generic Solutions**: Prefer solutions that work for all cases over special-case handling
-- **Error Handling**: Understand errors before fixing; log with context; only handle expected errors
-- **Logging**: Use INFO for information, WARNING only for actionable issues
+
+### Error Handling and Logging
+- **Use Custom Exceptions**: Use the application's custom exception classes in `src/folio/exceptions.py` for better context
+- **Distinguish States vs. Errors**: Log expected states (like initialization) as DEBUG, not as errors
+- **Use Error Handling Utilities**: Use the decorators and utilities in `src/folio/error_utils.py` for consistent handling
+- **Include Stack Traces**: Always include stack traces for unexpected errors using `exc_info=True`
+- **Appropriate Log Levels**:
+  - DEBUG: Detailed flow information
+  - INFO: Normal application events
+  - WARNING: Potential issues that don't prevent operation
+  - ERROR: Actual errors that affect functionality
+  - CRITICAL: Severe errors that prevent the application from functioning
+- **Actionable Warnings**: Only use WARNING level for issues that require attention
+- **Structured Error Messages**: Include context in error messages (what operation was being performed, what data was involved)
+- **Don't Swallow Exceptions**: Never catch exceptions without proper handling or re-raising
 
 ### Testing
 - **Always Test Changes**: Run tests after any change with `make test`
 - **Test Application**: Use `make portfolio` to launch and test the application with sample data
+- **Test Portfolio**: Use `src/lab/portfolio.csv` for testing with real portfolio data (note: this file is gitignored for privacy reasons but available locally)
 - **Test Behavior**: Focus on functionality, not implementation details
 - **Edge Cases**: Test boundary conditions and error scenarios
 - **Regression Tests**: Add tests for bugs to prevent recurrence

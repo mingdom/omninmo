@@ -1,4 +1,7 @@
 # List of executive TODO tasks
+- [ ] yfinance integration [P0]
+- [ ] Loading UI
+- [ ] UI: user friendly instructions. Hide portfolio on upload
 - [ ] Sector analysis
 - [ ] Portfolio graphs - brainstorm the most useful ones
 - [ ] Better theme for the UI, maybe dark-mode?

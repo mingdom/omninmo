@@ -1,7 +1,8 @@
 import argparse
+import base64
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union
 
 import dash
 import dash_bootstrap_components as dbc
@@ -11,6 +12,8 @@ from dash import ALL, Input, Output, State, dcc, html
 from .components.portfolio_table import create_portfolio_table
 from .components.position_details import create_position_details
 from .data_model import OptionPosition, PortfolioGroup, Position, StockPosition
+from .error_utils import handle_callback_error, log_exception
+from .exceptions import StateError
 from .logger import logger
 from .utils import format_beta, format_currency, process_portfolio_data
 
@@ -667,88 +670,82 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
             State("portfolio-table", "active_cell"),
         ],
     )
+    @handle_callback_error(default_return=None, error_message="Error selecting position")
     def store_selected_position(active_cell, btn_clicks, groups_data, prev_active_cell):
         """Store selected position data when row is clicked or Details button is clicked"""
         logger.debug("Storing selected position")
         position_data = None
 
-        if groups_data:
-            ctx = dash.callback_context
-            trigger_id = ctx.triggered[0]["prop_id"] if ctx.triggered else ""
-            logger.debug(f"Trigger ID: {trigger_id}")
-
-            try:
-                row = None
-
-                if "position-details" in trigger_id:
-                    # Button click
-                    button_idx = ctx.triggered[0]["prop_id"].split(".")[0]
-                    try:
-                        # Parse the button index JSON-like string without using eval
-                        # Example format: {"type":"position-details","index":"AAPL"}
-                        if not button_idx or not button_idx.startswith("{"):
-                            logger.error(f"Invalid button index format: {button_idx}")
-                            return None
-
-                        # Extract the index part safely using string manipulation
-                        import json
-
-                        button_data = json.loads(button_idx.replace("'", '"'))
-                        ticker = button_data.get("index")
-
-                        if not ticker:
-                            logger.error("No ticker found in button data")
-                            return None
-
-                        logger.debug(f"Button clicked for ticker: {ticker}")
-                    except (json.JSONDecodeError, KeyError) as e:
-                        logger.error(
-                            f"Error parsing button index: {e}, button_idx: {button_idx}"
-                        )
-                        return None
-
-                    # Find the group with matching ticker
-                    for i, group_data in enumerate(groups_data):
-                        try:
-                            stock_ticker = (
-                                group_data["stock_position"]["ticker"]
-                                if group_data["stock_position"]
-                                else None
-                            )
-                            option_tickers = [
-                                opt["ticker"] for opt in group_data["option_positions"]
-                            ]
-
-                            if stock_ticker == ticker or ticker in option_tickers:
-                                row = i
-                                logger.debug(
-                                    f"Found matching position at row {row} for ticker {ticker}"
-                                )
-                                break
-                        except Exception as e:
-                            logger.error(f"Error processing group {i}: {e}")
-                            continue
-                elif active_cell and active_cell != prev_active_cell:
-                    row = active_cell["row"]
-                    logger.debug(f"Table cell clicked at row {row}")
-
-                # Validate and return row data if found
-                if row is not None and 0 <= row < len(groups_data):
-                    position_data = groups_data[row]
-                else:
-                    logger.error(
-                        f"Row index out of range or not found: {row}, groups length: {len(groups_data)}"
-                    )
-
-            except Exception as e:
-                logger.error(f"Error storing selected position: {e}", exc_info=True)
-                import traceback
-
-                logger.error(f"Traceback: {traceback.format_exc()}")
-        else:
+        # Early return if no data available
+        if not groups_data:
             logger.debug("No portfolio data available for selection")
+            return None
+
+        # Get trigger information
+        ctx = dash.callback_context
+        trigger_id = ctx.triggered[0]["prop_id"] if ctx.triggered else ""
+        logger.debug(f"Trigger ID: {trigger_id}")
+
+        # Handle different trigger types
+        row = None
+
+        if "position-details" in trigger_id:
+            # Button click - extract ticker from button ID
+            row = _get_row_from_button_click(trigger_id, ctx, groups_data)
+        elif active_cell and active_cell != prev_active_cell:
+            # Table cell click
+            row = active_cell["row"]
+            logger.debug(f"Table cell clicked at row {row}")
+
+        # Validate row and return data if valid
+        if row is not None:
+            if 0 <= row < len(groups_data):
+                position_data = groups_data[row]
+            else:
+                # Invalid row index - this is an actual error
+                raise StateError.invalid_row(row, len(groups_data))
+        else:
+            # No selection - this is normal during initialization
+            logger.debug("No row selected (normal during initialization)")
 
         return position_data
+
+
+    def _get_row_from_button_click(trigger_id, ctx, groups_data):
+        """Helper function to extract row index from button click"""
+        import json
+
+        button_idx = ctx.triggered[0]["prop_id"].split(".")[0]
+
+        # Validate button index format
+        if not button_idx or not button_idx.startswith("{"):
+            raise ValueError(f"Invalid button index format: {button_idx}")
+
+        # Parse button data to extract ticker
+        button_data = json.loads(button_idx.replace("'", '"'))
+        ticker = button_data.get("index")
+
+        if not ticker:
+            raise ValueError("No ticker found in button data")
+
+        logger.debug(f"Button clicked for ticker: {ticker}")
+
+        # Find matching group by ticker
+        for i, group_data in enumerate(groups_data):
+            stock_ticker = (
+                group_data["stock_position"]["ticker"]
+                if group_data["stock_position"]
+                else None
+            )
+            option_tickers = [opt["ticker"] for opt in group_data["option_positions"]]
+
+            if stock_ticker == ticker or ticker in option_tickers:
+                logger.debug(f"Found matching position at row {i} for ticker {ticker}")
+                return i
+
+        # No matching ticker found
+        logger.warning(f"No matching position found for ticker {ticker}")
+        return None
 
     @app.callback(
         [
@@ -763,6 +760,10 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
             State("portfolio-table", "active_cell"),
             State({"type": "position-details", "index": ALL}, "n_clicks"),
         ],
+    )
+    @handle_callback_error(
+        default_return=(False, html.Div("Error loading position details", className="text-danger p-3")),
+        error_message="Error toggling position modal"
     )
     def toggle_position_modal(position_data, is_open, active_cell, btn_clicks):
         """Toggle position details modal"""
@@ -788,53 +789,50 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
             logger.debug(
                 f"Position data received: {position_data.keys() if position_data else None}"
             )
-            try:
-                # Convert data back to PortfolioGroup
-                if not position_data:
-                    logger.error("Position data is None")
-                    return False, html.Div(
-                        "No position data available", className="text-danger p-3"
-                    )
 
-                stock_position = (
-                    Position(**position_data["stock_position"])
-                    if position_data["stock_position"]
-                    else None
+            # Convert data back to PortfolioGroup
+            if not position_data:
+                logger.warning("Position data is None")
+                return False, html.Div(
+                    "No position data available", className="text-danger p-3"
                 )
-                option_positions = [
-                    OptionPosition(**opt) for opt in position_data["option_positions"]
-                ]
-                group = PortfolioGroup(
-                    ticker=position_data["ticker"],
-                    stock_position=stock_position,
-                    option_positions=option_positions,
-                    total_value=position_data["total_value"],
-                    net_exposure=position_data["net_exposure"],
-                    beta=position_data["beta"],
-                    beta_adjusted_exposure=position_data["beta_adjusted_exposure"],
-                    total_delta_exposure=position_data["total_delta_exposure"],
-                    options_delta_exposure=position_data["options_delta_exposure"],
-                )
-                logger.debug("Successfully created PortfolioGroup from position data")
 
-                # Create position details
-                details = create_position_details(group)
-                logger.debug("Successfully created position details")
-                return True, details
+            # Create PortfolioGroup from position data
+            group = _create_portfolio_group_from_data(position_data)
+            logger.debug("Successfully created PortfolioGroup from position data")
 
-            except Exception as e:
-                logger.error(f"Error creating position details: {e}", exc_info=True)
-                import traceback
-
-                logger.error(f"Traceback: {traceback.format_exc()}")
-                return True, html.Div(
-                    f"Error loading position details: {e!s}",
-                    className="text-danger p-3",
-                )
+            # Create position details
+            details = create_position_details(group)
+            logger.debug("Successfully created position details")
+            return True, details
 
         # Keep modal state unchanged for all other cases
         logger.debug(f"No action needed, keeping modal state: {is_open}")
         return is_open, dash.no_update
+
+
+    def _create_portfolio_group_from_data(position_data):
+        """Helper function to create a PortfolioGroup from position data"""
+        stock_position = (
+            Position(**position_data["stock_position"])
+            if position_data["stock_position"]
+            else None
+        )
+        option_positions = [
+            OptionPosition(**opt) for opt in position_data["option_positions"]
+        ]
+
+        return PortfolioGroup(
+            ticker=position_data["ticker"],
+            stock_position=stock_position,
+            option_positions=option_positions,
+            total_value=position_data["total_value"],
+            net_exposure=position_data["net_exposure"],
+            beta=position_data["beta"],
+            beta_adjusted_exposure=position_data["beta_adjusted_exposure"],
+            total_delta_exposure=position_data["total_delta_exposure"],
+            options_delta_exposure=position_data["options_delta_exposure"],
+        )
 
     # Add callback to handle column sorting
     @app.callback(
@@ -842,6 +840,7 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
         [Input({"type": "sort-header", "column": ALL}, "n_clicks")],
         [State("sort-state", "data")],
     )
+    @handle_callback_error(default_return=None, error_message="Error updating sort state")
     def update_sort_state(header_clicks, current_sort_state):
         """Update sort state when a column header is clicked"""
         ctx = dash.callback_context
@@ -860,6 +859,7 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
         clicked_column = column_data.get("column")
 
         if not clicked_column:
+            logger.debug(f"No column found in trigger data: {column_data}")
             return current_sort_state
 
         # Update sort direction if same column clicked, otherwise reset to descending
@@ -870,6 +870,7 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
         else:
             new_direction = "desc"
 
+        logger.debug(f"Sorting by {clicked_column} in {new_direction} order")
         return {"column": clicked_column, "direction": new_direction}
 
     return app

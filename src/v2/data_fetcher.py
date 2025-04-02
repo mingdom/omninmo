@@ -147,7 +147,9 @@ class DataFetcher:
         data = response.json()
 
         if "historical" not in data:
-            raise ValueError(f"No historical data found for {ticker}")
+            # This is not a critical error - just log a warning and return empty DataFrame
+            logger.warning(f"No historical data found for {ticker}")
+            return pd.DataFrame(columns=["Open", "High", "Low", "Close", "Volume"])
 
         # Convert to DataFrame
         df = pd.DataFrame(data["historical"])
