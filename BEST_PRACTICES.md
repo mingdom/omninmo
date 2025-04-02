@@ -39,7 +39,7 @@ This document is the single source of truth for the Folio project's best practic
 - **Don't Swallow Exceptions**: Never catch exceptions without proper handling or re-raising
 
 ### Testing
-- **Always Test Changes**: Run tests after any change with `make test`
+- **Always Test Changes**: Run tests after ANY change with `make test` - no exceptions!
 - **Test Application**: Use `make portfolio` to launch and test the application with sample data
 - **Test Portfolio**: Use `src/lab/portfolio.csv` for testing with real portfolio data (note: this file is gitignored for privacy reasons but available locally)
 - **Test Behavior**: Focus on functionality, not implementation details

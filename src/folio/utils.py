@@ -149,8 +149,9 @@ def get_beta(ticker: str, description: str = "") -> float:
         # Only catch calculation-related errors
         if "No historical data found" in str(e):
             # This is not a critical error - just log a warning
-            logger.warning(f"Error calculating beta for {ticker}: {e}. Assuming not cash-like.")
-            return 0.0
+            logger.warning(f"Error calculating beta for {ticker}: {e}. Unable to determine beta.")
+            # Re-raise with a more specific message
+            raise ValueError(f"No historical data available for beta calculation: {ticker}") from e
         else:
             # Log other calculation errors as errors
             logger.error(f"Error calculating beta for {ticker}: {e}")
@@ -564,12 +565,11 @@ def process_portfolio_data(
                 and price != 0
                 and abs(calculated_value - cleaned_current_value) > 0.01
             ):  # Tolerance for float issues
-                logger.warning(
-                    f"Row {index}: Stock {symbol} calculated value ({format_currency(calculated_value)}) differs from reported 'Current Value' ({format_currency(cleaned_current_value)}). Using reported value."
+                logger.info(
+                    f"Row {index}: Stock {symbol} calculated value ({format_currency(calculated_value)}) differs from reported 'Current Value' ({format_currency(cleaned_current_value)}). Using calculated value as it's likely more up-to-date."
                 )
-                value_to_use = cleaned_current_value
-            else:
-                value_to_use = calculated_value
+            # Always use our calculated value as it's likely more up-to-date
+            value_to_use = calculated_value
 
             # Get Beta - requires valid ticker and fetcher
             beta = get_beta(symbol, description)
@@ -1461,10 +1461,26 @@ def is_cash_or_short_term(ticker: str | float | None, beta: float | None = None,
     if beta is not None:
         return abs(beta) < 0.1
 
-    # Calculate beta if not provided - let errors propagate up
+    # Check if it's a known cash-like symbol based on patterns before attempting beta calculation
+    if ticker in ["CASH", "USD"] or is_likely_money_market(ticker, description):
+        logger.debug(f"Symbol {ticker} identified as cash-like based on pattern matching.")
+        return True
+
+    # Calculate beta if not provided
     try:
         calculated_beta = get_beta(ticker)
         return abs(calculated_beta) < 0.1
+    except ValueError as e:
+        # Handle specific case of no historical data
+        if "No historical data available for beta calculation" in str(e):
+            logger.warning(f"Cannot classify {ticker} as cash-like: {e}")
+            # Not enough information to classify as cash-like
+            return False
+        else:
+            # Other value errors
+            logger.warning(f"Error calculating beta for {ticker}: {e}. Assuming not cash-like.")
+            return False
     except Exception as e:
+        # Handle other exceptions
         logger.warning(f"Error calculating beta for {ticker}: {e}. Assuming not cash-like.")
         return False

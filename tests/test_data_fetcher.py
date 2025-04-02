@@ -237,8 +237,12 @@ class TestErrorHandling:
 
             with patch("requests.get", return_value=mock_empty_response):
                 fetcher = DataFetcher(cache_dir=temp_cache_dir)
-                with pytest.raises(ValueError, match="No historical data found"):
-                    fetcher.fetch_data("INVALID", period="1y")
+                # Now we expect an empty DataFrame instead of an exception
+                result = fetcher.fetch_data("INVALID", period="1y")
+                assert isinstance(result, pd.DataFrame)
+                assert result.empty or len(result) == 0
+                assert "Open" in result.columns
+                assert "Close" in result.columns
 
     def test_network_error_with_fallback(self, temp_cache_dir, sample_dataframe):
         """Test fallback to expired cache on network error."""

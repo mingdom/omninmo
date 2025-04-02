@@ -86,7 +86,9 @@ class DataFetcher:
                 df.to_csv(cache_file)
                 return df
             else:
-                raise ValueError(f"No data returned from API for {ticker}")
+                # Return empty DataFrame with expected columns instead of raising an error
+                logger.warning(f"No data returned from API for {ticker}. Returning empty DataFrame.")
+                return pd.DataFrame(columns=["Open", "High", "Low", "Close", "Volume"])
         except Exception as e:
             logger.error(f"Error fetching data for {ticker}: {e}")
 
@@ -94,6 +96,11 @@ class DataFetcher:
             if os.path.exists(cache_file):
                 logger.warning(f"Using expired cache as fallback for {ticker}")
                 return pd.read_csv(cache_file, index_col=0, parse_dates=True)
+
+            # For 'No historical data found' errors, return empty DataFrame
+            if "No historical data found" in str(e):
+                logger.warning(f"No historical data found for {ticker}. Returning empty DataFrame.")
+                return pd.DataFrame(columns=["Open", "High", "Low", "Close", "Volume"])
 
             raise
 

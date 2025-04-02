@@ -60,8 +60,11 @@ def test_beta_threshold_edge_cases():
     )  # Negative and over threshold
 
 
-def test_pattern_based_detection():
+def test_pattern_based_detection(mock_get_beta):
     """Test pattern-based detection of money market funds."""
+    # Set up mock to return a default beta value
+    mock_get_beta.return_value = 0.5  # Non-cash-like beta
+
     # Test XX pattern in symbol
     assert is_cash_or_short_term("SPAXX")
     assert is_cash_or_short_term("FMPXX")
