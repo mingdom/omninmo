@@ -10,18 +10,9 @@ from dash import ALL, Input, Output, State, dcc, html
 
 from .components.portfolio_table import create_portfolio_table
 from .components.position_details import create_position_details
-from .data_model import (
-    OptionPosition,
-    PortfolioGroup,
-    Position,
-    StockPosition,
-)
+from .data_model import OptionPosition, PortfolioGroup, Position, StockPosition
 from .logger import logger
-from .utils import (
-    format_beta,
-    format_currency,
-    process_portfolio_data,
-)
+from .utils import format_beta, format_currency, process_portfolio_data
 
 
 def create_header() -> dbc.Card:
@@ -38,7 +29,7 @@ def create_header() -> dbc.Card:
                                     dbc.CardBody(
                                         [
                                             html.H6(
-                                                "Total Value", className="card-subtitle"
+                                                "Total Exposure", className="card-subtitle"
                                             ),
                                             html.H5(
                                                 id="total-value",
@@ -218,6 +209,8 @@ def create_upload_section() -> dbc.Card:
                         "textAlign": "center",
                         "margin": "10px 0",
                     },
+                    # Filter for CSV files
+                    accept=".csv",
                     multiple=False,
                 ),
                 html.Div(id="upload-status"),

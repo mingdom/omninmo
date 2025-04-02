@@ -4,11 +4,7 @@ import dash_bootstrap_components as dbc
 from dash import html
 
 from ..data_model import PortfolioGroup
-from ..utils import (
-    format_beta,
-    format_currency,
-    format_percentage,
-)
+from ..utils import format_beta, format_currency
 
 
 def get_group_ticker(group: PortfolioGroup) -> str:
@@ -60,16 +56,7 @@ def create_position_row(group: PortfolioGroup, metrics: dict) -> dbc.Row:
                 width=2,
             ),
             dbc.Col(
-                [
-                    html.Div(
-                        [
-                            html.Div(format_currency(group.beta_adjusted_exposure)),
-                            html.Small(
-                                f"Δ: {format_percentage(group.total_delta_exposure / group.net_exposure * 100 if group.net_exposure != 0 else 0)}"
-                            ),
-                        ]
-                    )
-                ],
+                format_currency(group.beta_adjusted_exposure),
                 width=2,
             ),
             dbc.Col(

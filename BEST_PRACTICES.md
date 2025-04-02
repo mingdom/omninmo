@@ -27,6 +27,7 @@ This document is the single source of truth for the Folio project's best practic
 
 ### Testing
 - **Always Test Changes**: Run tests after any change with `make test`
+- **Test Application**: Use `make portfolio` to launch and test the application with sample data
 - **Test Behavior**: Focus on functionality, not implementation details
 - **Edge Cases**: Test boundary conditions and error scenarios
 - **Regression Tests**: Add tests for bugs to prevent recurrence
@@ -35,3 +36,5 @@ This document is the single source of truth for the Folio project's best practic
 - **Incremental Changes**: Make small, focused changes rather than large rewrites
 - **Documentation**: Keep documentation updated with changes
 - **Performance**: Optimize only after identifying actual bottlenecks
+- **Running the Application**: Use `make portfolio` to test with sample data or `make folio` for a clean start
+- **Testing Changes**: Always verify UI changes by running the application and interacting with it
