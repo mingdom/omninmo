@@ -119,3 +119,15 @@ Clear, accurate documentation helps onboard new developers and maintain institut
   - **Keep Updated**: Update documentation when code changes
   - **Code Comments**: Document complex logic and "why" decisions, not obvious code
   - **README Files**: Ensure each major component has a clear, concise README
+
+- **Development Planning**:
+  - **Create Devplans**: Document detailed plans in `docs/devplan/` for significant features, design changes, or deployments
+  - **Plan Structure**: Include overview, implementation steps, timeline, and considerations
+  - **Phased Approach**: Break complex changes into manageable phases with testing checkpoints
+  - **Deployment Plans**: For deployment-related changes, include hosting options, infrastructure requirements, and security considerations
+
+- **Development Logging**:
+  - **Update Devlogs**: Document completed changes in `docs/devlog/` after implementing major features or changes
+  - **Devlog Format**: Include date, summary, implementation details, and lessons learned
+  - **Technical Details**: Document key technical decisions, challenges overcome, and solutions implemented
+  - **Future Considerations**: Note any follow-up tasks or potential improvements identified during implementation
