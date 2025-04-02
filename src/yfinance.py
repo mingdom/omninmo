@@ -12,14 +12,14 @@ import time
 import pandas as pd
 
 import yfinance as yf
+from src.data_fetcher_interface import DataFetcherInterface
 
 logger = logging.getLogger(__name__)
 
 
-class YFinanceDataFetcher:
+class YFinanceDataFetcher(DataFetcherInterface):
     """Class to fetch stock data from Yahoo Finance API using yfinance"""
 
-    # TODO: Make beta_period configurable via config file
     # Default period for beta calculations (6 months provides more current market behavior)
     beta_period = "6m"
 

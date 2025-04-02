@@ -160,8 +160,12 @@ class YFinanceDataFetcher(DataFetcherInterface):
 ### 3. Create a Factory for Data Fetcher Selection
 
 ```python
-def create_data_fetcher(source="fmp", cache_dir="cache"):
+def create_data_fetcher(source="yfinance", cache_dir=None):
     """Factory function to create the appropriate data fetcher"""
+    # Set default cache directories based on data source
+    if cache_dir is None:
+        cache_dir = ".cache_yf" if source == "yfinance" else ".cache_fmp"
+
     if source == "yfinance":
         from src.yfinance import YFinanceDataFetcher
         return YFinanceDataFetcher(cache_dir=cache_dir)
@@ -175,10 +179,23 @@ def create_data_fetcher(source="fmp", cache_dir="cache"):
 ### 4. Update the Utils Module to Use the Factory
 
 ```python
+import os
+import yaml
 from src.data_fetcher_factory import create_data_fetcher
 
-# Get data source from config
-data_source = config.get("app.data_source", "fmp")
+# Load configuration from folio.yaml
+def load_config():
+    config_path = os.path.join(os.path.dirname(__file__), 'folio.yaml')
+    if os.path.exists(config_path):
+        with open(config_path, 'r') as f:
+            return yaml.safe_load(f)
+    return {}
+
+# Get configuration
+config = load_config()
+
+# Get data source from config (default to "yfinance" if not specified)
+data_source = config.get("app", {}).get("data_source", "yfinance")
 
 # Create data fetcher using factory
 data_fetcher = create_data_fetcher(source=data_source)
@@ -200,19 +217,35 @@ For Phase 3, we need to ensure this approach is consistently applied:
 
 ### 6. Add Configuration Options
 
-Add configuration options to select the data source:
+We've created a folio.yaml file in the src/folio directory with yfinance as the default data source:
 
-```python
-# In config.py
-config = {
-    "app": {
-        "data_source": "fmp",  # Options: "fmp", "yfinance"
-        "cache": {
-            "ttl": 86400  # 1 day
-        }
-    }
-}
+```yaml
+# Folio Application Configuration
+
+app:
+  # Data source configuration
+  data_source: "yfinance"  # Options: "fmp", "yfinance"
+
+  # Cache configuration
+  cache:
+    ttl: 86400  # Cache time-to-live in seconds (1 day)
+
+  # Beta calculation configuration
+  beta:
+    period: "6m"  # Default period for beta calculations (6 months)
+
+  # UI configuration
+  ui:
+    theme: "default"
+    table_rows_per_page: 20
+
+  # Logging configuration
+  logging:
+    level: "INFO"  # Options: "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"
+    file: "folio.log"
 ```
+
+This configuration file will be loaded by the utils module and used to determine which data source to use. By default, yfinance will be used as the data source.
 
 ### 7. Update Documentation
 
@@ -238,12 +271,22 @@ The implementation of Phase 3 will be considered successful when:
 
 1. Both data fetchers implement the common interface
 2. The factory function correctly creates the appropriate data fetcher
-3. The utils module uses the factory to create the data fetcher
-4. Beta calculations produce consistent results with both data sources
-5. The configuration options work correctly
+3. The utils module uses the factory to create the data fetcher based on config.yaml
+4. YFinance is used as the default data source
+5. Beta calculations use the 6-month period and produce consistent results
+6. The configuration options in config.yaml work correctly
+7. All tests pass with the new implementation
 
 ## Conclusion
 
 This updated plan for Phase 3 addresses the key findings from Phase 2, ensuring consistent behavior regardless of the data source. By implementing a common interface, a factory function, and using a 6-month period for beta calculations, we can provide a seamless experience for users regardless of which data source they choose to use.
 
 The decision to use a 6-month period for beta calculations is based on our analysis showing that market sentiment and cycles change over time, making recent data more relevant for assessing a stock's current relationship with the market. This approach provides more accurate and actionable beta values, especially for volatile stocks.
+
+With the creation of config.yaml and setting yfinance as the default data source, we're making a significant improvement to the application. YFinance offers several advantages over the FMP API, including:
+
+1. No API key required, making it easier for new users to get started
+2. More reliable data availability
+3. Additional data like dividends and stock splits
+
+While maintaining the option to use FMP API through configuration, making yfinance the default ensures that users get the best experience out of the box.

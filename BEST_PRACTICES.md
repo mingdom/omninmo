@@ -61,3 +61,4 @@ This document is the single source of truth for the Folio project's best practic
 - **Version Control**: Update .gitignore when adding new temporary files or directories
 - **Temporary Files**: Store temporary files in the .tmp directory
 - **Cache Files**: Use hidden directories (.cache_*) for cache files
+- **Commit Messages**: When asked to write a commit message, write it to the `.commit-msg.md` file in the root directory. Never commit to git directly.

@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 import requests
 
+from src.data_fetcher_interface import DataFetcherInterface
 from src.v2.config import config
 
 # Setup logging
@@ -20,10 +21,13 @@ logger = logging.getLogger(__name__)
 HTTP_SUCCESS = 200
 
 
-class DataFetcher:
-    """Class to fetch stock data from API"""
+class DataFetcher(DataFetcherInterface):
+    """Class to fetch stock data from Financial Modeling Prep API"""
 
-    def __init__(self, cache_dir="cache"):
+    # Default period for beta calculations
+    beta_period = "6m"
+
+    def __init__(self, cache_dir=".cache_fmp"):
         """Initialize with cache directory"""
         self.cache_dir = cache_dir
         self.api_key = os.environ.get("FMP_API_KEY") or config.get("data.fmp.api_key")
@@ -104,18 +108,23 @@ class DataFetcher:
 
             raise
 
-    def fetch_market_data(self, market_index="SPY", period="5y", interval="1d"):
+    def fetch_market_data(self, market_index="SPY", period=None, interval="1d"):
         """
-        Fetch market index data for beta calculations
+        Fetch market index data for beta calculations.
 
         Args:
             market_index (str): Market index ticker symbol (default: 'SPY' for S&P 500 ETF)
-            period (str): Time period ('1y', '5y', etc.)
+            period (str, optional): Time period. If None, uses beta_period.
             interval (str): Data interval ('1d', '1wk', etc.)
 
         Returns:
             pandas.DataFrame: DataFrame with market index data
         """
+        # Use the class beta_period if period is None
+        if period is None:
+            period = self.beta_period
+            logger.info(f"Using default beta period: {period}")
+
         logger.debug(f"Fetching market data for {market_index}")
         return self.fetch_data(market_index, period, interval)
 

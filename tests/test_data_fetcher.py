@@ -89,7 +89,7 @@ class TestDataFetcherInitialization:
         """Test initialization with default cache directory."""
         with patch.dict(os.environ, {"FMP_API_KEY": "test_key"}):
             fetcher = DataFetcher()
-            assert fetcher.cache_dir == "cache"
+            assert fetcher.cache_dir == ".cache_fmp"
             assert fetcher.api_key == "test_key"
             assert fetcher.cache_ttl == 86400  # Default TTL
 

@@ -42,31 +42,54 @@ def utility_function():
 ```
 """
 
+import os
 import re
 from typing import Optional
 
 import pandas as pd
+import yaml
 
+from src.data_fetcher_factory import create_data_fetcher
 from src.lab.option_utils import (calculate_option_delta,
                                   parse_option_description)
-from src.v2.data_fetcher import DataFetcher
 
 from .data_model import (ExposureBreakdown, PortfolioGroup, PortfolioSummary,
                          StockPosition, create_portfolio_group)
 from .logger import logger
 
+
+# Load configuration from folio.yaml
+def load_config():
+    config_path = os.path.join(os.path.dirname(__file__), 'folio.yaml')
+    if os.path.exists(config_path):
+        try:
+            with open(config_path, 'r') as f:
+                return yaml.safe_load(f)
+        except Exception as e:
+            logger.warning(f"Failed to load folio.yaml: {e}. Using default configuration.")
+    return {}
+
+# Get configuration
+config = load_config()
+
 # Initialize data fetcher
 try:
-    data_fetcher = DataFetcher()
+    # Get data source from config (default to "yfinance" if not specified)
+    data_source = config.get("app", {}).get("data_source", "yfinance")
+    logger.info(f"Using data source: {data_source}")
+
+    # Create data fetcher using factory
+    data_fetcher = create_data_fetcher(source=data_source)
+
     if data_fetcher is None:
         raise RuntimeError(
-            "DataFetcher initialization failed but didn't raise an exception"
+            "Data fetcher initialization failed but didn't raise an exception"
         )
 except ValueError as e:
-    logger.error(f"Failed to initialize DataFetcher: {e}")
+    logger.error(f"Failed to initialize data fetcher: {e}")
     # Re-raise to fail fast rather than continuing with a null reference
     raise RuntimeError(
-        f"Critical component DataFetcher could not be initialized: {e}"
+        f"Critical component data fetcher could not be initialized: {e}"
     ) from e
 
 
