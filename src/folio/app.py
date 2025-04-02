@@ -225,38 +225,56 @@ def create_empty_state() -> html.Div:
 
 
 def create_upload_section() -> dbc.Card:
-    """Create the file upload section"""
+    """Create the file upload section with collapsible functionality"""
     return dbc.Card(
-        dbc.CardBody(
-            [
-                html.H4("Upload Portfolio", className="mb-3"),
-                dcc.Upload(
-                    id="upload-portfolio",
-                    children=html.Div(
-                        [
-                            html.I(className="fas fa-file-upload me-2"),
-                            "Drag and Drop or ",
-                            html.A("Select a CSV File", className="text-primary"),
-                        ]
-                    ),
-                    style={
-                        "width": "100%",
-                        "height": "60px",
-                        "lineHeight": "60px",
-                        "textAlign": "center",
-                        "margin": "10px 0",
-                    },
-                    # Filter for CSV files
-                    accept=".csv",
-                    multiple=False,
+        [
+            dbc.CardHeader(
+                dbc.Button(
+                    [
+                        html.I(className="fas fa-upload me-2"),
+                        "Upload Portfolio",
+                        html.I(className="fas fa-chevron-down ms-2", id="collapse-icon"),
+                    ],
+                    id="upload-collapse-button",
+                    color="link",
+                    className="text-decoration-none text-dark p-0 d-flex align-items-center",
                 ),
-                dcc.Loading(
-                    id="upload-loading",
-                    type="circle",
-                    children=[html.Div(id="upload-status")],
+                className="d-flex justify-content-between align-items-center",
+            ),
+            dbc.Collapse(
+                dbc.CardBody(
+                    [
+                        dcc.Upload(
+                            id="upload-portfolio",
+                            children=html.Div(
+                                [
+                                    html.I(className="fas fa-file-upload me-2"),
+                                    "Drag and Drop or ",
+                                    html.A("Select a CSV File", className="text-primary"),
+                                ]
+                            ),
+                            style={
+                                "width": "100%",
+                                "height": "60px",
+                                "lineHeight": "60px",
+                                "textAlign": "center",
+                                "margin": "10px 0",
+                            },
+                            # Filter for CSV files
+                            accept=".csv",
+                            multiple=False,
+                        ),
+                        dcc.Loading(
+                            id="upload-loading",
+                            type="circle",
+                            children=[html.Div(id="upload-status")],
+                        ),
+                    ]
                 ),
-            ]
-        ),
+                id="upload-collapse",
+                is_open=True,  # Initially open
+            ),
+        ],
         className="mb-3",
     )
 
@@ -477,7 +495,35 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
                 // CMD+O or CTRL+O
                 if ((e.metaKey || e.ctrlKey) && e.key === 'o') {
                     e.preventDefault();
-                    document.getElementById('upload-portfolio').click();
+                    // Create a hidden file input and trigger it
+                    var fileInput = document.createElement('input');
+                    fileInput.type = 'file';
+                    fileInput.accept = '.csv';
+                    fileInput.style.display = 'none';
+                    document.body.appendChild(fileInput);
+
+                    // When a file is selected, trigger the upload component
+                    fileInput.addEventListener('change', function() {
+                        if (fileInput.files.length > 0) {
+                            var file = fileInput.files[0];
+                            var upload = document.getElementById('upload-portfolio');
+
+                            // Create a new DataTransfer object and add the file
+                            var dataTransfer = new DataTransfer();
+                            dataTransfer.items.add(file);
+
+                            // Create and dispatch a drop event
+                            var dropEvent = new Event('drop', {bubbles: true});
+                            dropEvent.dataTransfer = dataTransfer;
+                            upload.dispatchEvent(dropEvent);
+
+                            // Clean up
+                            document.body.removeChild(fileInput);
+                        }
+                    });
+
+                    // Trigger the file dialog
+                    fileInput.click();
                     return true;
                 }
             });
@@ -488,6 +534,26 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
         Input("interval-component", "n_intervals"),
     )
 
+    # Toggle upload section collapse
+    @app.callback(
+        [
+            Output("upload-collapse", "is_open", allow_duplicate=True),
+            Output("collapse-icon", "className"),
+        ],
+        [Input("upload-collapse-button", "n_clicks")],
+        [State("upload-collapse", "is_open")],
+        prevent_initial_call=True,
+    )
+    def toggle_upload_collapse(n_clicks, is_open):
+        """Toggle the upload section collapse state"""
+        if n_clicks:
+            # Toggle the collapse state
+            new_state = not is_open
+            # Update the icon based on the new state
+            icon_class = "fas fa-chevron-up ms-2" if new_state else "fas fa-chevron-down ms-2"
+            return new_state, icon_class
+        return is_open, "fas fa-chevron-down ms-2"
+
 
 
     # Show/hide empty state based on portfolio data
@@ -495,17 +561,19 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
         [
             Output("empty-state-container", "children"),
             Output("main-content", "style"),
+            # Also collapse the upload section when data is loaded
+            Output("upload-collapse", "is_open"),
         ],
         [Input("portfolio-groups", "data")],
     )
     def toggle_empty_state(groups_data):
-        """Show empty state when no data is loaded"""
+        """Show empty state when no data is loaded and collapse upload section when data is loaded"""
         if not groups_data:
-            # No data, show empty state and hide main content
-            return create_empty_state(), {"display": "none"}
+            # No data, show empty state, hide main content, keep upload open
+            return create_empty_state(), {"display": "none"}, True
         else:
-            # Data loaded, hide empty state and show main content
-            return None, {"display": "block"}
+            # Data loaded, hide empty state, show main content, collapse upload
+            return None, {"display": "block"}, False
 
     # Handle sample portfolio loading
     @app.callback(
