@@ -32,6 +32,12 @@ This document is the single source of truth for the Folio project's best practic
 - **Edge Cases**: Test boundary conditions and error scenarios
 - **Regression Tests**: Add tests for bugs to prevent recurrence
 
+### Documentation
+- **Date Accuracy**: Always use the `date` command to get the current date when creating dated documents
+- **Consistent Format**: Follow existing document formats and naming conventions
+- **Keep Updated**: Update documentation when code changes
+- **Single Source of Truth**: Maintain one authoritative source for each type of documentation
+
 ### Development Workflow
 - **Incremental Changes**: Make small, focused changes rather than large rewrites
 - **Documentation**: Keep documentation updated with changes
