@@ -1,0 +1,192 @@
+/* Enhanced UI styles for Folio */
+
+/* Gradient border for main container */
+.gradient-border {
+    position: relative;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+    background: white;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+.gradient-border::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-radius: 8px;
+    padding: 2px;
+    background: linear-gradient(135deg, #6e8efb, #a777e3, #4facfe);
+    -webkit-mask: 
+        linear-gradient(#fff 0 0) content-box, 
+        linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+}
+
+/* Card enhancements */
+.card {
+    border: none;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+}
+
+.card-header {
+    background: linear-gradient(to right, #f8f9fa, #ffffff);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    border-radius: 8px 8px 0 0 !important;
+}
+
+/* Button enhancements */
+.btn {
+    border-radius: 6px;
+    transition: all 0.2s;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    border: none;
+    box-shadow: 0 4px 10px rgba(79, 172, 254, 0.3);
+}
+
+.btn-primary:hover {
+    box-shadow: 0 6px 15px rgba(79, 172, 254, 0.4);
+    transform: translateY(-1px);
+}
+
+.btn-outline-primary {
+    border-color: #4facfe;
+    color: #4facfe;
+}
+
+.btn-outline-primary:hover {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    border-color: transparent;
+}
+
+/* Table enhancements */
+.table {
+    border-collapse: separate;
+    border-spacing: 0;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.table thead th {
+    background: linear-gradient(to right, #f8f9fa, #ffffff);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    font-weight: 600;
+    color: #495057;
+}
+
+.table tbody tr:hover {
+    background-color: rgba(79, 172, 254, 0.05);
+}
+
+/* Portfolio table specific */
+.portfolio-table {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.position-row {
+    transition: background-color 0.2s;
+}
+
+.position-row:hover {
+    background-color: rgba(79, 172, 254, 0.08) !important;
+}
+
+/* Input enhancements */
+.form-control {
+    border-radius: 6px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    transition: all 0.2s;
+}
+
+.form-control:focus {
+    box-shadow: 0 0 0 3px rgba(79, 172, 254, 0.2);
+    border-color: #4facfe;
+}
+
+/* Upload area enhancement */
+#upload-portfolio {
+    border: 2px dashed rgba(79, 172, 254, 0.5);
+    background-color: rgba(79, 172, 254, 0.03);
+    border-radius: 8px;
+    transition: all 0.2s;
+}
+
+#upload-portfolio:hover {
+    border-color: #4facfe;
+    background-color: rgba(79, 172, 254, 0.05);
+}
+
+/* Modal enhancements */
+.modal-content {
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+}
+
+.modal-header {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    background: linear-gradient(to right, #f8f9fa, #ffffff);
+}
+
+/* Loading spinner enhancement */
+._dash-loading {
+    background-color: rgba(255, 255, 255, 0.8) !important;
+}
+
+._dash-loading-callback {
+    border-color: #4facfe !important;
+}
+
+/* Empty state enhancement */
+.empty-state {
+    background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+    border-radius: 12px;
+    padding: 40px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+    text-align: center;
+}
+
+.empty-state i {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-size: 3rem;
+    margin-bottom: 20px;
+}
+
+/* App header enhancement */
+.app-header {
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.app-header h2 {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-weight: 700;
+}
+
+/* Keyboard shortcut styling */
+kbd {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    color: white;
+    border: none;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}

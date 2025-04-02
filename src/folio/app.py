@@ -7,7 +7,7 @@ from typing import Optional, Union
 import dash
 import dash_bootstrap_components as dbc
 import pandas as pd
-from dash import ALL, Input, Output, State, dcc, html
+from dash import ALL, Input, Output, State, callback_context, dcc, html
 
 from .components.portfolio_table import create_portfolio_table
 from .components.position_details import create_position_details
@@ -188,6 +188,42 @@ def create_header() -> dbc.Card:
     )
 
 
+def create_empty_state() -> html.Div:
+    """Create the empty state with instructions"""
+    return html.Div(
+        [
+            html.H4("Welcome to Folio", className="text-center mb-3"),
+            html.P("Upload your portfolio CSV file to get started", className="text-center"),
+            html.Div(
+                [
+                    html.I(className="fas fa-upload fa-3x"),
+                ],
+                className="text-center my-4",
+            ),
+            html.P("Or try a sample portfolio to explore the features", className="text-center mt-3"),
+            dbc.Button(
+                "Load Sample Portfolio",
+                id="load-sample",
+                color="primary",
+                className="mx-auto d-block",
+            ),
+            html.Div(
+                [
+                    html.P(
+                        [
+                            "Tip: Use ",
+                            html.Kbd("Cmd+O") if sys.platform == "darwin" else html.Kbd("Ctrl+O"),
+                            " to quickly open a portfolio file",
+                        ],
+                        className="text-center text-muted small mt-4",
+                    ),
+                ]
+            ),
+        ],
+        className="empty-state py-5",
+    )
+
+
 def create_upload_section() -> dbc.Card:
     """Create the file upload section"""
     return dbc.Card(
@@ -198,6 +234,7 @@ def create_upload_section() -> dbc.Card:
                     id="upload-portfolio",
                     children=html.Div(
                         [
+                            html.I(className="fas fa-file-upload me-2"),
                             "Drag and Drop or ",
                             html.A("Select a CSV File", className="text-primary"),
                         ]
@@ -206,9 +243,6 @@ def create_upload_section() -> dbc.Card:
                         "width": "100%",
                         "height": "60px",
                         "lineHeight": "60px",
-                        "borderWidth": "1px",
-                        "borderStyle": "dashed",
-                        "borderRadius": "5px",
                         "textAlign": "center",
                         "margin": "10px 0",
                     },
@@ -216,7 +250,11 @@ def create_upload_section() -> dbc.Card:
                     accept=".csv",
                     multiple=False,
                 ),
-                html.Div(id="upload-status"),
+                dcc.Loading(
+                    id="upload-loading",
+                    type="circle",
+                    children=[html.Div(id="upload-status")],
+                ),
             ]
         ),
         className="mb-3",
@@ -299,6 +337,9 @@ def create_position_modal() -> dbc.Modal:
     )
 
 
+
+
+
 def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> dash.Dash:
     """Create and configure the Dash application"""
     logger.info("Initializing Dash application")
@@ -312,6 +353,8 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
         ],
         title="Folio",
     )
+
+    # Enhanced UI CSS is automatically loaded from the assets folder
 
     # Define custom CSS
     app.index_string = """
@@ -330,6 +373,17 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
                     transition: background-color 0.2s;
                     padding: 8px 4px;
                     border-radius: 4px;
+                }
+                kbd {
+                    display: inline-block;
+                    padding: 0.2em 0.4em;
+                    font-size: 0.85em;
+                    font-weight: 700;
+                    line-height: 1;
+                    color: #fff;
+                    background-color: #212529;
+                    border-radius: 0.2rem;
+                    box-shadow: 0 2px 0 rgba(0,0,0,0.2);
                 }
             </style>
         </head>
@@ -352,17 +406,46 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
     app.layout = dbc.Container(
         [
             dcc.Location(id="url", refresh=False),  # Add URL component
-            html.H2("Folio", className="my-3"),
+
+            html.Div(html.H2("Folio"), className="app-header my-3"),
+
             create_upload_section(),  # Always show upload section
-            create_header(),
-            create_filters(),
-            create_main_table(),
+
+            # Wrap the main content in a loading component with gradient border
+            html.Div(
+                dcc.Loading(
+                    id="main-loading",
+                    type="circle",
+                    children=[
+                        html.Div(
+                            [
+                                create_header(),
+                                create_filters(),
+                                create_main_table(),
+                            ],
+                            id="main-content",
+                        )
+                    ],
+                ),
+                className="gradient-border",
+            ),
+
             create_position_modal(),
+
+            # Empty state container (shown when no data is loaded)
+            html.Div(id="empty-state-container"),
+
+            # Add keyboard shortcut listener
+            html.Div(id="keyboard-shortcut-listener"),
+
+            # Stores
             dcc.Store(id="portfolio-data"),
             dcc.Store(id="portfolio-summary"),  # Add portfolio summary store
             dcc.Store(id="portfolio-groups"),  # Add portfolio groups store
             dcc.Store(id="selected-position"),
             dcc.Store(id="loading-output"),  # Add loading output store
+            dcc.Store(id="theme-store", storage_type="local"),  # Theme preference store
+
             dcc.Interval(
                 id="interval-component",
                 interval=5 * 60 * 1000,  # 5 minutes in milliseconds
@@ -385,6 +468,79 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
         Output("initial-trigger", "data"),
         Input("url", "pathname"),
     )
+
+    # Add keyboard shortcut for opening files
+    app.clientside_callback(
+        """
+        function(n_intervals) {
+            document.addEventListener('keydown', function(e) {
+                // CMD+O or CTRL+O
+                if ((e.metaKey || e.ctrlKey) && e.key === 'o') {
+                    e.preventDefault();
+                    document.getElementById('upload-portfolio').click();
+                    return true;
+                }
+            });
+            return true;
+        }
+        """,
+        Output("keyboard-shortcut-listener", "data"),
+        Input("interval-component", "n_intervals"),
+    )
+
+
+
+    # Show/hide empty state based on portfolio data
+    @app.callback(
+        [
+            Output("empty-state-container", "children"),
+            Output("main-content", "style"),
+        ],
+        [Input("portfolio-groups", "data")],
+    )
+    def toggle_empty_state(groups_data):
+        """Show empty state when no data is loaded"""
+        if not groups_data:
+            # No data, show empty state and hide main content
+            return create_empty_state(), {"display": "none"}
+        else:
+            # Data loaded, hide empty state and show main content
+            return None, {"display": "block"}
+
+    # Handle sample portfolio loading
+    @app.callback(
+        Output("upload-portfolio", "contents"),
+        Input("load-sample", "n_clicks"),
+        prevent_initial_call=True,
+    )
+    def load_sample_portfolio(n_clicks):
+        """Load a sample portfolio when the button is clicked"""
+        logger.info(f"Load sample portfolio button clicked: {n_clicks}")
+        if n_clicks:
+            try:
+                # Path to sample portfolio in assets directory
+                sample_path = Path(__file__).parent / "assets" / "sample-portfolio.csv"
+                logger.info(f"Looking for sample portfolio at: {sample_path}")
+
+                if not sample_path.exists():
+                    logger.warning(f"Sample portfolio not found at {sample_path}")
+                    return None
+
+                logger.info(f"Sample portfolio found at: {sample_path}")
+
+                # Read the sample portfolio file
+                with open(sample_path, "rb") as f:
+                    content = f.read()
+
+                # Encode the content as base64 for the upload component
+                content_type = "text/csv"
+                content_string = base64.b64encode(content).decode("utf-8")
+
+                return f"data:{content_type};base64,{content_string}"
+            except Exception as e:
+                logger.error(f"Error loading sample portfolio: {e}", exc_info=True)
+                return None
+        return None
 
     @app.callback(
         [
@@ -429,7 +585,13 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
                 )
             elif app.portfolio_file:
                 # Use default portfolio file
-                df = pd.read_csv(app.portfolio_file)
+                try:
+                    # Try to read the CSV file with standard settings
+                    df = pd.read_csv(app.portfolio_file)
+                except pd.errors.ParserError as e:
+                    logger.warning(f"Parser error with standard settings: {e}")
+                    # Try again with more flexible quoting to handle commas in option symbols
+                    df = pd.read_csv(app.portfolio_file, quoting=3)  # QUOTE_NONE
                 logger.info(f"Successfully read {len(df)} rows from portfolio file")
                 status = html.Div(
                     "Using default portfolio file", className="text-muted"

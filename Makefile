@@ -124,13 +124,13 @@ lint:
 .PHONY: portfolio folio stop-folio port
 
 portfolio:
-	@echo "Starting portfolio dashboard with default portfolio.csv..."
+	@echo "Starting portfolio dashboard with sample portfolio.csv..."
 	@if [ ! -d "$(VENV_DIR)" ]; then \
 		echo "Virtual environment not found. Please run 'make env' first."; \
 		exit 1; \
 	fi
 	@source $(VENV_DIR)/bin/activate && \
-	PYTHONPATH=. python3 -m folio --port 8051 --portfolio src/lab/portfolio.csv
+	PYTHONPATH=. python3 -m folio --port 8051 --portfolio src/folio/assets/sample-portfolio.csv
 
 port:
 	@echo "Running portfolio analysis..."
@@ -139,7 +139,7 @@ port:
 		exit 1; \
 	fi
 	@source $(VENV_DIR)/bin/activate && \
-	PYTHONPATH=. python3 src/lab/portfolio.py "$(if $(csv),$(csv),src/lab/portfolio.csv)"
+	PYTHONPATH=. python3 src/lab/portfolio.py "$(if $(csv),$(csv),src/folio/assets/sample-portfolio.csv)"
 
 folio:
 	@echo "Starting portfolio dashboard..."
@@ -180,4 +180,4 @@ test:
 	@echo "Test log saved to: $(LOGS_DIR)/test_$(TIMESTAMP).log"
 
 %:
-	@: 
+	@:

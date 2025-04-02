@@ -1,13 +1,15 @@
 # List of executive TODO tasks
-- [ ] yfinance integration [P0]
 - [ ] Loading UI
 - [ ] UI: user friendly instructions. Hide portfolio on upload
+- [ ] UI: slick interface for professionals. dark mode default
+- [ ] CMD+O or CTRL+O hot key for opening a portfolio csv
 - [ ] Sector analysis
 - [ ] Portfolio graphs - brainstorm the most useful ones
 - [ ] Better theme for the UI, maybe dark-mode?
 - [ ] Poetry instead of Makefile?
  --- below this line is completed tasks ---
-- [X] Hello world
+- [x] yfinance integration [P0]
+
 
 ---
 ## Archive for the ML model
