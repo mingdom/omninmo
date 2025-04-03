@@ -2,7 +2,6 @@
 
 import importlib
 
-import pandas as pd
 import pytest
 
 
@@ -101,44 +100,4 @@ class TestModuleStructure:
         except AttributeError as e:
             pytest.fail(f"Failed to access attribute in app module: {str(e)}")
 
-    def test_portfolio_loading(self):
-        """Test that portfolio loading works correctly with utils module."""
-        from src.folio import utils
 
-        # Create a simple test dataframe with all required columns
-        df = pd.DataFrame({
-            "Symbol": ["AAPL", "SPAXX"],
-            "Quantity": [100, 1],
-            "Last Price": [150, 1],
-            "Current Value": [15000, 5000],
-            "Description": ["APPLE INC", "FIDELITY GOVERNMENT CASH RESERVES"],
-            "Percent Of Account": [0.75, 0.25],
-            "Type": ["Margin", "Cash"]
-        })
-
-        # Skip the actual test if we're in CI or don't want to make network calls
-        # This is a common pattern for tests that might make external API calls
-        pytest.skip("Skipping portfolio loading test to avoid network calls")
-
-        # The following code would be used in a real test environment
-        # where we can mock the network calls
-        """
-        try:
-            groups, summary, cash_like = utils.process_portfolio_data(df)
-
-            # Verify basic results
-            assert len(groups) >= 1
-            assert summary is not None
-            assert len(cash_like) >= 1
-
-            # Verify that SPAXX was detected as cash-like
-            cash_tickers = [pos.ticker for pos in cash_like]
-            assert "SPAXX" in cash_tickers
-
-            # Verify that AAPL was processed as a stock
-            stock_tickers = [group.ticker for group in groups]
-            assert "AAPL" in stock_tickers
-
-        except Exception as e:
-            pytest.fail(f"Failed to process portfolio data: {str(e)}")
-        """

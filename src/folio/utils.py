@@ -49,9 +49,9 @@ from typing import Optional
 import pandas as pd
 import yaml
 
-from src.data_fetcher_factory import create_data_fetcher
 from src.lab.option_utils import (calculate_option_delta,
                                   parse_option_description)
+from src.stockdata import create_data_fetcher
 
 from .data_model import (ExposureBreakdown, PortfolioGroup, PortfolioSummary,
                          StockPosition, create_portfolio_group)

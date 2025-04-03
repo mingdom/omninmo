@@ -12,7 +12,7 @@ import time
 import pandas as pd
 
 import yfinance as yf
-from src.data_fetcher_interface import DataFetcherInterface
+from src.stockdata import DataFetcherInterface
 
 logger = logging.getLogger(__name__)
 

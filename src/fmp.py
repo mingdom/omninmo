@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 import requests
 
-from src.data_fetcher_interface import DataFetcherInterface
+from src.stockdata import DataFetcherInterface
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -30,7 +30,7 @@ class DataFetcher(DataFetcherInterface):
         """Initialize with cache directory"""
         self.cache_dir = cache_dir
         self.api_key = os.environ.get("FMP_API_KEY")
-        
+
         # If not in environment, try to get from config
         if not self.api_key:
             try:
@@ -38,9 +38,9 @@ class DataFetcher(DataFetcherInterface):
                 self.api_key = config.get("data.fmp.api_key")
             except ImportError:
                 logger.warning("Could not import config from src.v2.config, will rely on environment variable")
-        
+
         self.cache_ttl = 86400  # Default to 1 day
-        
+
         # Try to get cache TTL from config if available
         try:
             from src.v2.config import config
