@@ -100,7 +100,8 @@
 }
 
 /* Message bubbles */
-.ai-message, .user-message {
+.ai-message,
+.user-message {
     max-width: 80%;
     padding: 10px 15px;
     border-radius: 15px;
@@ -124,9 +125,11 @@
     0% {
         box-shadow: 0 0 0 0 rgba(79, 172, 254, 0.7);
     }
+
     70% {
         box-shadow: 0 0 0 10px rgba(79, 172, 254, 0);
     }
+
     100% {
         box-shadow: 0 0 0 0 rgba(79, 172, 254, 0);
     }
@@ -134,4 +137,32 @@
 
 .pulse {
     animation: pulse 2s infinite;
+}
+
+/* Chat loading animation */
+.ai-message.loading {
+    position: relative;
+    min-height: 24px;
+}
+
+.ai-message.loading::after {
+    content: "...";
+    animation: loading-dots 1.5s infinite;
+}
+
+@keyframes loading-dots {
+
+    0%,
+    20% {
+        content: ".";
+    }
+
+    40% {
+        content: "..";
+    }
+
+    60%,
+    100% {
+        content: "...";
+    }
 }

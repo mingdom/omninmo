@@ -4,7 +4,7 @@ import dash_bootstrap_components as dbc
 from dash import html
 
 from ..data_model import PortfolioGroup
-from ..utils.formatting import format_beta, format_currency
+from ..utils import format_beta, format_currency
 
 
 def get_group_ticker(group: PortfolioGroup) -> str:

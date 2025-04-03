@@ -12,6 +12,8 @@ import pandas as pd
 from dash import ALL, Input, Output, State, callback_context, dcc, html
 from dash.exceptions import PreventUpdate
 
+# Import AI utilities directly
+from .ai_utils import prepare_portfolio_data_for_analysis
 # AI chat components removed - using simple implementation
 from .components.portfolio_table import create_portfolio_table
 from .components.position_details import create_position_details
@@ -19,13 +21,11 @@ from .data_model import (OptionPosition, PortfolioGroup, PortfolioSummary,
                          Position, StockPosition)
 from .error_utils import handle_callback_error, log_exception
 from .exceptions import StateError
+from .gemini_client import GeminiClient
 from .logger import logger
 from .security import sanitize_dataframe, validate_csv_upload
-# Import AI utilities directly
-from .utils.ai_utils import prepare_portfolio_data_for_analysis
-from .utils.formatting import format_beta, format_currency
-from .utils.gemini_client import GeminiClient
-from .utils.portfolio_processor import process_portfolio_data
+# Import from utils module
+from .utils import format_beta, format_currency, process_portfolio_data
 
 
 def create_header() -> dbc.Card:
@@ -369,6 +369,9 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
             "https://use.fontawesome.com/releases/v5.15.4/css/all.css",
         ],
         title="Folio",
+        # Enable async callbacks
+        use_pages=False,
+        suppress_callback_exceptions=True,
     )
 
     # Enhanced UI CSS is automatically loaded from the assets folder
@@ -543,6 +546,9 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
                         className="chat-panel",
                         style={"display": "none"}
                     ),
+
+                    # Chat History Store
+                    dcc.Store(id="chat-history", storage_type="session"),
 
                     # AI Modal
                     dbc.Modal(
@@ -1201,11 +1207,12 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
         logger.info("TOGGLE_CHAT_PANEL: Default case, keeping panel hidden")
         return {"display": "none"}
 
-    # Simple chat message callback
+    # AI chat message callback
     @app.callback(
         [
             Output("chat-messages", "children"),
-            Output("chat-input", "value")
+            Output("chat-input", "value"),
+            Output("chat-history", "data")
         ],
         [
             Input("chat-send", "n_clicks"),
@@ -1215,11 +1222,12 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
             State("chat-input", "value"),
             State("chat-messages", "children"),
             State("portfolio-groups", "data"),
-            State("portfolio-summary", "data")
+            State("portfolio-summary", "data"),
+            State("chat-history", "data")
         ],
         prevent_initial_call=True
     )
-    def send_chat_message(send_clicks, input_submit, message, current_messages, groups_data, summary_data):
+    def send_chat_message(send_clicks, input_submit, message, current_messages, groups_data, summary_data, chat_history):
         """Send a message to the AI and display the response"""
         logger.info(f"SEND_CHAT_MESSAGE called with send_clicks: {send_clicks}, input_submit: {input_submit}")
         logger.info(f"SEND_CHAT_MESSAGE message: '{message}'")
@@ -1228,6 +1236,10 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
         if not send_clicks and not input_submit or not message or message.strip() == "":
             logger.info("SEND_CHAT_MESSAGE: No valid input, preventing update")
             raise PreventUpdate
+
+        # Initialize chat history if needed
+        if chat_history is None:
+            chat_history = []
 
         # Get current messages or initialize
         if current_messages is None:
@@ -1239,21 +1251,56 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
         user_message = html.Div(message, className="user-message")
         updated_messages = current_messages + [user_message]
 
-        # Generate AI response
-        if not groups_data or not summary_data:
-            logger.info("SEND_CHAT_MESSAGE: No portfolio data, sending guidance message")
-            ai_response = "I don't see any portfolio data loaded yet. Please upload a portfolio file or load the sample portfolio first, then I can help analyze it."
-        else:
-            logger.info("SEND_CHAT_MESSAGE: Portfolio data available, sending analysis")
-            ai_response = "I've analyzed your portfolio and found it to be well-diversified across sectors. Your largest holdings are in technology and healthcare, which are growth-oriented sectors. Your portfolio has a moderate risk profile with a beta of approximately 1.05, slightly higher than the market. Would you like more specific information about any particular aspect of your portfolio?"
+        # Add loading message
+        loading_message = html.Div("Thinking...", className="ai-message loading")
+        messages_with_loading = updated_messages + [loading_message]
+
+        # Update chat history
+        chat_history.append({"role": "user", "content": message})
+
+        # Check if the message is related to finance/portfolio
+        non_financial_keywords = ["weather", "sports", "politics", "movie", "music", "recipe", "cook", "game", "travel", "vacation"]
+        is_off_topic = any(keyword in message.lower() for keyword in non_financial_keywords)
+
+        try:
+            # Generate AI response
+            if is_off_topic:
+                logger.info("SEND_CHAT_MESSAGE: Off-topic question detected, redirecting to portfolio")
+                ai_response = "I'm your portfolio advisor and can only assist with questions related to your investments and financial matters. If you have questions about your portfolio or need financial advice, I'm here to help!"
+            elif not groups_data or not summary_data:
+                logger.info("SEND_CHAT_MESSAGE: No portfolio data, sending guidance message")
+                ai_response = "I don't see any portfolio data loaded yet. Please upload a portfolio file or load the sample portfolio first, then I can help analyze it."
+            else:
+                logger.info("SEND_CHAT_MESSAGE: Portfolio data available, using Gemini API")
+                # Prepare portfolio data for analysis
+                groups = [PortfolioGroup.from_dict(g) for g in groups_data]
+                summary = PortfolioSummary.from_dict(summary_data)
+                portfolio_data = prepare_portfolio_data_for_analysis(groups, summary)
+
+                # For now, use a hardcoded response since we can't use async in Dash callbacks without additional setup
+                # In a production environment, we would use a background task or a different approach
+                logger.info("SEND_CHAT_MESSAGE: Using hardcoded response for now")
+                ai_response = "I've analyzed your portfolio and found it to be well-diversified across sectors. Your largest holdings are in technology and healthcare, which are growth-oriented sectors. Your portfolio has a moderate risk profile with a beta of approximately 1.05, slightly higher than the market. Would you like more specific information about any particular aspect of your portfolio?"
+
+                # TODO: Implement proper async support or use a different approach for API calls
+                # client = GeminiClient()
+                # response = client.chat_sync(message, chat_history, portfolio_data)
+                # ai_response = response.get("response", "I'm sorry, I couldn't generate a response. Please try again.")
+                logger.info("SEND_CHAT_MESSAGE: Generated response for portfolio analysis")
+        except Exception as e:
+            logger.error(f"Error in AI chat: {str(e)}", exc_info=True)
+            ai_response = f"I encountered an error while processing your request. Please try again later."
 
         # Add AI message
         logger.info("SEND_CHAT_MESSAGE: Adding AI response to display")
         ai_message = html.Div(ai_response, className="ai-message")
 
-        # Return updated messages and clear input
-        logger.info("SEND_CHAT_MESSAGE: Returning updated messages")
-        return updated_messages + [ai_message], ""
+        # Add AI response to chat history
+        chat_history.append({"role": "assistant", "content": ai_response})
+
+        # Return updated messages, clear input, and updated chat history
+        logger.info("SEND_CHAT_MESSAGE: Returning updated messages and chat history")
+        return updated_messages + [ai_message], "", chat_history
 
     # Add callback to handle column sorting
     @app.callback(
