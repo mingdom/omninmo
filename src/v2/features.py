@@ -565,7 +565,7 @@ def analyze_volume_trend(data):
 
 if __name__ == "__main__":
     # Simple test
-    from src.v2.data_fetcher import DataFetcher
+    from src.fmp import DataFetcher
 
     fetcher = DataFetcher()
     data = fetcher.fetch_data("AAPL", period="1y")

@@ -10,15 +10,12 @@ from datetime import datetime
 
 import pandas as pd
 
+from src.fmp import DataFetcher
 from src.v2.config import config
-from src.v2.data_fetcher import DataFetcher
 from src.v2.features import Features
 from src.v2.predictor import Predictor
-from src.v2.training_summary import (
-    generate_training_summary,
-    log_mlflow_metrics,
-    save_training_summary,
-)
+from src.v2.training_summary import (generate_training_summary,
+                                     log_mlflow_metrics, save_training_summary)
 
 # Setup logging
 logging.basicConfig(

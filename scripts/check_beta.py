@@ -44,9 +44,9 @@ if __name__ == "__main__":
     project_root = os.path.abspath(os.path.join(script_dir, ".."))
     sys.path.insert(0, project_root)
 
+from src.fmp import DataFetcher
 from src.folio.logger import logger  # Use the same logger if desired
 from src.folio.utils import is_cash_or_short_term
-from src.v2.data_fetcher import DataFetcher
 
 
 def calculate_raw_beta(

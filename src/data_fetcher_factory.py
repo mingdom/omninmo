@@ -42,7 +42,7 @@ def create_data_fetcher(source="yfinance", cache_dir=None):
         logger.info(f"Creating YFinance data fetcher with cache dir: {cache_dir}")
         return YFinanceDataFetcher(cache_dir=cache_dir)
     elif source == "fmp":
-        from src.v2.data_fetcher import DataFetcher
+        from src.fmp import DataFetcher
         logger.info(f"Creating FMP data fetcher with cache dir: {cache_dir}")
         return DataFetcher(cache_dir=cache_dir)
     else:

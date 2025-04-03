@@ -1,5 +1,5 @@
 """
-Tests for the DataFetcher class in src/v2/data_fetcher.py
+Tests for the DataFetcher class in src/fmp.py
 
 These tests verify the core functionality of the DataFetcher class, including:
 1. Initialization and configuration
@@ -23,7 +23,7 @@ import requests
 # Add the project root to the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from src.v2.data_fetcher import DataFetcher
+from src.fmp import DataFetcher
 # Import mock data utilities
 from tests.test_data.mock_stock_data import (get_mock_raw_data, get_real_beta,
                                              get_real_data)

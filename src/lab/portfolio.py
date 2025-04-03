@@ -5,11 +5,9 @@ import sys
 
 import pandas as pd
 
-from src.lab.option_utils import (
-    calculate_option_delta,
-    parse_option_description,
-)
-from src.v2.data_fetcher import DataFetcher
+from src.fmp import DataFetcher
+from src.lab.option_utils import (calculate_option_delta,
+                                  parse_option_description)
 
 
 def parse_args():

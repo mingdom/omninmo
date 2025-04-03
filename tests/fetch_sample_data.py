@@ -15,7 +15,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 import pandas as pd
 
-from src.v2.data_fetcher import DataFetcher
+from src.fmp import DataFetcher
 
 # Create output directory
 OUTPUT_DIR = "tests/test_data"
