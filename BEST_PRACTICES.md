@@ -66,7 +66,18 @@ Follow consistent development practices to maintain code quality and developer p
   - **Conventional Format**: Follow the conventional commits format with a type prefix
   - **Message Structure**: Use a concise title (50 chars max) followed by a blank line and then a detailed body
   - **Title Format**: `<type>: <concise description in imperative mood>`
-    - **Types**: feat (new feature), fix (bug fix), docs (documentation), style (formatting), refactor, test, chore (maintenance)
+    - **Types in Priority Order**: Always use the highest impact prefix when multiple types apply
+      1. `feat`: New features or significant enhancements (highest priority)
+      2. `fix`: Bug fixes or correcting errors
+      3. `security`: Security-related changes
+      4. `perf`: Performance improvements
+      5. `refactor`: Code restructuring without changing functionality
+      6. `test`: Adding or modifying tests
+      7. `docs`: Documentation updates only
+      8. `style`: Formatting, white-space, etc. (no code change)
+      9. `build`: Build system or external dependency changes
+      10. `ci`: CI configuration changes
+      11. `chore`: Maintenance tasks, no production code change (lowest priority)
     - **Examples**:
       - `feat: add user authentication system`
       - `fix: resolve database connection timeout issue`
