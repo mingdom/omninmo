@@ -47,7 +47,7 @@ def generate_price_series(base_price=100.0, volatility=0.01, days=252, seed=42):
     data = []
     for i, date in enumerate(dates):
         price = prices[i]
-        daily_vol = volatility * price
+        volatility * price
 
         # Generate realistic OHLC based on the close price
         open_price = price * (1 + np.random.normal(0, 0.003))
@@ -260,7 +260,7 @@ def get_real_data(ticker, period="1y"):
         return load_real_data(ticker, period)
     except Exception as e:
         print(f"Warning: Failed to load real data for {ticker}: {e}")
-        print(f"Falling back to synthetic data")
+        print("Falling back to synthetic data")
         return get_mock_data(ticker, period)
 
 
@@ -281,7 +281,7 @@ def get_mock_raw_data(ticker, period="1y"):
         raise ValueError(f"No sample file found for {ticker} with period {period}")
 
     # Load sample data
-    with open(sample_file, 'r') as f:
+    with open(sample_file) as f:
         sample_data = json.load(f)
 
     # Get full data
@@ -335,7 +335,7 @@ def get_real_beta(ticker, market_index="SPY"):
     if not os.path.exists(beta_file):
         raise ValueError("Beta values file not found")
 
-    with open(beta_file, 'r') as f:
+    with open(beta_file) as f:
         betas = json.load(f)
 
     if ticker not in betas:
@@ -388,7 +388,7 @@ if __name__ == "__main__":
     print("\n=== MOCK RAW DATA (FMP API FORMAT) ===")
     try:
         raw_data = get_mock_raw_data("AAPL", "1y")
-        print(f"\nSample of AAPL raw data (first 2 records):")
+        print("\nSample of AAPL raw data (first 2 records):")
         for i, record in enumerate(raw_data["historical"][:2]):
             print(f"\nRecord {i+1}:")
             for key, value in record.items():

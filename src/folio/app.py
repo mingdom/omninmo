@@ -4,26 +4,32 @@ import io
 import os
 import sys
 from pathlib import Path
-from typing import Optional, Union
 
 import dash
 import dash_bootstrap_components as dbc
 import dash_chat
 import pandas as pd
-from dash import ALL, Input, Output, State, callback_context, dcc, html
+from dash import ALL, Input, Output, State, dcc, html
 from dash.exceptions import PreventUpdate
 
 # Import portfolio processing functions
 # Import utility functions
 from . import portfolio, utils
+
 # Import AI utilities directly
 from .ai_utils import prepare_portfolio_data_for_analysis
+
 # AI chat components removed - using simple implementation
 from .components.portfolio_table import create_portfolio_table
 from .components.position_details import create_position_details
-from .data_model import (OptionPosition, PortfolioGroup, PortfolioSummary,
-                         Position, StockPosition)
-from .error_utils import handle_callback_error, log_exception
+from .data_model import (
+    OptionPosition,
+    PortfolioGroup,
+    PortfolioSummary,
+    Position,
+    StockPosition,
+)
+from .error_utils import handle_callback_error
 from .exceptions import StateError
 from .gemini_client import GeminiClient
 from .logger import logger
@@ -359,7 +365,7 @@ def create_position_modal() -> dbc.Modal:
 
 
 
-def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> dash.Dash:
+def create_app(portfolio_file: str | None = None, debug: bool = False) -> dash.Dash:
     """Create and configure the Dash application"""
     logger.info("Initializing Dash application")
 
@@ -674,7 +680,7 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
 
                 # Read the sample portfolio file
                 with open(sample_path, "rb") as f:
-                    content = f.read()
+                    f.read()
 
                 # Validate the sample file content
                 # We'll sanitize it during the normal processing flow
@@ -742,7 +748,7 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
                     )
                 except ValueError as e:
                     logger.error(f"CSV validation error: {e}")
-                    error_msg = f"Error loading file: {str(e)}"
+                    error_msg = f"Error loading file: {e!s}"
                     error_div = html.Div(error_msg, className="text-danger")
                     return [], {}, [], error_msg, error_div, None
             elif app.portfolio_file:
@@ -1220,7 +1226,7 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
 
         # Add user message to messages list
         logger.info("SEND_CHAT_MESSAGE: Adding user message to display")
-        updated_messages = current_messages + [new_message]
+        updated_messages = [*current_messages, new_message]
 
         # Update chat history
         chat_history.append({"role": "user", "content": new_message["content"]})
@@ -1263,11 +1269,11 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
                         ai_response = response.get("response", "I'm sorry, I couldn't generate a response. Please try again.")
                         logger.info(f"SEND_CHAT_MESSAGE: Received response from Gemini API: {len(ai_response)} characters")
                 except Exception as e:
-                    logger.error(f"SEND_CHAT_MESSAGE: Error calling Gemini API: {str(e)}", exc_info=True)
-                    ai_response = f"I encountered an error while processing your request: {str(e)}. Please try again later."
+                    logger.error(f"SEND_CHAT_MESSAGE: Error calling Gemini API: {e!s}", exc_info=True)
+                    ai_response = f"I encountered an error while processing your request: {e!s}. Please try again later."
         except Exception as e:
-            logger.error(f"Error in AI chat: {str(e)}", exc_info=True)
-            ai_response = f"I encountered an error while processing your request. Please try again later."
+            logger.error(f"Error in AI chat: {e!s}", exc_info=True)
+            ai_response = "I encountered an error while processing your request. Please try again later."
 
         # Add AI message
         logger.info("SEND_CHAT_MESSAGE: Adding AI response to display")
@@ -1281,7 +1287,7 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
 
         # Return updated messages with AI response
         logger.info("SEND_CHAT_MESSAGE: Returning updated messages")
-        return updated_messages + [ai_message]
+        return [*updated_messages, ai_message]
 
     # Add callback to handle column sorting
     @app.callback(
@@ -1369,14 +1375,14 @@ def main():
     is_huggingface = os.environ.get('HF_SPACE') == '1' or os.environ.get('SPACE_ID') is not None
 
     if is_huggingface:
-        logger.info(f"\n\n🚀 Folio is running on Hugging Face Spaces!")
-        logger.info(f"📊 Access the dashboard at the URL provided by Hugging Face\n")
+        logger.info("\n\n🚀 Folio is running on Hugging Face Spaces!")
+        logger.info("📊 Access the dashboard at the URL provided by Hugging Face\n")
     elif is_docker and args.host == '0.0.0.0':
-        logger.info(f"\n\n🚀 Folio is running inside a Docker container!")
+        logger.info("\n\n🚀 Folio is running inside a Docker container!")
         logger.info(f"📊 Access the dashboard at: http://localhost:{args.port}")
         logger.info(f"💻 (The app is bound to {args.host}:{args.port} inside the container)\n")
     else:
-        logger.info(f"\n\n🚀 Folio is running!")
+        logger.info("\n\n🚀 Folio is running!")
         logger.info(f"📊 Access the dashboard at: http://localhost:{args.port}\n")
 
     app.run_server(debug=args.debug, port=args.port, host=args.host)

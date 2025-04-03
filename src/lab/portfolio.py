@@ -6,8 +6,7 @@ import sys
 import pandas as pd
 
 from src.fmp import DataFetcher
-from src.lab.option_utils import (calculate_option_delta,
-                                  parse_option_description)
+from src.lab.option_utils import calculate_option_delta, parse_option_description
 
 
 def parse_args():
@@ -22,7 +21,7 @@ def parse_args():
 # --- Helper Functions ---
 def clean_currency(value):
     """Removes currency symbols, commas, and handles parentheses for negatives."""
-    if isinstance(value, (int, float)):
+    if isinstance(value, int | float):
         return value
     if not isinstance(value, str):
         return 0.0

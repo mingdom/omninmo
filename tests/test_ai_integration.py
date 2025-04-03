@@ -1,14 +1,13 @@
 """Tests for AI integration features."""
 
-import pytest
+from src.folio.ai_utils import prepare_portfolio_data_for_analysis
 from src.folio.data_model import (
-    StockPosition,
+    ExposureBreakdown,
     OptionPosition,
     PortfolioGroup,
-    ExposureBreakdown,
-    PortfolioSummary
+    PortfolioSummary,
+    StockPosition,
 )
-from src.folio.ai_utils import prepare_portfolio_data_for_analysis
 
 
 class TestAIIntegration:
@@ -24,7 +23,7 @@ class TestAIIntegration:
             beta=1.2,
             beta_adjusted_exposure=18000.0
         )
-        
+
         option_position = OptionPosition(
             ticker="AAPL",
             position_type="option",
@@ -43,7 +42,7 @@ class TestAIIntegration:
             notional_value=15000.0,
             underlying_beta=1.2
         )
-        
+
         # Create portfolio group
         portfolio_group = PortfolioGroup(
             ticker="AAPL",
@@ -56,7 +55,7 @@ class TestAIIntegration:
             total_delta_exposure=1050.0,
             options_delta_exposure=1050.0
         )
-        
+
         # Create test exposure breakdowns
         exposure = ExposureBreakdown(
             stock_value=15000.0,
@@ -69,7 +68,7 @@ class TestAIIntegration:
             formula="Stock + Options",
             components={"stock": 15000.0, "options": 1050.0}
         )
-        
+
         # Create portfolio summary
         summary = PortfolioSummary(
             total_value_net=16500.0,
@@ -84,22 +83,22 @@ class TestAIIntegration:
             cash_like_value=0.0,
             cash_like_count=0
         )
-        
+
         # Test prepare_portfolio_data_for_analysis
         ai_data = prepare_portfolio_data_for_analysis([portfolio_group], summary)
-        
+
         # Verify the structure of the prepared data
         assert "positions" in ai_data
         assert "summary" in ai_data
         assert len(ai_data["positions"]) == 2  # Stock and option position
-        
+
         # Verify stock position data
         stock_data = next((p for p in ai_data["positions"] if p["position_type"] == "stock"), None)
         assert stock_data is not None
         assert stock_data["ticker"] == "AAPL"
         assert stock_data["market_value"] == 15000.0
         assert stock_data["beta"] == 1.2
-        
+
         # Verify option position data
         option_data = next((p for p in ai_data["positions"] if p["position_type"] == "option"), None)
         assert option_data is not None
@@ -107,7 +106,7 @@ class TestAIIntegration:
         assert option_data["market_value"] == 1500.0
         assert option_data["option_type"] == "CALL"
         assert option_data["strike"] == 150.0
-        
+
         # Verify summary data
         assert ai_data["summary"]["total_value_net"] == 16500.0
         assert ai_data["summary"]["portfolio_beta"] == 1.2
@@ -124,7 +123,7 @@ class TestAIIntegration:
             beta=1.2,
             beta_adjusted_exposure=18000.0
         )
-        
+
         option_position = OptionPosition(
             ticker="AAPL",
             position_type="option",
@@ -143,7 +142,7 @@ class TestAIIntegration:
             notional_value=15000.0,
             underlying_beta=1.2
         )
-        
+
         # Create portfolio group
         portfolio_group = PortfolioGroup(
             ticker="AAPL",
@@ -156,7 +155,7 @@ class TestAIIntegration:
             total_delta_exposure=1050.0,
             options_delta_exposure=1050.0
         )
-        
+
         # Create test exposure breakdowns
         exposure = ExposureBreakdown(
             stock_value=15000.0,
@@ -169,7 +168,7 @@ class TestAIIntegration:
             formula="Stock + Options",
             components={"stock": 15000.0, "options": 1050.0}
         )
-        
+
         # Create portfolio summary
         summary = PortfolioSummary(
             total_value_net=16500.0,
@@ -184,22 +183,22 @@ class TestAIIntegration:
             cash_like_value=0.0,
             cash_like_count=0
         )
-        
+
         # Convert to dictionary format as would be stored in Dash
         groups_data = [portfolio_group.to_dict()]
         summary_data = summary.to_dict()
-        
+
         # Test that PortfolioGroup.from_dict works with this data
         restored_groups = [PortfolioGroup.from_dict(g) for g in groups_data]
         assert len(restored_groups) == 1
         assert restored_groups[0].ticker == "AAPL"
         assert restored_groups[0].total_value == 16500.0
-        
+
         # Test that PortfolioSummary.from_dict works with this data
         restored_summary = PortfolioSummary.from_dict(summary_data)
         assert restored_summary.total_value_net == 16500.0
         assert restored_summary.portfolio_beta == 1.2
-        
+
         # Test prepare_portfolio_data_for_analysis with the restored objects
         ai_data = prepare_portfolio_data_for_analysis(restored_groups, restored_summary)
         assert "positions" in ai_data

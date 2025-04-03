@@ -1,7 +1,7 @@
 """AI analysis component for portfolio dashboard."""
 
 import logging
-from typing import Any, Dict
+from typing import Any
 
 import dash_bootstrap_components as dbc
 from dash import html
@@ -46,7 +46,7 @@ def create_ai_analysis_section() -> html.Div:
         className="mb-4"
     )
 
-def create_analysis_content(analysis: Dict[str, Any]) -> html.Div:
+def create_analysis_content(analysis: dict[str, Any]) -> html.Div:
     """Create formatted content from analysis results."""
     if analysis.get("error"):
         return html.Div(analysis.get("message"), className="text-danger")

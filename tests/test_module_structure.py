@@ -10,8 +10,8 @@ class TestModuleStructure:
 
     def test_utils_module_functions(self):
         """Test that utils module functions are correctly imported and working."""
-        # Import the utils module
-        from src.folio import portfolio, utils
+        # Import the modules
+        from src.folio import cash_detection, portfolio, utils
 
         # Verify that key functions exist in utils.py
         assert hasattr(utils, "format_beta")
@@ -21,8 +21,10 @@ class TestModuleStructure:
 
         # Verify that key functions exist in portfolio.py
         assert hasattr(portfolio, "process_portfolio_data")
-        assert hasattr(portfolio, "is_cash_or_short_term")
-        assert hasattr(portfolio, "is_likely_money_market")
+
+        # Verify that key functions exist in cash_detection.py
+        assert hasattr(cash_detection, "is_cash_or_short_term")
+        assert hasattr(cash_detection, "is_likely_money_market")
 
         # Test that the formatting functions work correctly
         assert utils.format_beta(1.2) == "1.20β"
@@ -30,9 +32,9 @@ class TestModuleStructure:
         assert utils.format_percentage(0.25) == "25.0%"
 
         # Test cash detection functions
-        assert portfolio.is_cash_or_short_term("SPAXX")
-        assert portfolio.is_cash_or_short_term("FDRXX")
-        assert not portfolio.is_cash_or_short_term("AAPL")
+        assert cash_detection.is_cash_or_short_term("SPAXX")
+        assert cash_detection.is_cash_or_short_term("FDRXX")
+        assert not cash_detection.is_cash_or_short_term("AAPL")
 
         # Test beta function with a known ticker
         # Note: This might need to be mocked in a real test

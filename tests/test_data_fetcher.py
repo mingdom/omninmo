@@ -24,9 +24,13 @@ import requests
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from src.fmp import DataFetcher
+
 # Import mock data utilities
-from tests.test_data.mock_stock_data import (get_mock_raw_data, get_real_beta,
-                                             get_real_data)
+from tests.test_data.mock_stock_data import (
+    get_mock_raw_data,
+    get_real_beta,
+    get_real_data,
+)
 
 
 @pytest.fixture
@@ -196,7 +200,7 @@ class TestDataFetching:
 
             with patch("requests.get", return_value=mock_response) as mock_get:
                 fetcher = DataFetcher(cache_dir=temp_cache_dir)
-                df = fetcher.fetch_data("AAPL", period="1y")
+                fetcher.fetch_data("AAPL", period="1y")
 
                 # API should be called
                 mock_get.assert_called_once()

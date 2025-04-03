@@ -12,8 +12,11 @@ import pandas as pd
 
 from src.fmp import DataFetcher
 from src.v2.config import config
-from src.v2.exceptions import (ConfigurationError, FeatureGenerationError,
-                               InsufficientDataError)
+from src.v2.exceptions import (
+    ConfigurationError,
+    FeatureGenerationError,
+    InsufficientDataError,
+)
 from src.v2.features import Features
 from src.v2.predictor import Predictor
 

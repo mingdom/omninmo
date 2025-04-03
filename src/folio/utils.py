@@ -212,7 +212,7 @@ def clean_currency_value(value_str: str) -> float:
         TypeError: If input is not a string or string-convertible type
         ValueError: If the string cannot be converted to a float after cleaning
     """
-    if not isinstance(value_str, (str, int, float)):
+    if not isinstance(value_str, str | int | float):
         raise TypeError(f"Expected string or numeric input, got {type(value_str)}")
 
     value_str = str(value_str)

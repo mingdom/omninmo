@@ -13,21 +13,21 @@ The tests use mocking to avoid actual API calls and to provide consistent test d
 import os
 import sys
 import time
-from datetime import datetime, timedelta
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
 
-import yfinance as yf
-
 # Add the project root to the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from src.yfinance import YFinanceDataFetcher
+
 # Import mock data utilities
-from tests.test_data.mock_stock_data import (get_mock_raw_data, get_real_beta,
-                                             get_real_data)
+from tests.test_data.mock_stock_data import (
+    get_real_beta,
+    get_real_data,
+)
 
 
 @pytest.fixture
@@ -158,7 +158,7 @@ class TestDataFetching:
 
         with patch("yfinance.Ticker", return_value=mock_ticker) as mock_yf:
             fetcher = YFinanceDataFetcher(cache_dir=temp_cache_dir)
-            df = fetcher.fetch_data("AAPL", period="1y")
+            fetcher.fetch_data("AAPL", period="1y")
 
             # API should be called
             mock_yf.assert_called_once()

@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Literal, Optional, TypedDict, Union
+from typing import Literal, TypedDict
 
 
 class PositionDict(TypedDict):
@@ -56,7 +56,7 @@ class PortfolioGroupDict(TypedDict):
     """Type definition for portfolio group dictionary"""
 
     ticker: str
-    stock_position: Optional[StockPositionDict]
+    stock_position: StockPositionDict | None
     option_positions: list[OptionPositionDict]
     total_value: float
     net_exposure: float
@@ -253,7 +253,7 @@ class PortfolioGroup:
     """Group of related positions (stock + options)"""
 
     ticker: str
-    stock_position: Optional[StockPosition]
+    stock_position: StockPosition | None
     option_positions: list[OptionPosition]
 
     # Group metrics
@@ -336,7 +336,7 @@ class PortfolioGroup:
 
     def get_details(
         self,
-    ) -> dict[str, Union[dict[str, float], list[dict[str, Union[str, float]]]]]:
+    ) -> dict[str, dict[str, float] | list[dict[str, str | float]]]:
         """Get detailed breakdown of the group's exposures"""
         return {
             "Stock Position": {
@@ -442,7 +442,7 @@ class PortfolioSummary:
     cash_like_count: int = 0
 
     # Help text for each metric
-    help_text: Optional[dict[str, str]] = None
+    help_text: dict[str, str] | None = None
 
     def __post_init__(self):
         """Initialize help text for metrics"""
@@ -572,9 +572,9 @@ class PortfolioSummary:
 
 
 def create_portfolio_group(
-    stock_data: Optional[dict[str, Union[str, int, float]]] = None,
-    option_data: Optional[list[dict[str, Union[str, int, float]]]] = None,
-) -> Optional[PortfolioGroup]:
+    stock_data: dict[str, str | int | float] | None = None,
+    option_data: list[dict[str, str | int | float]] | None = None,
+) -> PortfolioGroup | None:
     """Create a PortfolioGroup from stock and option data"""
     if not stock_data and not option_data:
         return None

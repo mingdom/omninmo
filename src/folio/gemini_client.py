@@ -2,7 +2,7 @@
 
 import logging
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import google.generativeai as genai
 from google.generativeai.types import GenerationConfig
@@ -10,6 +10,7 @@ from google.generativeai.types import GenerationConfig
 from .ai_utils import PORTFOLIO_ADVISOR_SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
+
 
 class GeminiClient:
     """Client for interacting with Google Gemini AI API."""
@@ -31,12 +32,18 @@ class GeminiClient:
                 max_output_tokens=4096,
             ),
             # Set the system prompt to ensure the AI stays focused on portfolio advising
-            system_instruction=PORTFOLIO_ADVISOR_SYSTEM_PROMPT
+            system_instruction=PORTFOLIO_ADVISOR_SYSTEM_PROMPT,
         )
-        logger.info("Gemini client initialized successfully with portfolio advisor system prompt")
+        logger.info(
+            "Gemini client initialized successfully with portfolio advisor system prompt"
+        )
 
-    async def chat(self, message: str, history: List[Dict[str, str]],
-              portfolio_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    async def chat(
+        self,
+        message: str,
+        history: list[dict[str, str]],
+        portfolio_data: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """
         Generate a response to a user message in the context of their portfolio (async version).
 
@@ -55,42 +62,41 @@ class GeminiClient:
             # Format the conversation history for the model
             formatted_history = []
             for msg in history[-10:]:  # Limit to last 10 messages for context window
-                formatted_history.append({
-                    "role": msg["role"],
-                    "parts": [msg["content"]]
-                })
+                formatted_history.append(
+                    {"role": msg["role"], "parts": [msg["content"]]}
+                )
 
             # Add the current message
-            formatted_history.append({
-                "role": "user",
-                "parts": [message]
-            })
+            formatted_history.append({"role": "user", "parts": [message]})
 
             # If we have portfolio context, add it to the first user message
             if context and formatted_history:
                 for i, msg in enumerate(formatted_history):
                     if msg["role"] == "user":
-                        formatted_history[i]["parts"] = [context + "\n\n" + msg["parts"][0]]
+                        formatted_history[i]["parts"] = [
+                            context + "\n\n" + msg["parts"][0]
+                        ]
                         break
 
             # Generate response
             response = await self.model.generate_content_async(formatted_history)
 
-            return {
-                "response": response.text,
-                "complete": True
-            }
+            return {"response": response.text, "complete": True}
 
         except Exception as e:
-            logger.error(f"Error in chat: {str(e)}")
+            logger.error(f"Error in chat: {e!s}")
             return {
-                "response": f"I encountered an error: {str(e)}",
+                "response": f"I encountered an error: {e!s}",
                 "complete": False,
-                "error": True
+                "error": True,
             }
 
-    def chat_sync(self, message: str, history: List[Dict[str, str]],
-              portfolio_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def chat_sync(
+        self,
+        message: str,
+        history: list[dict[str, str]],
+        portfolio_data: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """
         Generate a response to a user message in the context of their portfolio (synchronous version).
 
@@ -106,7 +112,9 @@ class GeminiClient:
         """
         try:
             # Log the start of the process
-            logger.info(f"Starting chat_sync with message: '{message[:50]}...' and {len(history)} history items")
+            logger.info(
+                f"Starting chat_sync with message: '{message[:50]}...' and {len(history)} history items"
+            )
 
             # Create the conversation context with portfolio data if available
             context = self._create_conversation_context(portfolio_data)
@@ -126,13 +134,16 @@ class GeminiClient:
 
             # Add previous messages to the history in the correct format
             if history:
-                logger.info(f"Formatting {len(history)} previous messages for chat history")
-                for msg in history[-10:]:  # Limit to last 10 messages for context window
+                logger.info(
+                    f"Formatting {len(history)} previous messages for chat history"
+                )
+                for msg in history[
+                    -10:
+                ]:  # Limit to last 10 messages for context window
                     role = "user" if msg["role"] == "user" else "model"
-                    formatted_history.append({
-                        "role": role,
-                        "parts": [{"text": msg["content"]}]
-                    })
+                    formatted_history.append(
+                        {"role": role, "parts": [{"text": msg["content"]}]}
+                    )
 
             # Create a chat session with history
             logger.info("Creating new chat session with history")
@@ -141,22 +152,21 @@ class GeminiClient:
             # Send the current message
             logger.info("Sending message to chat session")
             response = chat.send_message(user_message)
-            logger.info(f"Received response from Gemini API: {len(response.text)} characters")
+            logger.info(
+                f"Received response from Gemini API: {len(response.text)} characters"
+            )
 
-            return {
-                "response": response.text,
-                "complete": True
-            }
+            return {"response": response.text, "complete": True}
 
         except Exception as e:
-            logger.error(f"Error in chat_sync: {str(e)}", exc_info=True)
+            logger.error(f"Error in chat_sync: {e!s}", exc_info=True)
             return {
-                "response": f"I encountered an error: {str(e)}",
+                "response": f"I encountered an error: {e!s}",
                 "complete": False,
-                "error": True
+                "error": True,
             }
 
-    async def analyze_portfolio(self, portfolio_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def analyze_portfolio(self, portfolio_data: dict[str, Any]) -> dict[str, Any]:
         """
         Analyze portfolio data using Gemini AI.
 
@@ -177,13 +187,13 @@ class GeminiClient:
             return structured_analysis
 
         except Exception as e:
-            logger.error(f"Error during portfolio analysis: {str(e)}")
+            logger.error(f"Error during portfolio analysis: {e!s}")
             return {
                 "error": True,
-                "message": f"Analysis failed: {str(e)}",
+                "message": f"Analysis failed: {e!s}",
             }
 
-    def _create_analysis_prompt(self, portfolio_data: Dict[str, Any]) -> str:
+    def _create_analysis_prompt(self, portfolio_data: dict[str, Any]) -> str:
         """
         Create a structured prompt for portfolio analysis.
 
@@ -198,13 +208,15 @@ class GeminiClient:
         summary = portfolio_data.get("summary", {})
 
         # Format positions data
-        positions_text = "\n".join([
-            f"- {pos['ticker']}: {pos['position_type'].upper()}, "
-            f"Value: ${pos['market_value']:.2f}, "
-            f"Beta: {pos['beta']:.2f}, "
-            f"Weight: {pos['weight']:.2%}"
-            for pos in positions
-        ])
+        positions_text = "\n".join(
+            [
+                f"- {pos['ticker']}: {pos['position_type'].upper()}, "
+                f"Value: ${pos['market_value']:.2f}, "
+                f"Beta: {pos['beta']:.2f}, "
+                f"Weight: {pos['weight']:.2%}"
+                for pos in positions
+            ]
+        )
 
         # Format summary data
         total_value = summary.get("total_value_net", 0)
@@ -237,7 +249,9 @@ class GeminiClient:
 
         return prompt
 
-    def _create_conversation_context(self, portfolio_data: Optional[Dict[str, Any]]) -> str:
+    def _create_conversation_context(
+        self, portfolio_data: dict[str, Any] | None
+    ) -> str:
         """
         Create a context string with portfolio information for the AI.
 
@@ -255,16 +269,20 @@ class GeminiClient:
         summary = portfolio_data.get("summary", {})
 
         # Format positions data (limit to top 10 by value for context size)
-        sorted_positions = sorted(positions, key=lambda p: abs(p.get("market_value", 0)), reverse=True)
+        sorted_positions = sorted(
+            positions, key=lambda p: abs(p.get("market_value", 0)), reverse=True
+        )
         top_positions = sorted_positions[:10]
 
-        positions_text = "\n".join([
-            f"- {pos['ticker']}: {pos['position_type'].upper()}, "
-            f"Value: ${pos['market_value']:.2f}, "
-            f"Beta: {pos['beta']:.2f}, "
-            f"Weight: {pos['weight']:.2%}"
-            for pos in top_positions
-        ])
+        positions_text = "\n".join(
+            [
+                f"- {pos['ticker']}: {pos['position_type'].upper()}, "
+                f"Value: ${pos['market_value']:.2f}, "
+                f"Beta: {pos['beta']:.2f}, "
+                f"Weight: {pos['weight']:.2%}"
+                for pos in top_positions
+            ]
+        )
 
         # Format summary data
         total_value = summary.get("total_value_net", 0)
@@ -287,7 +305,7 @@ class GeminiClient:
 
         return context
 
-    def _process_analysis_response(self, response_text: str) -> Dict[str, Any]:
+    def _process_analysis_response(self, response_text: str) -> dict[str, Any]:
         """
         Process and structure the raw AI response.
 
@@ -303,14 +321,14 @@ class GeminiClient:
             "sector_concentration": "",
             "diversification": "",
             "recommendations": "",
-            "raw_response": response_text
+            "raw_response": response_text,
         }
 
         # Extract sections based on headers in the response
         current_section = None
 
-        for line in response_text.split("\n"):
-            line = line.strip()
+        for line_text in response_text.split("\n"):
+            line = line_text.strip()
 
             if "risk assessment" in line.lower():
                 current_section = "risk_assessment"

@@ -8,7 +8,7 @@ user inputs, particularly for CSV file uploads.
 import base64
 import io
 import re
-from typing import Any, Optional, Tuple
+from typing import Any
 
 import pandas as pd
 
@@ -18,46 +18,56 @@ from .logger import logger
 MAX_FILE_SIZE = 10 * 1024 * 1024
 
 # Required columns for portfolio CSV files
-REQUIRED_COLUMNS = ['Symbol', 'Quantity', 'Last Price']
+REQUIRED_COLUMNS = ["Symbol", "Quantity", "Last Price"]
 
 # Columns that might contain formulas and need sanitization
 FORMULA_RISK_COLUMNS = [
-    'Symbol', 'Description', 'Type', 'Current Value',
-    'Last Price', 'Last Price Change', 'Today\'s Gain/Loss Dollar',
-    'Today\'s Gain/Loss Percent', 'Total Gain/Loss Dollar',
-    'Total Gain/Loss Percent', 'Percent Of Account',
-    'Cost Basis Total', 'Average Cost Basis'
+    "Symbol",
+    "Description",
+    "Type",
+    "Current Value",
+    "Last Price",
+    "Last Price Change",
+    "Today's Gain/Loss Dollar",
+    "Today's Gain/Loss Percent",
+    "Total Gain/Loss Dollar",
+    "Total Gain/Loss Percent",
+    "Percent Of Account",
+    "Cost Basis Total",
+    "Average Cost Basis",
 ]
 
 # Regex patterns for detecting potentially malicious content
 DANGEROUS_PATTERNS = [
     # Excel formula injection patterns
-    r'^=',
-    r'^@',
+    r"^=",
+    r"^@",
     # Removed r'^[+-]' and r'^-\d' as they flag legitimate financial data
-    r'^DDE\(',
-    r'^EMBED\(',
-    r'^HYPERLINK\(',
-    r'^MSEXCEL\|',
+    r"^DDE\(",
+    r"^EMBED\(",
+    r"^HYPERLINK\(",
+    r"^MSEXCEL\|",
     # HTML/JavaScript injection patterns
-    r'<script',
-    r'javascript:',
-    r'<iframe',
-    r'<img',
-    r'onerror=',
-    r'onload=',
-    r'onclick=',
+    r"<script",
+    r"javascript:",
+    r"<iframe",
+    r"<img",
+    r"onerror=",
+    r"onload=",
+    r"onclick=",
     # Command injection patterns - modified to exclude common financial data patterns
-    r'[|;`]',  # Removed & to allow S&P in stock names
-    r'\$\([^)]*\)',  # Modified to only match $() pattern, not just $ signs
-    r'`.*`',
+    r"[|;`]",  # Removed & to allow S&P in stock names
+    r"\$\([^)]*\)",  # Modified to only match $() pattern, not just $ signs
+    r"`.*`",
 ]
 
 # Compiled regex patterns for performance
-DANGEROUS_REGEX = re.compile('|'.join(DANGEROUS_PATTERNS), re.IGNORECASE)
+DANGEROUS_REGEX = re.compile("|".join(DANGEROUS_PATTERNS), re.IGNORECASE)
 
 
-def validate_csv_upload(contents: str, filename: Optional[str] = None) -> Tuple[pd.DataFrame, Optional[str]]:
+def validate_csv_upload(
+    contents: str, filename: str | None = None
+) -> tuple[pd.DataFrame, str | None]:
     """
     Validate and sanitize a CSV file upload.
 
@@ -74,17 +84,17 @@ def validate_csv_upload(contents: str, filename: Optional[str] = None) -> Tuple[
         ValueError: If validation fails
     """
     # Validate file extension if filename is provided
-    if filename is not None and not filename.lower().endswith('.csv'):
+    if filename is not None and not filename.lower().endswith(".csv"):
         raise ValueError("Only CSV files are supported")
 
     # Decode base64 content
     try:
         # Split the content string and ignore the content type part
-        _, content_string = contents.split(',')
+        _, content_string = contents.split(",")
         decoded = base64.b64decode(content_string)
     except Exception as e:
         logger.error(f"Error decoding file content: {e}")
-        raise ValueError(f"Invalid file format: {str(e)}")
+        raise ValueError(f"Invalid file format: {e!s}")
 
     # Check file size
     if len(decoded) > MAX_FILE_SIZE:
@@ -93,10 +103,10 @@ def validate_csv_upload(contents: str, filename: Optional[str] = None) -> Tuple[
 
     # Parse CSV
     try:
-        df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
+        df = pd.read_csv(io.StringIO(decoded.decode("utf-8")))
     except Exception as e:
         logger.error(f"Error parsing CSV: {e}")
-        raise ValueError(f"Invalid CSV format: {str(e)}")
+        raise ValueError(f"Invalid CSV format: {e!s}")
 
     # Check for required columns
     missing_columns = [col for col in REQUIRED_COLUMNS if col not in df.columns]
@@ -125,13 +135,17 @@ def sanitize_dataframe(df: pd.DataFrame) -> pd.DataFrame:
 
     # Sanitize all string columns
     for col in df_safe.columns:
-        if df_safe[col].dtype == 'object':
-            df_safe[col] = df_safe[col].apply(lambda x: sanitize_cell(x) if pd.notna(x) else x)
+        if df_safe[col].dtype == "object":
+            df_safe[col] = df_safe[col].apply(
+                lambda x: sanitize_cell(x) if pd.notna(x) else x
+            )
 
     # Additional sanitization for columns that might contain formulas
     for col in FORMULA_RISK_COLUMNS:
-        if col in df_safe.columns and df_safe[col].dtype == 'object':
-            df_safe[col] = df_safe[col].apply(lambda x: sanitize_formula(x) if pd.notna(x) else x)
+        if col in df_safe.columns and df_safe[col].dtype == "object":
+            df_safe[col] = df_safe[col].apply(
+                lambda x: sanitize_formula(x) if pd.notna(x) else x
+            )
 
     return df_safe
 
@@ -151,17 +165,19 @@ def sanitize_cell(value: Any) -> str:
         return str(value)
 
     # Check if this is a financial value with currency symbol (e.g., $123.45, -$123.45)
-    if re.match(r'^[+-]?\$\d+(\.\d+)?$', value) or re.match(r'^\$[+-]?\d+(\.\d+)?$', value):
+    if re.match(r"^[+-]?\$\d+(\.\d+)?$", value) or re.match(
+        r"^\$[+-]?\d+(\.\d+)?$", value
+    ):
         # This is a financial value with currency, leave it as is
         return value
 
     # Check if this is a percentage value (e.g., -12.34%, +12.34%)
-    if re.match(r'^[+-]?\d+(\.\d+)?%$', value):
+    if re.match(r"^[+-]?\d+(\.\d+)?%$", value):
         # This is a percentage value, leave it as is
         return value
 
     # Check if this is a stock name with ampersand (e.g., "S&P 500")
-    if '&' in value and not any(char in value for char in '|;`'):
+    if "&" in value and not any(char in value for char in "|;`"):
         # Contains ampersand but no other dangerous chars, leave it as is
         return value
 
@@ -184,43 +200,58 @@ def sanitize_formula(value: Any) -> str:
     Returns:
         Sanitized value
     """
+    # Convert non-string values to string
     if not isinstance(value, str):
         return str(value)
 
+    # Initialize result with the original value
+    result = value
+
+    # Flag to track if we need to neutralize the value
+    needs_neutralizing = False
+
     # Check if this is a financial value with currency symbol (e.g., $123.45, -$123.45)
-    if re.match(r'^[+-]?\$\d+(\.\d+)?$', value) or re.match(r'^\$[+-]?\d+(\.\d+)?$', value):
-        # This is a financial value with currency, leave it as is
-        return value
+    is_financial = re.match(r"^[+-]?\$\d+(\.\d+)?$", value) or re.match(
+        r"^\$[+-]?\d+(\.\d+)?$", value
+    )
 
     # Check if this is a percentage value (e.g., -12.34%, +12.34%)
-    if re.match(r'^[+-]?\d+(\.\d+)?%$', value):
-        # This is a percentage value, leave it as is
-        return value
+    is_percentage = re.match(r"^[+-]?\d+(\.\d+)?%$", value)
 
-    # Neutralize formula triggers, but preserve negative numbers
-    if value.startswith(('=', '+', '@')):
-        # Prefix with apostrophe to neutralize formula
-        return "'" + value
+    # Check if it's a negative number (integer or float)
+    is_negative_number = value.startswith("-") and re.match(r"^-\d+(\.\d+)?$", value)
 
-    # Special handling for values starting with '-'
-    if value.startswith('-'):
-        # Check if it's a negative number (integer or float)
-        if re.match(r'^-\d+(\.\d+)?$', value):
-            # It's a negative number, leave it as is
-            return value
-        # Check if it's a negative dollar amount (e.g., -$123.45)
-        elif re.match(r'^-\$\d+(\.\d+)?$', value):
-            # It's a negative dollar amount, leave it as is
-            return value
-        # Check if it's a negative percentage (e.g., -12.34%)
-        elif re.match(r'^-\d+(\.\d+)?%$', value):
-            # It's a negative percentage, leave it as is
-            return value
-        else:
-            # It's not a number, neutralize it
-            return "'" + value
+    # Check if it's a negative dollar amount (e.g., -$123.45)
+    is_negative_dollar = value.startswith("-") and re.match(r"^-\$\d+(\.\d+)?$", value)
 
-    return value
+    # Check if it's a negative percentage (e.g., -12.34%)
+    is_negative_percentage = value.startswith("-") and re.match(
+        r"^-\d+(\.\d+)?%$", value
+    )
+
+    # Determine if we need to neutralize the value
+    if value.startswith(("=", "+", "@")):
+        needs_neutralizing = True
+    elif value.startswith("-") and not (
+        is_negative_number or is_negative_dollar or is_negative_percentage
+    ):
+        needs_neutralizing = True
+
+    # Don't neutralize financial values, percentages, or negative numbers
+    if (
+        is_financial
+        or is_percentage
+        or is_negative_number
+        or is_negative_dollar
+        or is_negative_percentage
+    ):
+        needs_neutralizing = False
+
+    # Apply neutralization if needed
+    if needs_neutralizing:
+        result = "'" + value
+
+    return result
 
 
 def sanitize_dangerous_content(value: str) -> str:
@@ -234,40 +265,46 @@ def sanitize_dangerous_content(value: str) -> str:
         Sanitized content
     """
     # Check if this is a financial value with currency symbol (e.g., $123.45, -$123.45)
-    if re.match(r'^[+-]?\$\d+(\.\d+)?$', value) or re.match(r'^\$[+-]?\d+(\.\d+)?$', value):
+    if re.match(r"^[+-]?\$\d+(\.\d+)?$", value) or re.match(
+        r"^\$[+-]?\d+(\.\d+)?$", value
+    ):
         # This is a financial value with currency, leave it as is
         return value
 
     # Check if this is a percentage value (e.g., -12.34%, +12.34%)
-    if re.match(r'^[+-]?\d+(\.\d+)?%$', value):
+    if re.match(r"^[+-]?\d+(\.\d+)?%$", value):
         # This is a percentage value, leave it as is
         return value
 
     # Check if this is a stock name with ampersand (e.g., "S&P 500")
-    if '&' in value and not any(char in value for char in '|;`'):
+    if "&" in value and not any(char in value for char in "|;`"):
         # Contains ampersand but no other dangerous chars, leave it as is
         return value
 
     # Replace formula triggers
-    value = re.sub(r'^=', "'=", value)
-    value = re.sub(r'^@', "'@", value)
-    value = re.sub(r'^[+]', "'+", value)
+    value = re.sub(r"^=", "'=", value)
+    value = re.sub(r"^@", "'@", value)
+    value = re.sub(r"^[+]", "'+", value)
 
     # Don't modify negative numbers that are actually numbers
-    if not re.match(r'^-\d+(\.\d+)?$', value):
-        value = re.sub(r'^-', "'-", value)
+    if not re.match(r"^-\d+(\.\d+)?$", value):
+        value = re.sub(r"^-", "'-", value)
 
     # Remove HTML/script tags
-    value = re.sub(r'<script.*?>.*?</script>', "[REMOVED]", value, flags=re.IGNORECASE | re.DOTALL)
-    value = re.sub(r'<iframe.*?>.*?</iframe>', "[REMOVED]", value, flags=re.IGNORECASE | re.DOTALL)
-    value = re.sub(r'javascript:', "[REMOVED]", value, flags=re.IGNORECASE)
+    value = re.sub(
+        r"<script.*?>.*?</script>", "[REMOVED]", value, flags=re.IGNORECASE | re.DOTALL
+    )
+    value = re.sub(
+        r"<iframe.*?>.*?</iframe>", "[REMOVED]", value, flags=re.IGNORECASE | re.DOTALL
+    )
+    value = re.sub(r"javascript:", "[REMOVED]", value, flags=re.IGNORECASE)
 
     # Remove event handlers
-    value = re.sub(r'on\w+\s*=', "[REMOVED]=", value, flags=re.IGNORECASE)
+    value = re.sub(r"on\w+\s*=", "[REMOVED]=", value, flags=re.IGNORECASE)
 
     # Remove command injection characters, but preserve ampersands in stock names
-    value = re.sub(r'[|;`]', "", value)
-    value = re.sub(r'\$\([^)]*\)', "[REMOVED]", value)  # Only match $() pattern
-    value = re.sub(r'`.*?`', "", value, flags=re.DOTALL)
+    value = re.sub(r"[|;`]", "", value)
+    value = re.sub(r"\$\([^)]*\)", "[REMOVED]", value)  # Only match $() pattern
+    value = re.sub(r"`.*?`", "", value, flags=re.DOTALL)
 
     return value

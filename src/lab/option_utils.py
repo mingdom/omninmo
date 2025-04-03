@@ -5,7 +5,6 @@ Utilities for handling option positions and calculations.
 import math
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
 
 from scipy.stats import norm
 
@@ -436,7 +435,7 @@ def calculate_bs_price(
 def calculate_implied_volatility(
     option: OptionPosition,
     underlying_price: float,
-    market_price: Optional[float] = None,
+    market_price: float | None = None,
     risk_free_rate: float = 0.05,
     max_iterations: int = 100,
     precision: float = 0.0001,
@@ -775,7 +774,7 @@ def calculate_option_delta(
     underlying_price: float,
     use_black_scholes: bool = True,
     risk_free_rate: float = 0.05,
-    implied_volatility: Optional[float] = None,  # Allow optional IV override
+    implied_volatility: float | None = None,  # Allow optional IV override
 ) -> float:
     """Calculates the option delta, offering a choice between Black-Scholes and a simple model.
 

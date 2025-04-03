@@ -1,7 +1,7 @@
 """AI Chat component for portfolio analysis."""
 
 import logging
-from typing import Any, Dict, List
+from typing import Any
 
 import dash_bootstrap_components as dbc
 from dash import dcc, html
@@ -156,7 +156,7 @@ def create_ai_message(message: str) -> html.Div:
         className="ai-message"
     )
 
-def format_analysis_for_chat(analysis: Dict[str, Any]) -> str:
+def format_analysis_for_chat(analysis: dict[str, Any]) -> str:
     """Format analysis results for chat display."""
     if analysis.get("error"):
         return f"Error: {analysis.get('message')}"

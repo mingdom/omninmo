@@ -1,7 +1,7 @@
 """Utility functions for AI portfolio analysis."""
 
 import logging
-from typing import Any, Dict, List
+from typing import Any
 
 from .data_model import PortfolioGroup, PortfolioSummary
 
@@ -28,9 +28,9 @@ Your goal is to help clients understand their investments and make informed deci
 """
 
 def prepare_portfolio_data_for_analysis(
-    groups: List[PortfolioGroup],
+    groups: list[PortfolioGroup],
     summary: PortfolioSummary
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Prepare portfolio data for AI analysis.
 

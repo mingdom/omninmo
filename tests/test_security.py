@@ -12,9 +12,13 @@ import pandas as pd
 
 sys.path.insert(0, os.path.abspath('..'))
 
-from src.folio.security import (sanitize_cell, sanitize_dangerous_content,
-                                sanitize_dataframe, sanitize_formula,
-                                validate_csv_upload)
+from src.folio.security import (
+    sanitize_cell,
+    sanitize_dangerous_content,
+    sanitize_dataframe,
+    sanitize_formula,
+    validate_csv_upload,
+)
 
 
 class TestSecurity(unittest.TestCase):

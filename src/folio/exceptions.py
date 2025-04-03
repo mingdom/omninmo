@@ -33,12 +33,12 @@ class ConfigurationError(FolioError):
 
 class StateError(FolioError):
     """Raised when the application is in an invalid state."""
-    
+
     @classmethod
     def no_selection(cls):
         """Create a StateError for the no selection state."""
         return cls("No row selected (normal during initialization)")
-    
+
     @classmethod
     def invalid_row(cls, row, length):
         """Create a StateError for an invalid row index."""

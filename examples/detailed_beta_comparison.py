@@ -9,7 +9,6 @@ import os
 import sys
 
 import matplotlib.pyplot as plt
-import pandas as pd
 
 # Add the project root to the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -140,7 +139,7 @@ def analyze_beta_differences(ticker, fmp_fetcher, yf_fetcher):
             fmp_common_beta = fmp_common_aligned.cov(fmp_market_common_aligned) / fmp_market_common_aligned.var()
             yf_common_beta = yf_common_aligned.cov(yf_market_common_aligned) / yf_market_common_aligned.var()
 
-            print(f"Beta using common dates only:")
+            print("Beta using common dates only:")
             print(f"  FMP: {fmp_common_beta:.2f}")
             print(f"  YF:  {yf_common_beta:.2f}")
             print(f"  Diff: {abs(fmp_common_beta - yf_common_beta):.2f}")

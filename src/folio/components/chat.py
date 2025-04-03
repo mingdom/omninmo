@@ -1,8 +1,9 @@
 """Chat component for the portfolio dashboard."""
 
-import dash_bootstrap_components as dbc
-from dash import html, dcc, Input, Output, State, callback
 import dash
+import dash_bootstrap_components as dbc
+from dash import Input, Output, dcc, html
+
 from ..logger import logger
 
 
@@ -16,7 +17,7 @@ def create_chat_component():
                     [
                         html.H4("AI Portfolio Advisor", className="chat-header-title"),
                         html.Button(
-                            "×",
+                            "x",
                             id="chat-close",
                             className="chat-close-button",
                             n_clicks=0,
@@ -25,7 +26,6 @@ def create_chat_component():
                 ),
                 className="chat-header",
             ),
-            
             # Chat messages container
             dbc.Card(
                 dbc.CardBody(
@@ -34,7 +34,6 @@ def create_chat_component():
                 ),
                 className="chat-body",
             ),
-            
             # Chat input
             dbc.Card(
                 dbc.CardBody(
@@ -62,7 +61,6 @@ def create_chat_component():
                 ),
                 className="chat-footer",
             ),
-            
             # Chat history store
             dcc.Store(id="chat-history", storage_type="session"),
         ],
@@ -77,7 +75,7 @@ def format_message(content, is_user=True):
     message_class = "user-message" if is_user else "ai-message"
     avatar_class = "user-avatar" if is_user else "ai-avatar"
     avatar_icon = "fa-user" if is_user else "fa-robot"
-    
+
     return dbc.Card(
         dbc.CardBody(
             [
@@ -98,7 +96,7 @@ def format_message(content, is_user=True):
 
 def register_callbacks(app):
     """Register callbacks for the chat component."""
-    
+
     @app.callback(
         Output("chat-panel", "style"),
         [
@@ -109,22 +107,24 @@ def register_callbacks(app):
     )
     def toggle_chat_panel(open_clicks, close_clicks):
         """Toggle the chat panel when the button is clicked."""
-        logger.info(f"TOGGLE_CHAT_PANEL called with open_clicks: {open_clicks}, close_clicks: {close_clicks}")
-        
+        logger.info(
+            f"TOGGLE_CHAT_PANEL called with open_clicks: {open_clicks}, close_clicks: {close_clicks}"
+        )
+
         ctx = dash.callback_context
         if not ctx.triggered:
             logger.info("TOGGLE_CHAT_PANEL: No trigger, keeping panel hidden")
             return {"display": "none"}
-        
+
         trigger_id = ctx.triggered[0]["prop_id"].split(".")[0]
         logger.info(f"TOGGLE_CHAT_PANEL: Triggered by {trigger_id}")
-        
+
         if trigger_id == "chat-button":
             logger.info("TOGGLE_CHAT_PANEL: Opening chat panel")
             return {"display": "flex"}
         elif trigger_id == "chat-close":
             logger.info("TOGGLE_CHAT_PANEL: Closing chat panel")
             return {"display": "none"}
-        
+
         logger.info("TOGGLE_CHAT_PANEL: Default case, keeping panel hidden")
         return {"display": "none"}

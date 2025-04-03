@@ -1,12 +1,11 @@
 """Tests for data model serialization and deserialization."""
 
-import pytest
 from src.folio.data_model import (
-    StockPosition,
+    ExposureBreakdown,
     OptionPosition,
     PortfolioGroup,
-    ExposureBreakdown,
-    PortfolioSummary
+    PortfolioSummary,
+    StockPosition,
 )
 
 
@@ -23,13 +22,13 @@ class TestDataModelSerialization:
             beta=1.2,
             beta_adjusted_exposure=18000.0
         )
-        
+
         # Serialize to dict
         stock_dict = stock_position.to_dict()
-        
+
         # Deserialize back to object
         stock_restored = StockPosition.from_dict(stock_dict)
-        
+
         # Verify key attributes
         assert stock_restored.ticker == stock_position.ticker
         assert stock_restored.quantity == stock_position.quantity
@@ -58,13 +57,13 @@ class TestDataModelSerialization:
             notional_value=15000.0,
             underlying_beta=1.2
         )
-        
+
         # Serialize to dict
         option_dict = option_position.to_dict()
-        
+
         # Deserialize back to object
         option_restored = OptionPosition.from_dict(option_dict)
-        
+
         # Verify key attributes
         assert option_restored.ticker == option_position.ticker
         assert option_restored.position_type == option_position.position_type
@@ -88,7 +87,7 @@ class TestDataModelSerialization:
             beta=1.2,
             beta_adjusted_exposure=18000.0
         )
-        
+
         option_position = OptionPosition(
             ticker="AAPL",
             position_type="option",
@@ -107,7 +106,7 @@ class TestDataModelSerialization:
             notional_value=15000.0,
             underlying_beta=1.2
         )
-        
+
         # Create portfolio group
         portfolio_group = PortfolioGroup(
             ticker="AAPL",
@@ -120,13 +119,13 @@ class TestDataModelSerialization:
             total_delta_exposure=1050.0,
             options_delta_exposure=1050.0
         )
-        
+
         # Serialize to dict
         group_dict = portfolio_group.to_dict()
-        
+
         # Deserialize back to object
         group_restored = PortfolioGroup.from_dict(group_dict)
-        
+
         # Verify key attributes
         assert group_restored.ticker == portfolio_group.ticker
         assert group_restored.total_value == portfolio_group.total_value
@@ -135,12 +134,12 @@ class TestDataModelSerialization:
         assert group_restored.beta_adjusted_exposure == portfolio_group.beta_adjusted_exposure
         assert group_restored.total_delta_exposure == portfolio_group.total_delta_exposure
         assert group_restored.options_delta_exposure == portfolio_group.options_delta_exposure
-        
+
         # Verify stock position
         assert group_restored.stock_position is not None
         assert group_restored.stock_position.ticker == portfolio_group.stock_position.ticker
         assert group_restored.stock_position.quantity == portfolio_group.stock_position.quantity
-        
+
         # Verify option positions
         assert len(group_restored.option_positions) == len(portfolio_group.option_positions)
         assert group_restored.option_positions[0].ticker == portfolio_group.option_positions[0].ticker
@@ -160,13 +159,13 @@ class TestDataModelSerialization:
             formula="Stock + Options",
             components={"stock": 15000.0, "options": 1050.0}
         )
-        
+
         # Serialize to dict
         exposure_dict = exposure.to_dict()
-        
+
         # Deserialize back to object
         exposure_restored = ExposureBreakdown.from_dict(exposure_dict)
-        
+
         # Verify key attributes
         assert exposure_restored.stock_value == exposure.stock_value
         assert exposure_restored.stock_beta_adjusted == exposure.stock_beta_adjusted
@@ -192,7 +191,7 @@ class TestDataModelSerialization:
             formula="Stock + Options",
             components={"stock": 15000.0, "options": 1050.0}
         )
-        
+
         # Create test cash-like position
         cash_position = StockPosition(
             ticker="SPAXX",
@@ -201,7 +200,7 @@ class TestDataModelSerialization:
             beta=0.0,
             beta_adjusted_exposure=0.0
         )
-        
+
         # Create portfolio summary
         summary = PortfolioSummary(
             total_value_net=21050.0,
@@ -216,13 +215,13 @@ class TestDataModelSerialization:
             cash_like_value=5000.0,
             cash_like_count=1
         )
-        
+
         # Serialize to dict
         summary_dict = summary.to_dict()
-        
+
         # Deserialize back to object
         summary_restored = PortfolioSummary.from_dict(summary_dict)
-        
+
         # Verify key attributes
         assert summary_restored.total_value_net == summary.total_value_net
         assert summary_restored.total_value_abs == summary.total_value_abs
@@ -231,12 +230,12 @@ class TestDataModelSerialization:
         assert summary_restored.exposure_reduction_percentage == summary.exposure_reduction_percentage
         assert summary_restored.cash_like_value == summary.cash_like_value
         assert summary_restored.cash_like_count == summary.cash_like_count
-        
+
         # Verify exposure breakdowns
         assert summary_restored.long_exposure.total_value == summary.long_exposure.total_value
         assert summary_restored.short_exposure.total_value == summary.short_exposure.total_value
         assert summary_restored.options_exposure.total_value == summary.options_exposure.total_value
-        
+
         # Verify cash-like positions
         assert len(summary_restored.cash_like_positions) == len(summary.cash_like_positions)
         assert summary_restored.cash_like_positions[0].ticker == summary.cash_like_positions[0].ticker
@@ -252,7 +251,7 @@ class TestDataModelSerialization:
             beta=1.2,
             beta_adjusted_exposure=18000.0
         )
-        
+
         option_position = OptionPosition(
             ticker="AAPL",
             position_type="option",
@@ -271,7 +270,7 @@ class TestDataModelSerialization:
             notional_value=15000.0,
             underlying_beta=1.2
         )
-        
+
         # Create portfolio group
         portfolio_group = PortfolioGroup(
             ticker="AAPL",
@@ -284,7 +283,7 @@ class TestDataModelSerialization:
             total_delta_exposure=1050.0,
             options_delta_exposure=1050.0
         )
-        
+
         # Create test exposure breakdowns
         exposure = ExposureBreakdown(
             stock_value=15000.0,
@@ -297,7 +296,7 @@ class TestDataModelSerialization:
             formula="Stock + Options",
             components={"stock": 15000.0, "options": 1050.0}
         )
-        
+
         # Create portfolio summary
         summary = PortfolioSummary(
             total_value_net=16500.0,
@@ -312,15 +311,15 @@ class TestDataModelSerialization:
             cash_like_value=0.0,
             cash_like_count=0
         )
-        
+
         # Convert to dictionary format as would be stored in Dash
         groups_data = [portfolio_group.to_dict()]
         summary_data = summary.to_dict()
-        
+
         # Deserialize back to objects
         restored_groups = [PortfolioGroup.from_dict(g) for g in groups_data]
         restored_summary = PortfolioSummary.from_dict(summary_data)
-        
+
         # Verify key attributes
         assert len(restored_groups) == 1
         assert restored_groups[0].ticker == "AAPL"

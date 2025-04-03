@@ -1,4 +1,3 @@
-from typing import Optional
 
 import dash_bootstrap_components as dbc
 from dash import html
@@ -112,7 +111,7 @@ def create_sortable_header(label: str, column_id: str, current_sort: str) -> htm
 
 def create_portfolio_table(
     groups: list[PortfolioGroup],
-    search: Optional[str] = None,
+    search: str | None = None,
     sort_by: str = "value-desc",
 ) -> html.Div:
     """Create the portfolio table with all positions"""

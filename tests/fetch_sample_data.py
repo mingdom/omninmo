@@ -8,12 +8,10 @@ for reference when creating mock data and tests.
 import json
 import os
 import sys
-from datetime import datetime
 
 # Add the project root to the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-import pandas as pd
 
 from src.fmp import DataFetcher
 
@@ -38,7 +36,7 @@ PERIODS = ["1y", "5y"]
 
 def main():
     """Fetch sample data and save to files."""
-    print(f"Fetching sample data from FMP API...")
+    print("Fetching sample data from FMP API...")
 
     # Initialize data fetcher
     fetcher = DataFetcher()

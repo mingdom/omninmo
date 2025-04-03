@@ -10,8 +10,8 @@ import os
 import time
 
 import pandas as pd
-
 import yfinance as yf
+
 from src.stockdata import DataFetcherInterface
 
 logger = logging.getLogger(__name__)
@@ -40,6 +40,7 @@ class YFinanceDataFetcher(DataFetcherInterface):
         if cache_ttl is None:
             try:
                 from src.v2.config import config
+
                 self.cache_ttl = config.get("app.cache.ttl", 86400)
             except ImportError:
                 self.cache_ttl = 86400
@@ -144,13 +145,13 @@ class YFinanceDataFetcher(DataFetcherInterface):
             # Rename columns to match expected format
             # yfinance returns columns with capitalized names already, but let's ensure consistency
             column_mapping = {
-                'Open': 'Open',
-                'High': 'High',
-                'Low': 'Low',
-                'Close': 'Close',
-                'Volume': 'Volume',
-                'Dividends': 'Dividends',
-                'Stock Splits': 'Stock Splits'
+                "Open": "Open",
+                "High": "High",
+                "Low": "Low",
+                "Close": "Close",
+                "Volume": "Volume",
+                "Dividends": "Dividends",
+                "Stock Splits": "Stock Splits",
             }
 
             # Only rename columns that exist
@@ -158,7 +159,7 @@ class YFinanceDataFetcher(DataFetcherInterface):
             df = df.rename(columns=rename_cols)
 
             # Ensure index is named 'date'
-            df.index.name = 'date'
+            df.index.name = "date"
 
             # Convert timezone-aware timestamps to naive timestamps
             # This is important for compatibility with the current implementation
@@ -190,53 +191,70 @@ class YFinanceDataFetcher(DataFetcherInterface):
         # yfinance accepts these period formats:
         # 1d, 5d, 1mo, 3mo, 6mo, 1y, 2y, 5y, 10y, ytd, max
 
-        # Check if period is already in yfinance format
-        valid_periods = ['1d', '5d', '1mo', '3mo', '6mo', '1y', '2y', '5y', '10y', 'ytd', 'max']
-        if period in valid_periods:
-            return period
+        # Initialize result with default value
+        result = "1y"  # Default value
 
-        # Try to parse period
-        if period.endswith('y'):
+        # Check if period is already in yfinance format
+        valid_periods = [
+            "1d",
+            "5d",
+            "1mo",
+            "3mo",
+            "6mo",
+            "1y",
+            "2y",
+            "5y",
+            "10y",
+            "ytd",
+            "max",
+        ]
+        if period in valid_periods:
+            result = period
+        elif period.endswith("y"):
             try:
                 years = int(period[:-1])
                 if years == 1:
-                    return '1y'
+                    result = "1y"
                 elif years == 2:
-                    return '2y'
+                    result = "2y"
                 elif years <= 5:
-                    return '5y'
+                    result = "5y"
                 else:
-                    return '10y'
+                    result = "10y"
             except ValueError:
-                pass
-        elif period.endswith('m'):
+                # Keep default value
+                logger.warning(f"Invalid year format: {period}, defaulting to '1y'")
+        elif period.endswith("m"):
             try:
                 months = int(period[:-1])
                 if months <= 1:
-                    return '1mo'
+                    result = "1mo"
                 elif months <= 3:
-                    return '3mo'
+                    result = "3mo"
                 elif months <= 6:
-                    return '6mo'
+                    result = "6mo"
                 else:
-                    return '1y'
+                    result = "1y"
             except ValueError:
-                pass
-        elif period.endswith('d'):
+                # Keep default value
+                logger.warning(f"Invalid month format: {period}, defaulting to '1y'")
+        elif period.endswith("d"):
             try:
                 days = int(period[:-1])
                 if days <= 1:
-                    return '1d'
+                    result = "1d"
                 elif days <= 5:
-                    return '5d'
+                    result = "5d"
                 else:
-                    return '1mo'
+                    result = "1mo"
             except ValueError:
-                pass
+                # Keep default value
+                logger.warning(f"Invalid day format: {period}, defaulting to '1y'")
+        else:
+            # Default to 1y if period format is not recognized
+            logger.warning(f"Unrecognized period format: {period}, defaulting to '1y'")
 
-        # Default to 1y if period format is not recognized
-        logger.warning(f"Unrecognized period format: {period}, defaulting to '1y'")
-        return '1y'
+        return result
 
     def _get_cache_path(self, ticker, period, interval):
         """
