@@ -41,6 +41,7 @@ Dockerfile.dev
 docker-compose.dev.yml
 
 # Documentation
-docs/
+# Keep docs/ for Hugging Face deployment
+# docs/
 *.md
 !README.md

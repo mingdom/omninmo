@@ -4,7 +4,10 @@ WORKDIR /app
 
 # Set environment variables
 ENV PYTHONPATH=/app
+# Use PORT 7860 for Hugging Face Spaces, 8050 for local development
+# The application will check for HF_SPACE environment variable to determine the environment
 ENV PORT=8050
+ENV HF_SPACE=1
 
 # Install only the necessary system dependencies
 RUN apt-get update && \
@@ -25,8 +28,9 @@ RUN pip install --no-cache-dir \
 # Copy all necessary application code
 COPY src ./src
 
-# Expose the port
-EXPOSE 8050
+# Expose both ports (7860 for Hugging Face, 8050 for local)
+EXPOSE 7860 8050
 
 # Run the application with Python directly
-CMD ["python", "-m", "src.folio.app", "--port", "8050", "--host", "0.0.0.0"]
+# The entrypoint script will determine the correct port based on environment
+CMD ["sh", "-c", "if [ -n \"$HF_SPACE\" ]; then PORT=7860; fi && python -m src.folio.app --port $PORT --host 0.0.0.0"]

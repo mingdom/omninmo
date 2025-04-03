@@ -1148,7 +1148,12 @@ def main():
 
     # Display a helpful message about where to access the app
     is_docker = os.path.exists('/.dockerenv')
-    if is_docker and args.host == '0.0.0.0':
+    is_huggingface = os.environ.get('HF_SPACE') == '1' or os.environ.get('SPACE_ID') is not None
+
+    if is_huggingface:
+        logger.info(f"\n\n🚀 Folio is running on Hugging Face Spaces!")
+        logger.info(f"📊 Access the dashboard at the URL provided by Hugging Face\n")
+    elif is_docker and args.host == '0.0.0.0':
         logger.info(f"\n\n🚀 Folio is running inside a Docker container!")
         logger.info(f"📊 Access the dashboard at: http://localhost:{args.port}")
         logger.info(f"💻 (The app is bound to {args.host}:{args.port} inside the container)\n")
