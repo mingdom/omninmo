@@ -14,6 +14,8 @@ This document is the single source of truth for the Folio project's best practic
 
 4. **USABILITY** - Prioritize user experience. Design for clarity and ease of use, not technical elegance alone.
 
+5. **SAFETY** - Never modify Git history or hide Git commands in scripts. All version control operations must be explicit, visible, and performed manually by the user.
+
 ---
 
 ## Key Principles
@@ -55,6 +57,10 @@ Follow consistent development practices to maintain code quality and developer p
 - **Version Control**:
   - **Commit Messages**: Write commit messages to `.commit-msg.md` in the root directory when asked
   - **Never Commit Directly**: Let the user handle all git operations
+  - **⚠️ NEVER USE GIT IN SCRIPTS**: Do not write scripts that use git commands - this can lead to catastrophic data loss and irreversible history modification
+  - **Manual Git Operations**: All git operations must be performed manually by the user, never automated
+  - **Preserve Git History**: Never modify Git history without explicit user consent and understanding of the consequences
+  - **Transparent Operations**: All version control suggestions must be explicit, visible, and explained clearly
 
 ### �💻 Implementation
 *Supports SIMPLICITY and RELIABILITY*
