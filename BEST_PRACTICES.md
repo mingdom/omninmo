@@ -119,6 +119,11 @@ Handle errors gracefully and log information that helps diagnose issues quickly.
   - **ERROR**: Actual errors affecting functionality ("Failed to calculate beta for AAPL")
   - **CRITICAL**: Severe errors preventing operation ("Database connection failed")
 
+- **Regression Analysis**:
+  - **Root Cause Investigation**: Always use `git blame` to understand what caused a regression
+  - **Document Findings**: Record regression analysis in devlogs to prevent repeating mistakes
+  - **Follow Process**: See [regression-analysis.md](docs/regression-analysis.md) for the complete process
+
 ### 🚨 Testing
 *Supports RELIABILITY and PRECISION*
 Thorough testing prevents bugs and ensures code behaves as expected in all scenarios.

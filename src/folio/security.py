@@ -58,13 +58,13 @@ DANGEROUS_PATTERNS = [
 DANGEROUS_REGEX = re.compile('|'.join(DANGEROUS_PATTERNS), re.IGNORECASE)
 
 
-def validate_csv_upload(contents: str, filename: str) -> Tuple[pd.DataFrame, Optional[str]]:
+def validate_csv_upload(contents: str, filename: Optional[str] = None) -> Tuple[pd.DataFrame, Optional[str]]:
     """
     Validate and sanitize a CSV file upload.
 
     Args:
         contents: Base64-encoded contents of the uploaded file
-        filename: Name of the uploaded file
+        filename: Name of the uploaded file (optional, defaults to None for sample data)
 
     Returns:
         Tuple containing:
@@ -74,8 +74,8 @@ def validate_csv_upload(contents: str, filename: str) -> Tuple[pd.DataFrame, Opt
     Raises:
         ValueError: If validation fails
     """
-    # Validate file extension
-    if not filename.lower().endswith('.csv'):
+    # Validate file extension if filename is provided
+    if filename is not None and not filename.lower().endswith('.csv'):
         raise ValueError("Only CSV files are supported")
 
     # Decode base64 content

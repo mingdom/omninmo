@@ -524,7 +524,10 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
 
     # Handle sample portfolio loading
     @app.callback(
-        Output("upload-portfolio", "contents"),
+        [
+            Output("upload-portfolio", "contents"),
+            Output("upload-portfolio", "filename"),
+        ],
         Input("load-sample", "n_clicks"),
         prevent_initial_call=True,
     )
@@ -539,7 +542,7 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
 
                 if not sample_path.exists():
                     logger.warning(f"Sample portfolio not found at {sample_path}")
-                    return None
+                    return None, None
 
                 logger.info(f"Sample portfolio found at: {sample_path}")
 
@@ -563,11 +566,12 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
                 content_type = "text/csv"
                 content_string = base64.b64encode(csv_str.encode('utf-8')).decode("utf-8")
 
-                return f"data:{content_type};base64,{content_string}"
+                # Return both the contents and the filename
+                return f"data:{content_type};base64,{content_string}", "sample-portfolio.csv"
             except Exception as e:
                 logger.error(f"Error loading sample portfolio: {e}", exc_info=True)
-                return None
-        return None
+                return None, None
+        return None, None
 
     @app.callback(
         [
