@@ -24,7 +24,6 @@ class TestModuleStructure:
 
         # Verify that key functions exist in cash_detection.py
         assert hasattr(cash_detection, "is_cash_or_short_term")
-        assert hasattr(cash_detection, "is_likely_money_market")
 
         # Test that the formatting functions work correctly
         assert utils.format_beta(1.2) == "1.20β"

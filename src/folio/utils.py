@@ -10,7 +10,7 @@ import yaml
 from src.stockdata import create_data_fetcher
 
 # Import cash detection functions
-from .cash_detection import is_likely_money_market
+from .cash_detection import is_cash_or_short_term
 from .logger import logger
 
 
@@ -72,7 +72,7 @@ def get_beta(ticker: str, description: str = "") -> float:
         KeyError: If the data format is invalid (missing required columns)
     """
     # For cash-like instruments, return 0 without calculation
-    if ticker in ["CASH", "USD"] or is_likely_money_market(ticker, description):
+    if is_cash_or_short_term(ticker, beta=None, description=description):
         logger.info(f"Using default beta of 0.0 for cash-like position: {ticker}")
         return 0.0
 

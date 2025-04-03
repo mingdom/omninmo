@@ -6,7 +6,7 @@ This module provides functions for identifying cash-like positions in a portfoli
 """
 
 
-def is_likely_money_market(
+def _is_likely_money_market(
     ticker: str | float | None, description: str | float | None = ""
 ) -> bool:
     """Determine if a position is likely a money market fund based on patterns and keywords.
@@ -97,43 +97,21 @@ def is_cash_or_short_term(
     ticker = ticker.upper()
     description = description.upper()
 
-    # Check if it's a money market fund
-    if is_likely_money_market(ticker, description):
-        return True
+    # Initialize result
+    is_cash_like = False
 
-    # Check for very low beta (near zero)
-    if beta is not None and abs(beta) < 0.1:
-        return True
+    # Check various conditions that would make this a cash-like position
 
-    # Check for short-term bond fund keywords
-    short_term_keywords = [
-        "SHORT TERM BOND",
-        "SHORT DURATION",
-        "ULTRA SHORT",
-        "TREASURY BILL",
-        "T-BILL",
-        "MONEY FUND",
-        "CASH EQUIVALENT",
-        "FLOATING RATE",
-    ]
+    # 1. Check if it's a cash symbol
+    if ticker in ["CASH", "USD"]:
+        is_cash_like = True
 
-    for keyword in short_term_keywords:
-        if keyword in description:
-            return True
+    # 2. Check if it's a money market fund
+    elif _is_likely_money_market(ticker, description):
+        is_cash_like = True
 
-    # Check for common short-term bond ETFs
-    short_term_etfs = [
-        "SHV",  # iShares Short Treasury Bond ETF
-        "BIL",  # SPDR Bloomberg 1-3 Month T-Bill ETF
-        "SGOV",  # iShares 0-3 Month Treasury Bond ETF
-        "GBIL",  # Goldman Sachs Treasury Access 0-1 Year ETF
-        "NEAR",  # iShares Short Maturity Bond ETF
-        "FLOT",  # iShares Floating Rate Bond ETF
-        "MINT",  # PIMCO Enhanced Short Maturity Active ETF
-        "GSY",  # Invesco Ultra Short Duration ETF
-    ]
+    # 3. Check for very low beta (near zero)
+    elif beta is not None and abs(beta) < 0.1:
+        is_cash_like = True
 
-    if ticker in short_term_etfs:
-        return True
-
-    return False
+    return is_cash_like
