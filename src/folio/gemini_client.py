@@ -105,32 +105,43 @@ class GeminiClient:
             Dictionary with the AI response and any additional data
         """
         try:
+            # Log the start of the process
+            logger.info(f"Starting chat_sync with message: '{message[:50]}...' and {len(history)} history items")
+
             # Create the conversation context with portfolio data if available
             context = self._create_conversation_context(portfolio_data)
+            logger.info(f"Created conversation context: {len(context)} characters")
 
-            # Format the conversation history for the model
+            # Prepare the user message with context if available
+            user_message = message
+            if context:
+                user_message = context + "\n\n" + message
+                logger.info("Added portfolio context to user message")
+
+            # Use the Gemini SDK's built-in chat functionality
+            logger.info("Using Gemini SDK chat functionality")
+
+            # Properly format history for the Gemini API
             formatted_history = []
-            for msg in history[-10:]:  # Limit to last 10 messages for context window
-                formatted_history.append({
-                    "role": msg["role"],
-                    "parts": [msg["content"]]
-                })
 
-            # Add the current message
-            formatted_history.append({
-                "role": "user",
-                "parts": [message]
-            })
+            # Add previous messages to the history in the correct format
+            if history:
+                logger.info(f"Formatting {len(history)} previous messages for chat history")
+                for msg in history[-10:]:  # Limit to last 10 messages for context window
+                    role = "user" if msg["role"] == "user" else "model"
+                    formatted_history.append({
+                        "role": role,
+                        "parts": [{"text": msg["content"]}]
+                    })
 
-            # If we have portfolio context, add it to the first user message
-            if context and formatted_history:
-                for i, msg in enumerate(formatted_history):
-                    if msg["role"] == "user":
-                        formatted_history[i]["parts"] = [context + "\n\n" + msg["parts"][0]]
-                        break
+            # Create a chat session with history
+            logger.info("Creating new chat session with history")
+            chat = self.model.start_chat(history=formatted_history)
 
-            # Generate response (synchronous version)
-            response = self.model.generate_content(formatted_history)
+            # Send the current message
+            logger.info("Sending message to chat session")
+            response = chat.send_message(user_message)
+            logger.info(f"Received response from Gemini API: {len(response.text)} characters")
 
             return {
                 "response": response.text,
@@ -138,7 +149,7 @@ class GeminiClient:
             }
 
         except Exception as e:
-            logger.error(f"Error in chat_sync: {str(e)}")
+            logger.error(f"Error in chat_sync: {str(e)}", exc_info=True)
             return {
                 "response": f"I encountered an error: {str(e)}",
                 "complete": False,

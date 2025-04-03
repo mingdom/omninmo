@@ -8,6 +8,7 @@ from typing import Optional, Union
 
 import dash
 import dash_bootstrap_components as dbc
+import dash_chat
 import pandas as pd
 from dash import ALL, Input, Output, State, callback_context, dcc, html
 from dash.exceptions import PreventUpdate
@@ -494,13 +495,13 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
                         style={"display": "none"}
                     ),
 
-                    # Chat Panel
+                    # Chat Panel using dash-chat
                     html.Div(
                         [
                             # Chat Header
                             html.Div(
                                 [
-                                    html.H4([html.I(className="fas fa-robot me-2"), "AI Advisor"]),
+                                    html.H4([html.I(className="fas fa-robot me-2"), "AI Portfolio Advisor"]),
                                     html.Button(
                                         html.I(className="fas fa-times"),
                                         id="chat-close",
@@ -511,35 +512,15 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
                                 className="chat-header"
                             ),
 
-                            # Chat Messages
-                            html.Div(
-                                [
-                                    html.Div(
-                                        "Hi! I'm your AI portfolio advisor. Load a portfolio and I can help analyze it.",
-                                        className="ai-message"
-                                    )
+                            # Dash Chat Component
+                            dash_chat.ChatComponent(
+                                id="chat-component",
+                                messages=[
+                                    {"role": "assistant", "content": "Hi! I'm your AI portfolio advisor. Load a portfolio and I can help analyze it."}
                                 ],
-                                id="chat-messages",
-                                className="chat-messages"
-                            ),
-
-                            # Chat Input Area
-                            html.Div(
-                                [
-                                    dbc.Input(
-                                        id="chat-input",
-                                        placeholder="Ask about your portfolio...",
-                                        type="text",
-                                        className="chat-input"
-                                    ),
-                                    html.Button(
-                                        html.I(className="fas fa-paper-plane"),
-                                        id="chat-send",
-                                        className="chat-send",
-                                        n_clicks=0
-                                    )
-                                ],
-                                className="chat-input-area"
+                                container_style={"height": "500px", "width": "100%"},
+                                input_placeholder="Ask about your portfolio...",
+                                theme="light",
                             )
                         ],
                         id="chat-panel",
@@ -1207,35 +1188,25 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
         logger.info("TOGGLE_CHAT_PANEL: Default case, keeping panel hidden")
         return {"display": "none"}
 
-    # AI chat message callback
+    # AI chat message callback for dash-chat
     @app.callback(
+        Output("chat-component", "messages"),
+        Input("chat-component", "new_message"),
         [
-            Output("chat-messages", "children"),
-            Output("chat-input", "value"),
-            Output("chat-history", "data")
-        ],
-        [
-            Input("chat-send", "n_clicks"),
-            Input("chat-input", "n_submit")
-        ],
-        [
-            State("chat-input", "value"),
-            State("chat-messages", "children"),
+            State("chat-component", "messages"),
             State("portfolio-groups", "data"),
             State("portfolio-summary", "data"),
             State("chat-history", "data")
         ],
         prevent_initial_call=True
     )
-    def send_chat_message(send_clicks, input_submit, message, current_messages, groups_data, summary_data, chat_history):
+    def send_chat_message(new_message, current_messages, groups_data, summary_data, chat_history):
         """Send a message to the AI and display the response"""
-        logger.info(f"SEND_CHAT_MESSAGE called with send_clicks: {send_clicks}, input_submit: {input_submit}")
-        logger.info(f"SEND_CHAT_MESSAGE message: '{message}'")
-        logger.info(f"SEND_CHAT_MESSAGE has groups_data: {bool(groups_data)}, has summary_data: {bool(summary_data)}")
-
-        if not send_clicks and not input_submit or not message or message.strip() == "":
-            logger.info("SEND_CHAT_MESSAGE: No valid input, preventing update")
+        if not new_message:
             raise PreventUpdate
+
+        logger.info(f"SEND_CHAT_MESSAGE called with message: '{new_message}'")
+        logger.info(f"SEND_CHAT_MESSAGE has groups_data: {bool(groups_data)}, has summary_data: {bool(summary_data)}")
 
         # Initialize chat history if needed
         if chat_history is None:
@@ -1246,21 +1217,16 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
             logger.info("SEND_CHAT_MESSAGE: Initializing empty messages list")
             current_messages = []
 
-        # Add user message to display
+        # Add user message to messages list
         logger.info("SEND_CHAT_MESSAGE: Adding user message to display")
-        user_message = html.Div(message, className="user-message")
-        updated_messages = current_messages + [user_message]
-
-        # Add loading message
-        loading_message = html.Div("Thinking...", className="ai-message loading")
-        messages_with_loading = updated_messages + [loading_message]
+        updated_messages = current_messages + [new_message]
 
         # Update chat history
-        chat_history.append({"role": "user", "content": message})
+        chat_history.append({"role": "user", "content": new_message["content"]})
 
         # Check if the message is related to finance/portfolio
         non_financial_keywords = ["weather", "sports", "politics", "movie", "music", "recipe", "cook", "game", "travel", "vacation"]
-        is_off_topic = any(keyword in message.lower() for keyword in non_financial_keywords)
+        is_off_topic = any(keyword in new_message["content"].lower() for keyword in non_financial_keywords)
 
         try:
             # Generate AI response
@@ -1277,30 +1243,44 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
                 summary = PortfolioSummary.from_dict(summary_data)
                 portfolio_data = prepare_portfolio_data_for_analysis(groups, summary)
 
-                # For now, use a hardcoded response since we can't use async in Dash callbacks without additional setup
-                # In a production environment, we would use a background task or a different approach
-                logger.info("SEND_CHAT_MESSAGE: Using hardcoded response for now")
-                ai_response = "I've analyzed your portfolio and found it to be well-diversified across sectors. Your largest holdings are in technology and healthcare, which are growth-oriented sectors. Your portfolio has a moderate risk profile with a beta of approximately 1.05, slightly higher than the market. Would you like more specific information about any particular aspect of your portfolio?"
+                # Use the synchronous version of the Gemini API call
+                logger.info("SEND_CHAT_MESSAGE: Calling Gemini API with portfolio data")
+                try:
+                    # Initialize Gemini client
+                    logger.info("SEND_CHAT_MESSAGE: Initializing GeminiClient")
+                    client = GeminiClient()
 
-                # TODO: Implement proper async support or use a different approach for API calls
-                # client = GeminiClient()
-                # response = client.chat_sync(message, chat_history, portfolio_data)
-                # ai_response = response.get("response", "I'm sorry, I couldn't generate a response. Please try again.")
-                logger.info("SEND_CHAT_MESSAGE: Generated response for portfolio analysis")
+                    # Get response from Gemini using the synchronous method
+                    logger.info(f"SEND_CHAT_MESSAGE: Calling chat_sync with message: '{new_message['content']}' and {len(chat_history)} history items")
+                    response = client.chat_sync(new_message['content'], chat_history, portfolio_data)
+
+                    # Check if there was an error in the response
+                    if response.get("error", False):
+                        logger.error(f"SEND_CHAT_MESSAGE: Error in Gemini API response: {response.get('response')}")
+                        ai_response = response.get("response", "I'm sorry, I couldn't generate a response. Please try again.")
+                    else:
+                        ai_response = response.get("response", "I'm sorry, I couldn't generate a response. Please try again.")
+                        logger.info(f"SEND_CHAT_MESSAGE: Received response from Gemini API: {len(ai_response)} characters")
+                except Exception as e:
+                    logger.error(f"SEND_CHAT_MESSAGE: Error calling Gemini API: {str(e)}", exc_info=True)
+                    ai_response = f"I encountered an error while processing your request: {str(e)}. Please try again later."
         except Exception as e:
             logger.error(f"Error in AI chat: {str(e)}", exc_info=True)
             ai_response = f"I encountered an error while processing your request. Please try again later."
 
         # Add AI message
         logger.info("SEND_CHAT_MESSAGE: Adding AI response to display")
-        ai_message = html.Div(ai_response, className="ai-message")
+        ai_message = {
+            "role": "assistant",
+            "content": ai_response
+        }
 
         # Add AI response to chat history
         chat_history.append({"role": "assistant", "content": ai_response})
 
-        # Return updated messages, clear input, and updated chat history
-        logger.info("SEND_CHAT_MESSAGE: Returning updated messages and chat history")
-        return updated_messages + [ai_message], "", chat_history
+        # Return updated messages with AI response
+        logger.info("SEND_CHAT_MESSAGE: Returning updated messages")
+        return updated_messages + [ai_message]
 
     # Add callback to handle column sorting
     @app.callback(
