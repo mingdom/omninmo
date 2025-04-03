@@ -8,7 +8,7 @@ user inputs, particularly for CSV file uploads.
 import base64
 import io
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional, Tuple
 
 import pandas as pd
 
@@ -34,8 +34,7 @@ DANGEROUS_PATTERNS = [
     # Excel formula injection patterns
     r'^=',
     r'^@',
-    r'^[+-]',
-    r'^-\d',  # Exclude negative numbers
+    # Removed r'^[+-]' and r'^-\d' as they flag legitimate financial data
     r'^DDE\(',
     r'^EMBED\(',
     r'^HYPERLINK\(',
@@ -48,9 +47,9 @@ DANGEROUS_PATTERNS = [
     r'onerror=',
     r'onload=',
     r'onclick=',
-    # Command injection patterns
-    r'[&|;`]',
-    r'\$\(',
+    # Command injection patterns - modified to exclude common financial data patterns
+    r'[|;`]',  # Removed & to allow S&P in stock names
+    r'\$\([^)]*\)',  # Modified to only match $() pattern, not just $ signs
     r'`.*`',
 ]
 
@@ -80,7 +79,8 @@ def validate_csv_upload(contents: str, filename: Optional[str] = None) -> Tuple[
 
     # Decode base64 content
     try:
-        content_type, content_string = contents.split(',')
+        # Split the content string and ignore the content type part
+        _, content_string = contents.split(',')
         decoded = base64.b64decode(content_string)
     except Exception as e:
         logger.error(f"Error decoding file content: {e}")
@@ -150,6 +150,21 @@ def sanitize_cell(value: Any) -> str:
     if not isinstance(value, str):
         return str(value)
 
+    # Check if this is a financial value with currency symbol (e.g., $123.45, -$123.45)
+    if re.match(r'^[+-]?\$\d+(\.\d+)?$', value) or re.match(r'^\$[+-]?\d+(\.\d+)?$', value):
+        # This is a financial value with currency, leave it as is
+        return value
+
+    # Check if this is a percentage value (e.g., -12.34%, +12.34%)
+    if re.match(r'^[+-]?\d+(\.\d+)?%$', value):
+        # This is a percentage value, leave it as is
+        return value
+
+    # Check if this is a stock name with ampersand (e.g., "S&P 500")
+    if '&' in value and not any(char in value for char in '|;`'):
+        # Contains ampersand but no other dangerous chars, leave it as is
+        return value
+
     # Check for dangerous patterns
     if DANGEROUS_REGEX.search(value):
         logger.warning(f"Potentially dangerous content detected: {value}")
@@ -172,6 +187,16 @@ def sanitize_formula(value: Any) -> str:
     if not isinstance(value, str):
         return str(value)
 
+    # Check if this is a financial value with currency symbol (e.g., $123.45, -$123.45)
+    if re.match(r'^[+-]?\$\d+(\.\d+)?$', value) or re.match(r'^\$[+-]?\d+(\.\d+)?$', value):
+        # This is a financial value with currency, leave it as is
+        return value
+
+    # Check if this is a percentage value (e.g., -12.34%, +12.34%)
+    if re.match(r'^[+-]?\d+(\.\d+)?%$', value):
+        # This is a percentage value, leave it as is
+        return value
+
     # Neutralize formula triggers, but preserve negative numbers
     if value.startswith(('=', '+', '@')):
         # Prefix with apostrophe to neutralize formula
@@ -182,6 +207,14 @@ def sanitize_formula(value: Any) -> str:
         # Check if it's a negative number (integer or float)
         if re.match(r'^-\d+(\.\d+)?$', value):
             # It's a negative number, leave it as is
+            return value
+        # Check if it's a negative dollar amount (e.g., -$123.45)
+        elif re.match(r'^-\$\d+(\.\d+)?$', value):
+            # It's a negative dollar amount, leave it as is
+            return value
+        # Check if it's a negative percentage (e.g., -12.34%)
+        elif re.match(r'^-\d+(\.\d+)?%$', value):
+            # It's a negative percentage, leave it as is
             return value
         else:
             # It's not a number, neutralize it
@@ -200,6 +233,21 @@ def sanitize_dangerous_content(value: str) -> str:
     Returns:
         Sanitized content
     """
+    # Check if this is a financial value with currency symbol (e.g., $123.45, -$123.45)
+    if re.match(r'^[+-]?\$\d+(\.\d+)?$', value) or re.match(r'^\$[+-]?\d+(\.\d+)?$', value):
+        # This is a financial value with currency, leave it as is
+        return value
+
+    # Check if this is a percentage value (e.g., -12.34%, +12.34%)
+    if re.match(r'^[+-]?\d+(\.\d+)?%$', value):
+        # This is a percentage value, leave it as is
+        return value
+
+    # Check if this is a stock name with ampersand (e.g., "S&P 500")
+    if '&' in value and not any(char in value for char in '|;`'):
+        # Contains ampersand but no other dangerous chars, leave it as is
+        return value
+
     # Replace formula triggers
     value = re.sub(r'^=', "'=", value)
     value = re.sub(r'^@', "'@", value)
@@ -217,9 +265,9 @@ def sanitize_dangerous_content(value: str) -> str:
     # Remove event handlers
     value = re.sub(r'on\w+\s*=', "[REMOVED]=", value, flags=re.IGNORECASE)
 
-    # Remove command injection characters
-    value = re.sub(r'[&|;`]', "", value)
-    value = re.sub(r'\$\(', "$(", value)
+    # Remove command injection characters, but preserve ampersands in stock names
+    value = re.sub(r'[|;`]', "", value)
+    value = re.sub(r'\$\([^)]*\)', "[REMOVED]", value)  # Only match $() pattern
     value = re.sub(r'`.*?`', "", value, flags=re.DOTALL)
 
     return value

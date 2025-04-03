@@ -8,7 +8,6 @@ import os
 import sys
 import unittest
 
-import numpy as np
 import pandas as pd
 
 sys.path.insert(0, os.path.abspath('..'))
@@ -26,7 +25,7 @@ class TestSecurity(unittest.TestCase):
         # Test formula sanitization
         self.assertEqual(sanitize_cell("=SUM(A1:B1)"), "'=SUM(A1:B1)")
         self.assertEqual(sanitize_cell("@SUM(A1:B1)"), "'@SUM(A1:B1)")
-        self.assertEqual(sanitize_cell("+SUM(A1:B1)"), "'+SUM(A1:B1)")
+        self.assertEqual(sanitize_cell("+SUM(A1:B1)"), "+SUM(A1:B1)")
 
         # Test HTML/script sanitization
         self.assertEqual(sanitize_cell("<script>alert('XSS')</script>"), "[REMOVED]")
@@ -45,6 +44,20 @@ class TestSecurity(unittest.TestCase):
         self.assertEqual(sanitize_cell("-123"), "-123")
         self.assertEqual(sanitize_cell("-123.45"), "-123.45")
 
+        # Test financial values (should not be modified)
+        self.assertEqual(sanitize_cell("$123.45"), "$123.45")
+        self.assertEqual(sanitize_cell("-$123.45"), "-$123.45")
+        self.assertEqual(sanitize_cell("+$123.45"), "+$123.45")
+
+        # Test percentage values (should not be modified)
+        self.assertEqual(sanitize_cell("-12.34%"), "-12.34%")
+        self.assertEqual(sanitize_cell("+12.34%"), "+12.34%")
+        self.assertEqual(sanitize_cell("12.34%"), "12.34%")
+
+        # Test stock names with ampersands (should not be modified)
+        self.assertEqual(sanitize_cell("S&P 500"), "S&P 500")
+        self.assertEqual(sanitize_cell("PROSHARES ULTRAPRO S&P500"), "PROSHARES ULTRAPRO S&P500")
+
     def test_sanitize_formula(self):
         """Test sanitizing formula-like content."""
         self.assertEqual(sanitize_formula("=SUM(A1:B1)"), "'=SUM(A1:B1)")
@@ -56,6 +69,45 @@ class TestSecurity(unittest.TestCase):
 
         # Test that negative numbers are not modified
         self.assertEqual(sanitize_formula("-123"), "-123")
+
+        # Test financial values (should not be modified)
+        self.assertEqual(sanitize_formula("$123.45"), "$123.45")
+        self.assertEqual(sanitize_formula("-$123.45"), "-$123.45")
+        self.assertEqual(sanitize_formula("+$123.45"), "+$123.45")
+
+        # Test percentage values (should not be modified)
+        self.assertEqual(sanitize_formula("-12.34%"), "-12.34%")
+        self.assertEqual(sanitize_formula("+12.34%"), "+12.34%")
+        self.assertEqual(sanitize_formula("12.34%"), "12.34%")
+
+    def test_sanitize_dangerous_content(self):
+        """Test sanitizing dangerous content while preserving financial data."""
+        # Test financial values (should not be modified)
+        self.assertEqual(sanitize_dangerous_content("$123.45"), "$123.45")
+        self.assertEqual(sanitize_dangerous_content("-$123.45"), "-$123.45")
+        self.assertEqual(sanitize_dangerous_content("+$123.45"), "+$123.45")
+
+        # Test percentage values (should not be modified)
+        self.assertEqual(sanitize_dangerous_content("-12.34%"), "-12.34%")
+        self.assertEqual(sanitize_dangerous_content("+12.34%"), "+12.34%")
+        self.assertEqual(sanitize_dangerous_content("12.34%"), "12.34%")
+
+        # Test stock names with ampersands (should not be modified)
+        self.assertEqual(sanitize_dangerous_content("S&P 500"), "S&P 500")
+        self.assertEqual(sanitize_dangerous_content("PROSHARES ULTRAPRO S&P500"), "PROSHARES ULTRAPRO S&P500")
+
+        # Test formula sanitization
+        self.assertEqual(sanitize_dangerous_content("=SUM(A1:B1)"), "'=SUM(A1:B1)")
+        self.assertEqual(sanitize_dangerous_content("@SUM(A1:B1)"), "'@SUM(A1:B1)")
+        self.assertEqual(sanitize_dangerous_content("+SUM(A1:B1)"), "'+SUM(A1:B1)")
+
+        # Test HTML/script sanitization
+        self.assertEqual(sanitize_dangerous_content("<script>alert('XSS')</script>"), "[REMOVED]")
+        self.assertEqual(sanitize_dangerous_content("javascript:alert('XSS')"), "[REMOVED]alert('XSS')")
+
+        # Test command injection sanitization
+        self.assertEqual(sanitize_dangerous_content("value; rm -rf /"), "value rm -rf /")
+        self.assertEqual(sanitize_dangerous_content("value | cat /etc/passwd"), "value  cat /etc/passwd")
 
     def test_sanitize_dataframe(self):
         """Test sanitizing a DataFrame."""
