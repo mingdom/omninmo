@@ -1,0 +1,82 @@
+name: Deploy to Hugging Face Spaces
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Login to Hugging Face
+        run: |
+          pip install huggingface_hub
+          python -c "from huggingface_hub import login; login('${{ secrets.HF_TOKEN }}')"
+
+      - name: Deploy to Hugging Face Spaces
+        run: |
+          # Clone the Space repository
+          git clone https://huggingface.co/${{ secrets.HF_USERNAME }}/folio space-repo
+
+          # Copy necessary files to the Space repository
+          cp -r src space-repo/
+          cp -r config space-repo/
+          cp requirements.txt space-repo/
+          cp Dockerfile space-repo/
+          cp docker-compose.yml space-repo/
+
+          # Create a README.md for the Space
+          cat > space-repo/README.md << EOL
+          # Folio - Portfolio Dashboard
+
+          This is a Dash-based portfolio dashboard application that provides analysis and visualization of investment portfolios.
+
+          ## Features
+
+          - Portfolio analysis with key metrics
+          - Position grouping (stocks with related options)
+          - Risk metrics calculation
+          - Interactive UI with filtering and sorting
+          - CSV import functionality
+
+          ## How to Use
+
+          1. Click on the "App" tab above
+          2. Upload a portfolio CSV file or use the sample portfolio
+          3. Explore your portfolio data and analysis
+          EOL
+
+          # Add Hugging Face Space configuration
+          cat > space-repo/.github/workflows/docker-build.yml << EOL
+          name: Build and Push Docker image
+          on:
+            push:
+              branches: [main]
+
+          jobs:
+            build-docker:
+              runs-on: ubuntu-latest
+              steps:
+                - name: Checkout
+                  uses: actions/checkout@v3
+
+                - name: Build Docker image
+                  uses: docker/build-push-action@v4
+                  with:
+                    context: .
+                    push: false
+                    tags: folio:latest
+          EOL
+
+          # Commit and push changes to the Space repository
+          cd space-repo
+          git config --global user.email "github-actions@github.com"
+          git config --global user.name "GitHub Actions"
+          git add .
+          git commit -m "Update from GitHub repository"
+          git push https://${{ secrets.HF_USERNAME }}:${{ secrets.HF_TOKEN }}@huggingface.co/${{ secrets.HF_USERNAME }}/folio main

@@ -1,5 +1,6 @@
 import argparse
 import base64
+import os
 import sys
 from pathlib import Path
 from typing import Optional, Union
@@ -1125,6 +1126,12 @@ def main():
         default=8050,
         help="Port to run the server on",
     )
+    parser.add_argument(
+        "--host",
+        type=str,
+        default="127.0.0.1",
+        help="Host to run the server on",
+    )
     args = parser.parse_args()
 
     # Validate portfolio file if provided
@@ -1138,7 +1145,18 @@ def main():
 
     # Create and run app
     app = create_app(portfolio_file, args.debug)
-    app.run_server(debug=args.debug, port=args.port)
+
+    # Display a helpful message about where to access the app
+    is_docker = os.path.exists('/.dockerenv')
+    if is_docker and args.host == '0.0.0.0':
+        logger.info(f"\n\n🚀 Folio is running inside a Docker container!")
+        logger.info(f"📊 Access the dashboard at: http://localhost:{args.port}")
+        logger.info(f"💻 (The app is bound to {args.host}:{args.port} inside the container)\n")
+    else:
+        logger.info(f"\n\n🚀 Folio is running!")
+        logger.info(f"📊 Access the dashboard at: http://localhost:{args.port}\n")
+
+    app.run_server(debug=args.debug, port=args.port, host=args.host)
     return 0
 
 

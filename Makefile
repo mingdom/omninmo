@@ -123,6 +123,9 @@ lint:
 # Lab Projects
 .PHONY: portfolio folio stop-folio port
 
+# Docker targets
+.PHONY: docker-build docker-run docker-compose-up docker-compose-down
+
 portfolio:
 	@echo "Starting portfolio dashboard with sample portfolio.csv..."
 	@if [ ! -d "$(VENV_DIR)" ]; then \
@@ -178,6 +181,26 @@ test:
 	(source $(VENV_DIR)/bin/activate && \
 	PYTHONPATH=. pytest tests/ -v) 2>&1) | tee $(LOGS_DIR)/test_$(TIMESTAMP).log
 	@echo "Test log saved to: $(LOGS_DIR)/test_$(TIMESTAMP).log"
+
+# Docker commands
+docker-build:
+	@echo "Building Docker image..."
+	docker build --debug -t folio:latest .
+
+# Run the Docker container
+docker-run:
+	@echo "Running Docker container..."
+	docker run -p 8050:8050 --env-file .env folio:latest
+
+# Start with docker-compose
+docker-compose-up:
+	@echo "Starting with docker-compose..."
+	docker-compose up -d
+
+# Stop docker-compose services
+docker-compose-down:
+	@echo "Stopping docker-compose services..."
+	docker-compose down
 
 %:
 	@:

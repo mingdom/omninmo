@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Literal, NotRequired, Optional, TypedDict, Union
+from typing import Literal, Optional, TypedDict, Union
 
 
 class PositionDict(TypedDict):
@@ -56,7 +56,7 @@ class PortfolioGroupDict(TypedDict):
     """Type definition for portfolio group dictionary"""
 
     ticker: str
-    stock_position: NotRequired[Union[StockPositionDict, None]]
+    stock_position: Optional[StockPositionDict]
     option_positions: list[OptionPositionDict]
     total_value: float
     net_exposure: float
