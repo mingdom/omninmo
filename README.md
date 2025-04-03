@@ -1,3 +1,14 @@
+---
+title: Folio - Financial Portfolio Dashboard
+emoji: 📊
+colorFrom: indigo
+colorTo: purple
+sdk: docker
+sdk_version: "latest"
+app_file: app.py
+pinned: false
+---
+
 # Folio - Financial Portfolio Dashboard
 
 Folio is a web-based dashboard for analyzing financial portfolios. It provides visualizations and insights for stocks, options, and other financial instruments.
