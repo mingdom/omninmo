@@ -75,11 +75,11 @@ def setup_logger() -> logging.Logger:
         logs_dir = Path("logs")
         logs_dir.mkdir(exist_ok=True)
 
-        # Try to create a file handler, but fall back to console-only logging if it fails
+        # Try to create a file handler with a fixed name (overwriting previous logs)
+        # This ensures we only keep the latest log file
         try:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             file_handler = logging.FileHandler(
-                logs_dir / f"folio_{timestamp}.log", encoding="utf-8"
+                logs_dir / "folio_latest.log", mode="w", encoding="utf-8"
             )
 
             # Set level for file handler

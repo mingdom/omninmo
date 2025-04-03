@@ -130,6 +130,12 @@ Handle errors gracefully and log information that helps diagnose issues quickly.
   - **ERROR**: Actual errors affecting functionality ("Failed to calculate beta for AAPL")
   - **CRITICAL**: Severe errors preventing operation ("Database connection failed")
 
+- **Log Monitoring**:
+  - **Check Latest Logs**: Always check the latest logs in the `logs/` directory after running tests or the application
+  - **Application Logs**: Review `logs/folio_latest.log` after running the application to identify errors
+  - **Test Logs**: Check `logs/test_latest.log` after running tests to catch test failures and errors
+  - **Error Investigation**: When errors occur, examine the logs first for detailed error messages and stack traces
+
 - **Regression Analysis**:
   - **Root Cause Investigation**: Always use `git blame` to understand what caused a regression
   - **Document Findings**: Record regression analysis in devlogs to prevent repeating mistakes
@@ -141,7 +147,9 @@ Thorough testing prevents bugs and ensures code behaves as expected in all scena
 
 - **Testing Workflow**:
   - **Always Test Changes**: Run `make test` after ANY change - no exceptions!
+  - **Check Test Logs**: Always review `logs/test_latest.log` after running tests to identify failures
   - **Test Application**: Use `make portfolio` to test with sample data
+  - **Review App Logs**: Check `logs/folio_latest.log` after running the application to catch errors
   - **Test Real Data**: Use `src/lab/portfolio.csv` for testing with real portfolio data
 
 - **Testing Strategy**:

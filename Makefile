@@ -113,8 +113,8 @@ lint:
 	(source $(VENV_DIR)/bin/activate && \
 	echo "Running linter..." && \
 	ruff check --fix --unsafe-fixes .) \
-	2>&1) | tee $(LOGS_DIR)/code_check_$(TIMESTAMP).log
-	@echo "Check log saved to: $(LOGS_DIR)/code_check_$(TIMESTAMP).log"
+	2>&1) | tee $(LOGS_DIR)/code_check_latest.log
+	@echo "Check log saved to: $(LOGS_DIR)/code_check_latest.log"
 
 # Allow --fix as target without actions
 .PHONY: --fix
@@ -179,8 +179,8 @@ test:
 	@(echo "=== Test Run Log $(TIMESTAMP) ===" && \
 	echo "Starting tests at: $$(date)" && \
 	(source $(VENV_DIR)/bin/activate && \
-	PYTHONPATH=. pytest tests/ -v) 2>&1) | tee $(LOGS_DIR)/test_$(TIMESTAMP).log
-	@echo "Test log saved to: $(LOGS_DIR)/test_$(TIMESTAMP).log"
+	PYTHONPATH=. pytest tests/ -v) 2>&1) | tee $(LOGS_DIR)/test_latest.log
+	@echo "Test log saved to: $(LOGS_DIR)/test_latest.log"
 
 # Docker commands
 docker-build:

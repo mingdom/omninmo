@@ -47,6 +47,10 @@ However, the current implementation has some gaps:
 
 - [x] Phase 1: Basic Chat UI (Completed)
 - [ ] Phase 2: Gemini API Integration
+  - [x] Create GeminiClient class with chat functionality
+  - [x] Add system prompt for portfolio advisor role
+  - [ ] Implement proper async support for Dash callbacks
+  - [ ] Connect chat interface to Gemini API
 - [ ] Phase 3: Portfolio Analysis Capabilities
 - [ ] Phase 4: Enhanced Conversational Features
 
@@ -106,7 +110,26 @@ However, the current implementation has some gaps:
 
 ## Technical Design
 
-### 1. Chat Interface Integration
+### 1. Async Callback Support
+
+Dash doesn't natively support async callbacks in the way we need for the Gemini API. We have a few options to address this:
+
+1. **Use a Background Task Queue**:
+   - Implement a task queue (like Celery or RQ) to handle API calls asynchronously
+   - Store chat messages in a database or cache
+   - Use polling or WebSockets to update the UI when responses are ready
+
+2. **Use Dash Long Callback**:
+   - Implement Dash's long callback pattern for handling async operations
+   - Requires additional setup and potentially a Redis backend
+
+3. **Use a Synchronous API Call**:
+   - Use the synchronous version of the Gemini API call
+   - May block the UI during API calls, but simpler to implement
+
+For the initial implementation, we'll use option 3 (synchronous calls) and later upgrade to option 1 or 2 for better performance.
+
+### 2. Chat Interface Integration
 
 Update the `send_chat_message` function in `app.py` to use the `GeminiClient`:
 
@@ -129,31 +152,31 @@ Update the `send_chat_message` function in `app.py` to use the `GeminiClient`:
     ],
     prevent_initial_call=True
 )
-async def send_chat_message(send_clicks, input_submit, message, current_messages, 
+async def send_chat_message(send_clicks, input_submit, message, current_messages,
                            groups_data, summary_data, chat_history):
     """Send a message to the AI and display the response"""
     if not send_clicks and not input_submit or not message or message.strip() == "":
         raise PreventUpdate
-        
+
     # Initialize chat history if needed
     if chat_history is None:
         chat_history = []
-    
+
     # Get current messages or initialize
     if current_messages is None:
         current_messages = []
-    
+
     # Add user message to display
     user_message = html.Div(message, className="user-message")
     updated_messages = current_messages + [user_message]
-    
+
     # Add loading message
     loading_message = html.Div("Thinking...", className="ai-message loading")
     messages_with_loading = updated_messages + [loading_message]
-    
+
     # Update chat history
     chat_history.append({"role": "user", "content": message})
-    
+
     try:
         # Check if we have portfolio data
         if not groups_data or not summary_data:
@@ -163,24 +186,24 @@ async def send_chat_message(send_clicks, input_submit, message, current_messages
             groups = [PortfolioGroup.from_dict(g) for g in groups_data]
             summary = PortfolioSummary.from_dict(summary_data)
             portfolio_data = prepare_portfolio_data_for_analysis(groups, summary)
-            
+
             # Initialize Gemini client
             client = GeminiClient()
-            
+
             # Get response from Gemini
             response = await client.chat(message, chat_history, portfolio_data)
             ai_response = response.get("response", "I'm sorry, I couldn't generate a response. Please try again.")
-    
+
     except Exception as e:
         logger.error(f"Error in AI chat: {str(e)}", exc_info=True)
         ai_response = f"I encountered an error while processing your request. Please try again later."
-    
+
     # Add AI response to chat history
     chat_history.append({"role": "assistant", "content": ai_response})
-    
+
     # Add AI message to display
     ai_message = html.Div(ai_response, className="ai-message")
-    
+
     # Return updated messages and clear input
     return updated_messages + [ai_message], "", chat_history
 ```
@@ -190,23 +213,23 @@ async def send_chat_message(send_clicks, input_submit, message, current_messages
 Update the `GeminiClient` class to support chat functionality:
 
 ```python
-async def chat(self, message: str, history: List[Dict[str, str]], 
+async def chat(self, message: str, history: List[Dict[str, str]],
               portfolio_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """
     Generate a response to a user message in the context of their portfolio.
-    
+
     Args:
         message: The user's message
         history: List of previous messages in the conversation
         portfolio_data: Optional dictionary containing portfolio information
-        
+
     Returns:
         Dictionary with the AI response and any additional data
     """
     try:
         # Create the conversation context with portfolio data if available
         context = self._create_conversation_context(portfolio_data)
-        
+
         # Format the conversation history for the model
         formatted_history = []
         for msg in history[-10:]:  # Limit to last 10 messages for context window
@@ -214,28 +237,28 @@ async def chat(self, message: str, history: List[Dict[str, str]],
                 "role": msg["role"],
                 "parts": [msg["content"]]
             })
-        
+
         # Add the current message
         formatted_history.append({
             "role": "user",
             "parts": [message]
         })
-        
+
         # If we have portfolio context, add it to the first user message
         if context and formatted_history:
             for i, msg in enumerate(formatted_history):
                 if msg["role"] == "user":
                     formatted_history[i]["parts"] = [context + "\n\n" + msg["parts"][0]]
                     break
-        
+
         # Generate response
         response = await self.model.generate_content_async(formatted_history)
-        
+
         return {
             "response": response.text,
             "complete": True
         }
-        
+
     except Exception as e:
         logger.error(f"Error in chat: {str(e)}", exc_info=True)
         return {
@@ -243,28 +266,28 @@ async def chat(self, message: str, history: List[Dict[str, str]],
             "complete": False,
             "error": True
         }
-        
+
 def _create_conversation_context(self, portfolio_data: Optional[Dict[str, Any]]) -> str:
     """
     Create a context string with portfolio information for the AI.
-    
+
     Args:
         portfolio_data: Dictionary containing portfolio information
-        
+
     Returns:
         Formatted context string
     """
     if not portfolio_data:
         return ""
-        
+
     # Extract key portfolio metrics
     positions = portfolio_data.get("positions", [])
     summary = portfolio_data.get("summary", {})
-    
+
     # Format positions data (limit to top 10 by value for context size)
     sorted_positions = sorted(positions, key=lambda p: abs(p.get("market_value", 0)), reverse=True)
     top_positions = sorted_positions[:10]
-    
+
     positions_text = "\n".join([
         f"- {pos['ticker']}: {pos['position_type'].upper()}, "
         f"Value: ${pos['market_value']:.2f}, "
@@ -272,26 +295,26 @@ def _create_conversation_context(self, portfolio_data: Optional[Dict[str, Any]])
         f"Weight: {pos['weight']:.2%}"
         for pos in top_positions
     ])
-    
+
     # Format summary data
     total_value = summary.get("total_value_net", 0)
     portfolio_beta = summary.get("portfolio_beta", 0)
-    
+
     # Construct the context
     context = f"""
     PORTFOLIO CONTEXT:
-    
+
     Summary:
     - Total Value: ${total_value:.2f}
     - Portfolio Beta: {portfolio_beta:.2f}
     - Number of Positions: {len(positions)}
-    
+
     Top Positions:
     {positions_text}
-    
+
     Use this information to provide relevant advice and analysis.
     """
-    
+
     return context
 ```
 

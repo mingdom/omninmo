@@ -114,6 +114,28 @@ class Position:
             "position_beta": self.position_beta,
         }
 
+    @classmethod
+    def from_dict(cls, data: PositionDict) -> 'Position':
+        """Create a Position from a dictionary
+
+        Args:
+            data: Dictionary representation of a Position
+
+        Returns:
+            A new Position instance
+        """
+        return cls(
+            ticker=data["ticker"],
+            position_type=data["position_type"],
+            quantity=data["quantity"],
+            market_value=data["market_value"],
+            beta=data["beta"],
+            beta_adjusted_exposure=data["beta_adjusted_exposure"],
+            clean_value=data.get("clean_value", data["market_value"]),
+            weight=data.get("weight", 1.0),
+            position_beta=data.get("position_beta", data["beta"])
+        )
+
 
 @dataclass
 class OptionPosition(Position):
@@ -153,6 +175,35 @@ class OptionPosition(Position):
             "underlying_beta": self.underlying_beta,
         }
 
+    @classmethod
+    def from_dict(cls, data: OptionPositionDict) -> 'OptionPosition':
+        """Create an OptionPosition from a dictionary
+
+        Args:
+            data: Dictionary representation of an OptionPosition
+
+        Returns:
+            A new OptionPosition instance
+        """
+        return cls(
+            ticker=data["ticker"],
+            position_type=data["position_type"],
+            quantity=data["quantity"],
+            market_value=data["market_value"],
+            beta=data["beta"],
+            beta_adjusted_exposure=data["beta_adjusted_exposure"],
+            clean_value=data.get("clean_value", data["market_value"]),
+            weight=data.get("weight", 1.0),
+            position_beta=data.get("position_beta", data["beta"]),
+            strike=data["strike"],
+            expiry=data["expiry"],
+            option_type=data["option_type"],
+            delta=data["delta"],
+            delta_exposure=data["delta_exposure"],
+            notional_value=data["notional_value"],
+            underlying_beta=data["underlying_beta"]
+        )
+
 
 @dataclass
 class StockPosition:
@@ -177,6 +228,24 @@ class StockPosition:
             "weight": 1.0,
             "position_beta": self.beta,
         }
+
+    @classmethod
+    def from_dict(cls, data: StockPositionDict) -> 'StockPosition':
+        """Create a StockPosition from a dictionary
+
+        Args:
+            data: Dictionary representation of a StockPosition
+
+        Returns:
+            A new StockPosition instance
+        """
+        return cls(
+            ticker=data["ticker"],
+            quantity=data["quantity"],
+            market_value=data["market_value"],
+            beta=data["beta"],
+            beta_adjusted_exposure=data["beta_adjusted_exposure"]
+        )
 
 
 @dataclass
@@ -228,6 +297,42 @@ class PortfolioGroup:
             "put_count": self.put_count,
             "net_option_value": self.net_option_value,
         }
+
+    @classmethod
+    def from_dict(cls, data: PortfolioGroupDict) -> 'PortfolioGroup':
+        """Create a PortfolioGroup from a dictionary
+
+        Args:
+            data: Dictionary representation of a PortfolioGroup
+
+        Returns:
+            A new PortfolioGroup instance
+        """
+        # Create stock position if present
+        stock_position = None
+        if data.get("stock_position"):
+            stock_position = StockPosition.from_dict(data["stock_position"])
+
+        # Create option positions
+        option_positions = []
+        for opt_data in data.get("option_positions", []):
+            option_positions.append(OptionPosition.from_dict(opt_data))
+
+        # Create the group
+        return cls(
+            ticker=data["ticker"],
+            stock_position=stock_position,
+            option_positions=option_positions,
+            total_value=data["total_value"],
+            net_exposure=data["net_exposure"],
+            beta=data["beta"],
+            beta_adjusted_exposure=data["beta_adjusted_exposure"],
+            total_delta_exposure=data["total_delta_exposure"],
+            options_delta_exposure=data["options_delta_exposure"],
+            call_count=data.get("call_count", 0),
+            put_count=data.get("put_count", 0),
+            net_option_value=data.get("net_option_value", 0.0)
+        )
 
     def get_details(
         self,
@@ -285,6 +390,28 @@ class ExposureBreakdown:
             "formula": self.formula,
             "components": self.components,
         }
+
+    @classmethod
+    def from_dict(cls, data: ExposureBreakdownDict) -> 'ExposureBreakdown':
+        """Create an ExposureBreakdown from a dictionary
+
+        Args:
+            data: Dictionary representation of an ExposureBreakdown
+
+        Returns:
+            A new ExposureBreakdown instance
+        """
+        return cls(
+            stock_value=data["stock_value"],
+            stock_beta_adjusted=data["stock_beta_adjusted"],
+            option_delta_value=data["option_delta_value"],
+            option_beta_adjusted=data["option_beta_adjusted"],
+            total_value=data["total_value"],
+            total_beta_adjusted=data["total_beta_adjusted"],
+            description=data["description"],
+            formula=data["formula"],
+            components=data["components"]
+        )
 
 
 @dataclass
@@ -407,6 +534,41 @@ class PortfolioSummary:
             "cash_like_count": self.cash_like_count,
             "help_text": self.help_text if self.help_text is not None else {},
         }
+
+    @classmethod
+    def from_dict(cls, data: PortfolioSummaryDict) -> 'PortfolioSummary':
+        """Create a PortfolioSummary from a dictionary
+
+        Args:
+            data: Dictionary representation of a PortfolioSummary
+
+        Returns:
+            A new PortfolioSummary instance
+        """
+        # Create exposure breakdowns
+        long_exposure = ExposureBreakdown.from_dict(data["long_exposure"])
+        short_exposure = ExposureBreakdown.from_dict(data["short_exposure"])
+        options_exposure = ExposureBreakdown.from_dict(data["options_exposure"])
+
+        # Create cash-like positions
+        cash_like_positions = []
+        for pos_data in data.get("cash_like_positions", []):
+            cash_like_positions.append(StockPosition.from_dict(pos_data))
+
+        return cls(
+            total_value_net=data["total_value_net"],
+            total_value_abs=data["total_value_abs"],
+            portfolio_beta=data["portfolio_beta"],
+            long_exposure=long_exposure,
+            short_exposure=short_exposure,
+            options_exposure=options_exposure,
+            short_percentage=data["short_percentage"],
+            exposure_reduction_percentage=data["exposure_reduction_percentage"],
+            cash_like_positions=cash_like_positions,
+            cash_like_value=data["cash_like_value"],
+            cash_like_count=data["cash_like_count"],
+            help_text=data.get("help_text")
+        )
 
 
 def create_portfolio_group(

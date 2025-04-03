@@ -12,6 +12,8 @@ import pandas as pd
 from dash import ALL, Input, Output, State, callback_context, dcc, html
 from dash.exceptions import PreventUpdate
 
+# Import directly from utils.py
+from . import utils
 # Import AI utilities directly
 from .ai_utils import prepare_portfolio_data_for_analysis
 # AI chat components removed - using simple implementation
@@ -24,8 +26,6 @@ from .exceptions import StateError
 from .gemini_client import GeminiClient
 from .logger import logger
 from .security import sanitize_dataframe, validate_csv_upload
-# Import from utils module
-from .utils import format_beta, format_currency, process_portfolio_data
 
 
 def create_header() -> dbc.Card:
@@ -788,7 +788,7 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
                 )
 
             # Process portfolio data
-            groups, summary, cash_like_positions = process_portfolio_data(df)
+            groups, summary, cash_like_positions = utils.process_portfolio_data(df)
             logger.info(f"Successfully processed {len(groups)} portfolio groups and {len(cash_like_positions)} cash-like positions")
 
             # Convert to Dash-compatible format
@@ -834,30 +834,30 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
             )
 
             return [
-                format_currency(summary_data["total_value_net"]),
-                format_beta(summary_data["portfolio_beta"]),
-                format_currency(summary_data["long_exposure"]["total_value"]),
-                format_beta(
+                utils.format_currency(summary_data["total_value_net"]),
+                utils.format_beta(summary_data["portfolio_beta"]),
+                utils.format_currency(summary_data["long_exposure"]["total_value"]),
+                utils.format_beta(
                     summary_data["long_exposure"]["total_beta_adjusted"]
                     / summary_data["long_exposure"]["total_value"]
                     if summary_data["long_exposure"]["total_value"] != 0
                     else 0
                 ),
-                format_currency(summary_data["short_exposure"]["total_value"]),
-                format_beta(
+                utils.format_currency(summary_data["short_exposure"]["total_value"]),
+                utils.format_beta(
                     summary_data["short_exposure"]["total_beta_adjusted"]
                     / summary_data["short_exposure"]["total_value"]
                     if summary_data["short_exposure"]["total_value"] != 0
                     else 0
                 ),
-                format_currency(summary_data["options_exposure"]["total_value"]),
-                format_beta(
+                utils.format_currency(summary_data["options_exposure"]["total_value"]),
+                utils.format_beta(
                     summary_data["options_exposure"]["total_beta_adjusted"]
                     / summary_data["options_exposure"]["total_value"]
                     if summary_data["options_exposure"]["total_value"] != 0
                     else 0
                 ),
-                format_currency(summary_data["cash_like_value"]),
+                utils.format_currency(summary_data["cash_like_value"]),
                 f"{cash_like_percent:.1f}%",
             ]
 
