@@ -210,18 +210,7 @@ def create_empty_state() -> html.Div:
                 color="primary",
                 className="mx-auto d-block",
             ),
-            html.Div(
-                [
-                    html.P(
-                        [
-                            "Tip: Use ",
-                            html.Kbd("Cmd+O") if sys.platform == "darwin" else html.Kbd("Ctrl+O"),
-                            " to quickly open a portfolio file",
-                        ],
-                        className="text-center text-muted small mt-4",
-                    ),
-                ]
-            ),
+            # Keyboard shortcut hint removed
         ],
         className="empty-state py-5",
     )
@@ -490,52 +479,7 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
         Input("url", "pathname"),
     )
 
-    # Add keyboard shortcut for opening files
-    app.clientside_callback(
-        """
-        function(n_intervals) {
-            document.addEventListener('keydown', function(e) {
-                // CMD+O or CTRL+O
-                if ((e.metaKey || e.ctrlKey) && e.key === 'o') {
-                    e.preventDefault();
-                    // Create a hidden file input and trigger it
-                    var fileInput = document.createElement('input');
-                    fileInput.type = 'file';
-                    fileInput.accept = '.csv';
-                    fileInput.style.display = 'none';
-                    document.body.appendChild(fileInput);
-
-                    // When a file is selected, trigger the upload component
-                    fileInput.addEventListener('change', function() {
-                        if (fileInput.files.length > 0) {
-                            var file = fileInput.files[0];
-                            var upload = document.getElementById('upload-portfolio');
-
-                            // Create a new DataTransfer object and add the file
-                            var dataTransfer = new DataTransfer();
-                            dataTransfer.items.add(file);
-
-                            // Create and dispatch a drop event
-                            var dropEvent = new Event('drop', {bubbles: true});
-                            dropEvent.dataTransfer = dataTransfer;
-                            upload.dispatchEvent(dropEvent);
-
-                            // Clean up
-                            document.body.removeChild(fileInput);
-                        }
-                    });
-
-                    // Trigger the file dialog
-                    fileInput.click();
-                    return true;
-                }
-            });
-            return true;
-        }
-        """,
-        Output("keyboard-shortcut-listener", "data"),
-        Input("interval-component", "n_intervals"),
-    )
+    # Keyboard shortcut functionality removed as it was causing issues
 
     # Toggle upload section collapse
     @app.callback(

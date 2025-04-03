@@ -8,7 +8,7 @@ This development plan outlines the implementation of several UI Quality of Life 
 - [ ] **Loading UI**: Implement loading spinners and visual feedback during data processing
 - [ ] **User-friendly instructions**: Add clear instructions and hide portfolio on initial upload
 - [ ] **Professional interface with dark mode**: Implement a dark theme as default with toggle option
-- [ ] **Keyboard shortcuts**: Add CMD+O/CTRL+O for opening portfolio CSV files
+- [ ] **Keyboard shortcuts**: Removed due to browser compatibility issues
 - [ ] **File dialog improvements**: Default filter for portfolio CSV files
 
 ## Detailed Implementation Plan
@@ -122,37 +122,15 @@ def toggle_theme(n_clicks, current_theme):
 
 ### Phase 4: Keyboard Shortcuts
 
-#### 4.1 File Opening Shortcut
-- Implement CMD+O (macOS) / CTRL+O (Windows/Linux) for opening files
-- Add keyboard shortcut hints in the UI
-- Ensure shortcuts work across different browsers
+#### 4.1 Keyboard Shortcut Status
+- Keyboard shortcuts have been removed from the current implementation due to browser compatibility issues
+- Future implementations may revisit this feature with a more robust approach
+- Focus will be on improving the direct UI interactions instead
 
-#### 4.2 Additional Shortcuts
-- Add keyboard navigation for table rows
-- Implement ESC key to close modals
-- Add shortcut for refreshing data
-
-#### 4.3 Technical Approach
-```python
-# Example implementation for keyboard shortcuts
-app.clientside_callback(
-    """
-    function(n_intervals) {
-        document.addEventListener('keydown', function(e) {
-            // CMD+O or CTRL+O
-            if ((e.metaKey || e.ctrlKey) && e.key === 'o') {
-                e.preventDefault();
-                document.getElementById('upload-portfolio').click();
-                return true;
-            }
-        });
-        return true;
-    }
-    """,
-    Output("keyboard-shortcut-listener", "data"),
-    Input("interval-component", "n_intervals"),
-)
-```
+#### 4.2 Alternative Improvements
+- Enhance the file upload component for better usability
+- Improve visual feedback during file selection
+- Add clearer instructions for file upload process
 
 ### Phase 5: File Dialog Improvements
 
