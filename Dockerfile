@@ -8,6 +8,8 @@ ENV PYTHONPATH=/app
 # The application will check for HF_SPACE environment variable to determine the environment
 ENV PORT=8050
 ENV HF_SPACE=1
+# Set logging level to WARNING for Hugging Face deployment (for privacy reasons)
+ENV LOG_LEVEL=WARNING
 
 # Install only the necessary system dependencies
 RUN apt-get update && \

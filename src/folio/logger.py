@@ -9,9 +9,13 @@ def setup_logger() -> logging.Logger:
     """Set up and configure the logger
 
     This function configures the logger to:
-    1. Write DEBUG and higher messages to a timestamped log file
-    2. Write INFO and higher messages to the console
+    1. Write DEBUG and higher messages to a timestamped log file (except on Hugging Face)
+    2. Write messages to the console at the level specified by LOG_LEVEL env var (default: INFO)
     3. Prevent duplicate messages by disabling propagation
+
+    Environment variables:
+        LOG_LEVEL: The logging level to use (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+                  Default is INFO for normal environments, WARNING for Hugging Face
 
     Returns:
         logging.Logger: Configured logger instance
@@ -21,12 +25,19 @@ def setup_logger() -> logging.Logger:
     # In other environments, use the logs directory in the current working directory
     is_huggingface = os.environ.get('HF_SPACE') == '1' or os.environ.get('SPACE_ID') is not None
 
-    if is_huggingface:
-        logs_dir = Path("/tmp")
+    # Get log level from environment variable
+    # Default to WARNING for Hugging Face, INFO for other environments
+    log_level_str = os.environ.get('LOG_LEVEL')
+    if log_level_str:
+        # Use the provided log level
+        log_level_str = log_level_str.upper()
+        log_level = getattr(logging, log_level_str, None)
+        if log_level is None:
+            print(f"Invalid LOG_LEVEL: {log_level_str}. Using default.")
+            log_level = logging.WARNING if is_huggingface else logging.INFO
     else:
-        logs_dir = Path("logs")
-        # Only create the directory if we're not in Hugging Face
-        logs_dir.mkdir(exist_ok=True)
+        # Use default log level based on environment
+        log_level = logging.WARNING if is_huggingface else logging.INFO
 
     # Configure root logger to prevent duplicate logs
     root_logger = logging.getLogger()
@@ -43,28 +54,14 @@ def setup_logger() -> logging.Logger:
 
     # Create our application logger
     logger = logging.getLogger("folio")
-    logger.setLevel(logging.DEBUG)
+    logger.setLevel(logging.DEBUG)  # Set to DEBUG to allow all levels to be logged based on handlers
     logger.propagate = False  # Prevent propagation to avoid duplicate logs
 
     # Create handlers
     console_handler = logging.StreamHandler()
 
-    # Try to create a file handler, but fall back to console-only logging if it fails
-    try:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        file_handler = logging.FileHandler(
-            logs_dir / f"folio_{timestamp}.log", encoding="utf-8"
-        )
-        use_file_handler = True
-    except (PermissionError, OSError):
-        # If we can't create a log file, log to console only
-        logger = logging.getLogger("folio")
-        logger.setLevel(logging.DEBUG)
-        logger.warning("Could not create log file. Logging to console only.")
-        use_file_handler = False
-
-    # Set level for console handler
-    console_handler.setLevel(logging.INFO)
+    # Set level for console handler based on environment variable
+    console_handler.setLevel(log_level)
 
     # Create formatters
     console_formatter = logging.Formatter("%(levelname)s: %(message)s")
@@ -73,19 +70,32 @@ def setup_logger() -> logging.Logger:
     # Add console handler to logger
     logger.addHandler(console_handler)
 
-    # Only set up file handler if we were able to create it
-    if use_file_handler:
-        # Set level for file handler
-        file_handler.setLevel(logging.DEBUG)
+    # Only create file handler if not on Hugging Face (for privacy reasons)
+    if not is_huggingface:
+        logs_dir = Path("logs")
+        logs_dir.mkdir(exist_ok=True)
 
-        # Create formatter for file handler
-        file_formatter = logging.Formatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-        )
-        file_handler.setFormatter(file_formatter)
+        # Try to create a file handler, but fall back to console-only logging if it fails
+        try:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            file_handler = logging.FileHandler(
+                logs_dir / f"folio_{timestamp}.log", encoding="utf-8"
+            )
 
-        # Add file handler to logger
-        logger.addHandler(file_handler)
+            # Set level for file handler
+            file_handler.setLevel(logging.DEBUG)
+
+            # Create formatter for file handler
+            file_formatter = logging.Formatter(
+                "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+            )
+            file_handler.setFormatter(file_formatter)
+
+            # Add file handler to logger
+            logger.addHandler(file_handler)
+        except (PermissionError, OSError):
+            # If we can't create a log file, log to console only
+            logger.warning("Could not create log file. Logging to console only.")
 
     logger.info("Logger initialized")
     return logger

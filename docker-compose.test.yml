@@ -9,6 +9,7 @@ services:
       - PORT=8050
       - PYTHONPATH=/app
       - DATA_SOURCE=yfinance
+      - LOG_LEVEL=INFO
     volumes:
       - ./config:/app/config
       - ./data:/app/data
