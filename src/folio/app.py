@@ -13,8 +13,9 @@ import pandas as pd
 from dash import ALL, Input, Output, State, callback_context, dcc, html
 from dash.exceptions import PreventUpdate
 
-# Import directly from utils.py
-from . import utils
+# Import portfolio processing functions
+# Import utility functions
+from . import portfolio, utils
 # Import AI utilities directly
 from .ai_utils import prepare_portfolio_data_for_analysis
 # AI chat components removed - using simple implementation
@@ -769,7 +770,7 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
                 )
 
             # Process portfolio data
-            groups, summary, cash_like_positions = utils.process_portfolio_data(df)
+            groups, summary, cash_like_positions = portfolio.process_portfolio_data(df)
             logger.info(f"Successfully processed {len(groups)} portfolio groups and {len(cash_like_positions)} cash-like positions")
 
             # Convert to Dash-compatible format

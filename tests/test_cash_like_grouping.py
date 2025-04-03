@@ -3,10 +3,7 @@
 import pandas as pd
 import pytest
 
-from src.folio.utils import (
-    is_cash_or_short_term,
-    process_portfolio_data,
-)
+from src.folio.portfolio import is_cash_or_short_term, process_portfolio_data
 
 
 def test_is_cash_or_short_term():
@@ -58,7 +55,9 @@ def test_cash_like_positions_identification():
     assert "AAPL" not in cash_like_tickers
 
     # Check that the values are correct
-    cash_like_values = {pos["ticker"]: pos["market_value"] for pos in cash_like_positions}
+    cash_like_values = {
+        pos["ticker"]: pos["market_value"] for pos in cash_like_positions
+    }
     assert cash_like_values["SPAXX"] == 1000.00
     assert cash_like_values["SHY"] == 4000.00
     assert cash_like_values["CASH"] == 2000.00
@@ -99,10 +98,17 @@ def test_portfolio_summary_cash_like_metrics():
 def test_empty_portfolio():
     """Test handling of an empty portfolio."""
     # Create an empty DataFrame
-    df = pd.DataFrame(columns=[
-        "Symbol", "Description", "Quantity", "Last Price",
-        "Current Value", "Type", "Percent Of Account"
-    ])
+    df = pd.DataFrame(
+        columns=[
+            "Symbol",
+            "Description",
+            "Quantity",
+            "Last Price",
+            "Current Value",
+            "Type",
+            "Percent Of Account",
+        ]
+    )
 
     # Process the empty portfolio
     groups, summary, cash_like_positions = process_portfolio_data(df)
@@ -178,7 +184,9 @@ def test_position_deduplication():
     assert tlt_position["quantity"] == 150  # Combined quantity
 
     # Find SPAXX position
-    spaxx_position = next(pos for pos in cash_like_positions if pos["ticker"] == "SPAXX")
+    spaxx_position = next(
+        pos for pos in cash_like_positions if pos["ticker"] == "SPAXX"
+    )
     assert spaxx_position["market_value"] == 3000.00  # Combined value
     assert spaxx_position["quantity"] == 3000  # Combined quantity
 

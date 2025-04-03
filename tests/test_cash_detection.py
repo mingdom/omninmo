@@ -2,7 +2,7 @@ from unittest.mock import patch
 
 import pytest
 
-from src.folio.utils import is_cash_or_short_term
+from src.folio.portfolio import is_cash_or_short_term
 
 
 @pytest.fixture

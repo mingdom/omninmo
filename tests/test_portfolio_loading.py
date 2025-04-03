@@ -2,7 +2,7 @@ import pandas as pd
 import pytest
 
 import src.folio.utils
-from src.folio.utils import process_portfolio_data
+from src.folio.portfolio import process_portfolio_data
 
 
 @pytest.fixture(autouse=True)
