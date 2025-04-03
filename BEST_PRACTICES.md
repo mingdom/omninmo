@@ -55,12 +55,34 @@ Follow consistent development practices to maintain code quality and developer p
   - **Cache Files**: Use hidden directories (`.cache_*`) for cache files
 
 - **Version Control**:
-  - **Commit Messages**: When asked to write a commit message, provide it directly as a markdown code block (```...```) in the chat, not as a separate file
   - **Never Commit Directly**: Let the user handle all git operations
   - **⚠️ NEVER USE GIT IN SCRIPTS**: Do not write scripts that use git commands - this can lead to catastrophic data loss and irreversible history modification
   - **Manual Git Operations**: All git operations must be performed manually by the user, never automated
   - **Preserve Git History**: Never modify Git history without explicit user consent and understanding of the consequences
   - **Transparent Operations**: All version control suggestions must be explicit, visible, and explained clearly
+
+- **Commit Messages**:
+  - **Delivery Format**: When asked to write a commit message, provide it directly as a markdown code block (```...```) in the chat, not as a separate file
+  - **Conventional Format**: Follow the conventional commits format with a type prefix
+  - **Message Structure**: Use a concise title (50 chars max) followed by a blank line and then a detailed body
+  - **Title Format**: `<type>: <concise description in imperative mood>`
+    - **Types**: feat (new feature), fix (bug fix), docs (documentation), style (formatting), refactor, test, chore (maintenance)
+    - **Examples**:
+      - `feat: add user authentication system`
+      - `fix: resolve database connection timeout issue`
+      - `docs: update deployment instructions`
+  - **Title Guidelines**:
+    - Use imperative mood ("Add feature" not "Added feature")
+    - Capitalize the first word after the type prefix
+    - Don't end with a period
+    - Keep under 50 characters
+    - Be specific about what changed
+  - **Body Guidelines**:
+    - Explain the "what" and "why" of the change, not the "how"
+    - Wrap text at 72 characters
+    - Use bullet points for multiple points
+    - Reference issues or tickets where applicable
+    - Don't use phrases like "This commit..."
 
 ### �💻 Implementation
 *Supports SIMPLICITY and RELIABILITY*
