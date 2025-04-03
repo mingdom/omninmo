@@ -16,16 +16,11 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends gcc && \
     rm -rf /var/lib/apt/lists/*
 
+# Copy requirements file
+COPY requirements-docker.txt .
+
 # Install all required packages
-RUN pip install --no-cache-dir \
-    dash==2.14.2 \
-    dash-bootstrap-components==1.5.0 \
-    yfinance>=0.2.37 \
-    PyYAML==6.0.1 \
-    requests==2.31.0 \
-    scipy>=1.11.0 \
-    pandas==2.2.1 \
-    numpy==1.26.4
+RUN pip install --no-cache-dir -r requirements-docker.txt
 
 # Copy all necessary application code
 COPY src ./src
@@ -33,6 +28,6 @@ COPY src ./src
 # Expose both ports (7860 for Hugging Face, 8050 for local)
 EXPOSE 7860 8050
 
-# Run the application with Python directly
+# Run the application with Uvicorn for improved security and performance
 # The entrypoint script will determine the correct port based on environment
-CMD ["sh", "-c", "if [ -n \"$HF_SPACE\" ]; then PORT=7860; fi && python -m src.folio.app --port $PORT --host 0.0.0.0"]
+CMD ["sh", "-c", "if [ -n \"$HF_SPACE\" ]; then PORT=7860; fi && uvicorn src.folio.app:server --host 0.0.0.0 --port $PORT --workers 2 --timeout-keep-alive 60"]

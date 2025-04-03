@@ -11,9 +11,9 @@ typing_extensions>=4.7.1  # For backporting newer typing features to Python 3.9
 # Data source
 yfinance>=0.2.37  # For portfolio beta calculation
 
-# Web application
-dash==2.14.2
-dash-bootstrap-components==1.5.0
+# Web application - using latest versions for security updates
+dash>=2.14.2
+dash-bootstrap-components>=1.5.0
 
-# WSGI server for production
-gunicorn==21.2.0
+# ASGI server for production - always use latest for security
+uvicorn>=0.27.1

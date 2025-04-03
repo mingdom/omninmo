@@ -34,8 +34,18 @@ if ! is_package_installed "matplotlib"; then
     python3 -m pip install --no-cache-dir matplotlib --no-warn-script-location
 fi
 
-# Install other dependencies from requirements.txt
-echo "Installing remaining Python dependencies from requirements.txt..."
+# Install Folio app dependencies from requirements-docker.txt
+echo "Installing Folio app dependencies from requirements-docker.txt..."
+while IFS= read -r package || [ -n "$package" ]; do
+    # Skip empty lines and comments
+    if [[ -z "$package" || "$package" =~ ^# ]]; then
+        continue
+    fi
+    install_package "$package"
+done < "$PROJECT_ROOT/requirements-docker.txt"
+
+# Install additional development dependencies from requirements.txt
+echo "Installing additional development dependencies from requirements.txt..."
 while IFS= read -r package || [ -n "$package" ]; do
     # Skip empty lines and comments
     if [[ -z "$package" || "$package" =~ ^# ]]; then
@@ -51,4 +61,4 @@ done < "$PROJECT_ROOT/requirements.txt"
 echo "Making Python scripts executable..."
 chmod +x "$SCRIPT_DIR"/*.py
 
-echo "Installation complete!" 
+echo "Installation complete!"

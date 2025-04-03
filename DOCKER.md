@@ -77,6 +77,8 @@ If you prefer to use Docker directly without Docker Compose:
 
 - **Volume mounting**: If you're making changes to the code and want to see them reflected immediately, ensure the volumes in `docker-compose.yml` are correctly mapping your local directories.
 
+- **Dependencies**: The Docker image uses `requirements-docker.txt` for its dependencies. If you need to add or update dependencies, modify this file instead of editing the Dockerfile directly.
+
 ## Next Steps
 
 After successfully running the application locally with Docker, you can consider:

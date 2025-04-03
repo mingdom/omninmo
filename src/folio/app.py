@@ -1184,5 +1184,9 @@ def main():
     return 0
 
 
+# Create the app instance for Uvicorn to use
+app = create_app()
+server = app.server
+
 if __name__ == "__main__":
     sys.exit(main())

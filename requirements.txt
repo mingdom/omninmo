@@ -1,12 +1,10 @@
-# Core dependencies
-pandas==2.2.1
-numpy==1.26.4
+# Additional dependencies for development (not included in requirements-docker.txt)
+
+# Machine Learning
 scikit-learn==1.4.0
 xgboost==2.0.3
 
-# Utilities
-requests==2.31.0
-PyYAML==6.0.1
+# Additional Utilities
 tabulate==0.9.0
 
 # Technical Analysis
@@ -22,10 +20,5 @@ tqdm==4.65.0
 ruff==0.3.3
 pytest==8.1.1
 
-# Lab project dependencies
-yfinance>=0.2.37  # For portfolio beta calculation
-
-# New dependencies
-dash==2.14.2
-dash-bootstrap-components==1.5.0
-plotly==5.19.0
+# Additional visualization
+plotly==5.19.0  # Dash already includes plotly, but we pin the version for development
