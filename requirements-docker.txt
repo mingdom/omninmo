@@ -4,9 +4,8 @@ numpy==1.26.4
 scipy==1.11.3  # For option calculations
 
 # Utilities
-requests==2.31.0
+requests>=2.32.0
 PyYAML==6.0.1
-typing_extensions>=4.7.1  # For backporting newer typing features to Python 3.9
 
 # Data source
 yfinance>=0.2.37  # For portfolio beta calculation
