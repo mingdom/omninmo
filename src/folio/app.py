@@ -1,5 +1,6 @@
 import argparse
 import base64
+import io
 import os
 import sys
 from pathlib import Path
@@ -16,6 +17,7 @@ from .data_model import OptionPosition, PortfolioGroup, Position, StockPosition
 from .error_utils import handle_callback_error, log_exception
 from .exceptions import StateError
 from .logger import logger
+from .security import sanitize_dataframe, validate_csv_upload
 from .utils import format_beta, format_currency, process_portfolio_data
 
 
@@ -601,9 +603,21 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
                 with open(sample_path, "rb") as f:
                     content = f.read()
 
+                # Validate the sample file content
+                # We'll sanitize it during the normal processing flow
+                df = pd.read_csv(sample_path)
+
+                # Check for any potentially dangerous content
+                df = sanitize_dataframe(df)
+
+                # Re-encode the sanitized dataframe
+                csv_buffer = io.StringIO()
+                df.to_csv(csv_buffer, index=False)
+                csv_str = csv_buffer.getvalue()
+
                 # Encode the content as base64 for the upload component
                 content_type = "text/csv"
-                content_string = base64.b64encode(content).decode("utf-8")
+                content_string = base64.b64encode(csv_str.encode('utf-8')).decode("utf-8")
 
                 return f"data:{content_type};base64,{content_string}"
             except Exception as e:
@@ -639,19 +653,24 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
 
             # Handle file upload if provided
             if contents and "upload-portfolio.contents" in trigger_id:
-                import base64
-                import io
+                try:
+                    logger.info(f"Processing uploaded file: {filename}")
+                    # Validate and sanitize the CSV file
+                    df, error = validate_csv_upload(contents, filename)
+                    if error:
+                        raise ValueError(error)
 
-                logger.info(f"Processing uploaded file: {filename}")
-                content_type, content_string = contents.split(",")
-                decoded = base64.b64decode(content_string)
-                df = pd.read_csv(io.StringIO(decoded.decode("utf-8")))
-                logger.info(
-                    f"Successfully read {len(df)} rows from uploaded file {filename}"
-                )
-                status = html.Div(
-                    f"Successfully loaded {filename}", className="text-success"
-                )
+                    logger.info(
+                        f"Successfully read and validated {len(df)} rows from uploaded file {filename}"
+                    )
+                    status = html.Div(
+                        f"Successfully loaded {filename}", className="text-success"
+                    )
+                except ValueError as e:
+                    logger.error(f"CSV validation error: {e}")
+                    error_msg = f"Error loading file: {str(e)}"
+                    error_div = html.Div(error_msg, className="text-danger")
+                    return [], {}, [], error_msg, error_div, None
             elif app.portfolio_file:
                 # Use default portfolio file
                 try:

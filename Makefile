@@ -133,7 +133,7 @@ portfolio:
 		exit 1; \
 	fi
 	@source $(VENV_DIR)/bin/activate && \
-	PYTHONPATH=. python3 -m folio --port 8051 --portfolio src/folio/assets/sample-portfolio.csv
+	PYTHONPATH=. python3 -m src.folio.app --port 8051 --portfolio src/folio/assets/sample-portfolio.csv
 
 port:
 	@echo "Running portfolio analysis..."
@@ -151,7 +151,7 @@ folio:
 		exit 1; \
 	fi
 	@source $(VENV_DIR)/bin/activate && \
-	PYTHONPATH=. python3 -m folio --port 8051 $(if $(portfolio),--portfolio $(portfolio),)
+	PYTHONPATH=. python3 -m src.folio.app --port 8051 $(if $(portfolio),--portfolio $(portfolio),)
 
 stop-folio:
 	@echo "Stopping portfolio dashboard..."

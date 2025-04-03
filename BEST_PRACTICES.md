@@ -55,7 +55,7 @@ Follow consistent development practices to maintain code quality and developer p
   - **Cache Files**: Use hidden directories (`.cache_*`) for cache files
 
 - **Version Control**:
-  - **Commit Messages**: Write commit messages to `.commit-msg.md` in the root directory when asked
+  - **Commit Messages**: When asked to write a commit message, provide it directly as markdown in the chat, not as a separate file
   - **Never Commit Directly**: Let the user handle all git operations
   - **⚠️ NEVER USE GIT IN SCRIPTS**: Do not write scripts that use git commands - this can lead to catastrophic data loss and irreversible history modification
   - **Manual Git Operations**: All git operations must be performed manually by the user, never automated
