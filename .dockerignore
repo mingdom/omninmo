@@ -45,3 +45,6 @@ docker-compose.dev.yml
 # docs/
 *.md
 !README.md
+
+# personal notes
+-executive.md
