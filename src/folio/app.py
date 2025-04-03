@@ -8,17 +8,25 @@ from typing import Optional, Union
 
 import dash
 import dash_bootstrap_components as dbc
+import dash_chat
 import pandas as pd
 from dash import ALL, Input, Output, State, callback_context, dcc, html
+from dash.exceptions import PreventUpdate
 
+# Import directly from utils.py
+from . import utils
+# Import AI utilities directly
+from .ai_utils import prepare_portfolio_data_for_analysis
+# AI chat components removed - using simple implementation
 from .components.portfolio_table import create_portfolio_table
 from .components.position_details import create_position_details
-from .data_model import OptionPosition, PortfolioGroup, Position, StockPosition
+from .data_model import (OptionPosition, PortfolioGroup, PortfolioSummary,
+                         Position, StockPosition)
 from .error_utils import handle_callback_error, log_exception
 from .exceptions import StateError
+from .gemini_client import GeminiClient
 from .logger import logger
 from .security import sanitize_dataframe, validate_csv_upload
-from .utils import format_beta, format_currency, process_portfolio_data
 
 
 def create_header() -> dbc.Card:
@@ -362,6 +370,9 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
             "https://use.fontawesome.com/releases/v5.15.4/css/all.css",
         ],
         title="Folio",
+        # Enable async callbacks
+        use_pages=False,
+        suppress_callback_exceptions=True,
     )
 
     # Enhanced UI CSS is automatically loaded from the assets folder
@@ -431,6 +442,7 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
                             [
                                 create_header(),
                                 create_filters(),
+                                # AI analysis removed from main content - now using chat panel
                                 create_main_table(),
                             ],
                             id="main-content",
@@ -448,6 +460,113 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
             # Add keyboard shortcut listener
             html.Div(id="keyboard-shortcut-listener"),
 
+            # Simple AI Chat Interface (fixed position, always visible)
+            html.Div(
+                [
+                    # Chat Button with inline styles
+                    html.Button(
+                        html.I(className="fas fa-robot"),
+                        id="chat-button",
+                        className="chat-button pulse",
+                        n_clicks=0,
+                        style={
+                            "position": "fixed",
+                            "bottom": "20px",
+                            "right": "20px",
+                            "zIndex": "9999",
+                            "width": "60px",
+                            "height": "60px",
+                            "borderRadius": "50%",
+                            "backgroundColor": "#4facfe",
+                            "color": "white",
+                            "border": "none",
+                            "boxShadow": "0 4px 10px rgba(79, 172, 254, 0.3)",
+                            "display": "flex",
+                            "alignItems": "center",
+                            "justifyContent": "center",
+                            "fontSize": "24px"
+                        }
+                    ),
+
+                    # Debug info - visible in the DOM
+                    html.Div(
+                        "AI Button Added to DOM",
+                        id="ai-button-debug",
+                        style={"display": "none"}
+                    ),
+
+                    # Chat Panel using dash-chat
+                    html.Div(
+                        [
+                            # Chat Header
+                            html.Div(
+                                [
+                                    html.H4([html.I(className="fas fa-robot me-2"), "AI Portfolio Advisor"]),
+                                    html.Button(
+                                        html.I(className="fas fa-times"),
+                                        id="chat-close",
+                                        className="chat-close",
+                                        n_clicks=0
+                                    )
+                                ],
+                                className="chat-header"
+                            ),
+
+                            # Dash Chat Component
+                            dash_chat.ChatComponent(
+                                id="chat-component",
+                                messages=[
+                                    {"role": "assistant", "content": "Hi! I'm your AI portfolio advisor. Load a portfolio and I can help analyze it."}
+                                ],
+                                container_style={"height": "500px", "width": "100%"},
+                                input_placeholder="Ask about your portfolio...",
+                                theme="light",
+                            )
+                        ],
+                        id="chat-panel",
+                        className="chat-panel",
+                        style={"display": "none"}
+                    ),
+
+                    # Chat History Store
+                    dcc.Store(id="chat-history", storage_type="session"),
+
+                    # AI Modal
+                    dbc.Modal(
+                        [
+                            dbc.ModalHeader("AI Portfolio Advisor"),
+                            dbc.ModalBody(
+                                [
+                                    html.P("What would you like to know about your portfolio?"),
+                                    dbc.Textarea(
+                                        id="ai-query-input",
+                                        placeholder="Ask about your portfolio...",
+                                        rows=3,
+                                        className="mb-3"
+                                    ),
+                                    dbc.Button(
+                                        "Analyze",
+                                        id="analyze-portfolio-button",
+                                        color="primary",
+                                        className="mb-3"
+                                    ),
+                                    html.Div(id="ai-analysis-result")
+                                ]
+                            ),
+                            dbc.ModalFooter(
+                                dbc.Button(
+                                    "Close", id="close-ai-modal", className="ms-auto", n_clicks=0
+                                )
+                            ),
+                        ],
+                        id="ai-modal",
+                        size="lg",
+                        is_open=False,
+                    ),
+                ],
+                id="ai-advisor-container"
+            ),
+
             # Stores
             dcc.Store(id="portfolio-data"),
             dcc.Store(id="portfolio-summary"),  # Add portfolio summary store
@@ -455,6 +574,7 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
             dcc.Store(id="selected-position"),
             dcc.Store(id="loading-output"),  # Add loading output store
             dcc.Store(id="theme-store", storage_type="local"),  # Theme preference store
+            dcc.Store(id="ai-analysis-data"),  # Store for AI analysis results
 
             dcc.Interval(
                 id="interval-component",
@@ -515,11 +635,15 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
     )
     def toggle_empty_state(groups_data):
         """Show empty state when no data is loaded and collapse upload section when data is loaded"""
+        logger.info(f"TOGGLE_EMPTY_STATE called with groups_data: {bool(groups_data)}")
+
         if not groups_data:
             # No data, show empty state, hide main content, keep upload open
+            logger.info("TOGGLE_EMPTY_STATE: No data, showing empty state, hiding main content")
             return create_empty_state(), {"display": "none"}, True
         else:
             # Data loaded, hide empty state, show main content, collapse upload
+            logger.info("TOGGLE_EMPTY_STATE: Data loaded, hiding empty state, showing main content")
             return None, {"display": "block"}, False
 
     # Handle sample portfolio loading
@@ -533,8 +657,9 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
     )
     def load_sample_portfolio(n_clicks):
         """Load a sample portfolio when the button is clicked"""
-        logger.info(f"Load sample portfolio button clicked: {n_clicks}")
+        logger.info(f"LOAD_SAMPLE_PORTFOLIO: Button clicked: {n_clicks}")
         if n_clicks:
+            logger.info("LOAD_SAMPLE_PORTFOLIO: Processing sample portfolio")
             try:
                 # Path to sample portfolio in assets directory
                 sample_path = Path(__file__).parent / "assets" / "sample-portfolio.csv"
@@ -644,7 +769,7 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
                 )
 
             # Process portfolio data
-            groups, summary, cash_like_positions = process_portfolio_data(df)
+            groups, summary, cash_like_positions = utils.process_portfolio_data(df)
             logger.info(f"Successfully processed {len(groups)} portfolio groups and {len(cash_like_positions)} cash-like positions")
 
             # Convert to Dash-compatible format
@@ -690,30 +815,30 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
             )
 
             return [
-                format_currency(summary_data["total_value_net"]),
-                format_beta(summary_data["portfolio_beta"]),
-                format_currency(summary_data["long_exposure"]["total_value"]),
-                format_beta(
+                utils.format_currency(summary_data["total_value_net"]),
+                utils.format_beta(summary_data["portfolio_beta"]),
+                utils.format_currency(summary_data["long_exposure"]["total_value"]),
+                utils.format_beta(
                     summary_data["long_exposure"]["total_beta_adjusted"]
                     / summary_data["long_exposure"]["total_value"]
                     if summary_data["long_exposure"]["total_value"] != 0
                     else 0
                 ),
-                format_currency(summary_data["short_exposure"]["total_value"]),
-                format_beta(
+                utils.format_currency(summary_data["short_exposure"]["total_value"]),
+                utils.format_beta(
                     summary_data["short_exposure"]["total_beta_adjusted"]
                     / summary_data["short_exposure"]["total_value"]
                     if summary_data["short_exposure"]["total_value"] != 0
                     else 0
                 ),
-                format_currency(summary_data["options_exposure"]["total_value"]),
-                format_beta(
+                utils.format_currency(summary_data["options_exposure"]["total_value"]),
+                utils.format_beta(
                     summary_data["options_exposure"]["total_beta_adjusted"]
                     / summary_data["options_exposure"]["total_value"]
                     if summary_data["options_exposure"]["total_value"] != 0
                     else 0
                 ),
-                format_currency(summary_data["cash_like_value"]),
+                utils.format_currency(summary_data["cash_like_value"]),
                 f"{cash_like_percent:.1f}%",
             ]
 
@@ -1031,6 +1156,131 @@ def create_app(portfolio_file: Optional[str] = None, debug: bool = False) -> das
             total_delta_exposure=position_data["total_delta_exposure"],
             options_delta_exposure=position_data["options_delta_exposure"],
         )
+
+    # Simple chat panel toggle callback
+    @app.callback(
+        Output("chat-panel", "style"),
+        [
+            Input("chat-button", "n_clicks"),
+            Input("chat-close", "n_clicks")
+        ],
+        prevent_initial_call=True
+    )
+    def toggle_chat_panel(open_clicks, close_clicks):
+        """Toggle the chat panel when the button is clicked"""
+        logger.info(f"TOGGLE_CHAT_PANEL called with open_clicks: {open_clicks}, close_clicks: {close_clicks}")
+
+        ctx = dash.callback_context
+        if not ctx.triggered:
+            logger.info("TOGGLE_CHAT_PANEL: No trigger, keeping panel hidden")
+            return {"display": "none"}
+
+        trigger_id = ctx.triggered[0]["prop_id"].split(".")[0]
+        logger.info(f"TOGGLE_CHAT_PANEL: Triggered by {trigger_id}")
+
+        if trigger_id == "chat-button":
+            logger.info("TOGGLE_CHAT_PANEL: Opening chat panel")
+            return {"display": "flex"}
+        elif trigger_id == "chat-close":
+            logger.info("TOGGLE_CHAT_PANEL: Closing chat panel")
+            return {"display": "none"}
+
+        logger.info("TOGGLE_CHAT_PANEL: Default case, keeping panel hidden")
+        return {"display": "none"}
+
+    # AI chat message callback for dash-chat
+    @app.callback(
+        Output("chat-component", "messages"),
+        Input("chat-component", "new_message"),
+        [
+            State("chat-component", "messages"),
+            State("portfolio-groups", "data"),
+            State("portfolio-summary", "data"),
+            State("chat-history", "data")
+        ],
+        prevent_initial_call=True
+    )
+    def send_chat_message(new_message, current_messages, groups_data, summary_data, chat_history):
+        """Send a message to the AI and display the response"""
+        if not new_message:
+            raise PreventUpdate
+
+        logger.info(f"SEND_CHAT_MESSAGE called with message: '{new_message}'")
+        logger.info(f"SEND_CHAT_MESSAGE has groups_data: {bool(groups_data)}, has summary_data: {bool(summary_data)}")
+
+        # Initialize chat history if needed
+        if chat_history is None:
+            chat_history = []
+
+        # Get current messages or initialize
+        if current_messages is None:
+            logger.info("SEND_CHAT_MESSAGE: Initializing empty messages list")
+            current_messages = []
+
+        # Add user message to messages list
+        logger.info("SEND_CHAT_MESSAGE: Adding user message to display")
+        updated_messages = current_messages + [new_message]
+
+        # Update chat history
+        chat_history.append({"role": "user", "content": new_message["content"]})
+
+        # Check if the message is related to finance/portfolio
+        non_financial_keywords = ["weather", "sports", "politics", "movie", "music", "recipe", "cook", "game", "travel", "vacation"]
+        is_off_topic = any(keyword in new_message["content"].lower() for keyword in non_financial_keywords)
+
+        try:
+            # Generate AI response
+            if is_off_topic:
+                logger.info("SEND_CHAT_MESSAGE: Off-topic question detected, redirecting to portfolio")
+                ai_response = "I'm your portfolio advisor and can only assist with questions related to your investments and financial matters. If you have questions about your portfolio or need financial advice, I'm here to help!"
+            elif not groups_data or not summary_data:
+                logger.info("SEND_CHAT_MESSAGE: No portfolio data, sending guidance message")
+                ai_response = "I don't see any portfolio data loaded yet. Please upload a portfolio file or load the sample portfolio first, then I can help analyze it."
+            else:
+                logger.info("SEND_CHAT_MESSAGE: Portfolio data available, using Gemini API")
+                # Prepare portfolio data for analysis
+                groups = [PortfolioGroup.from_dict(g) for g in groups_data]
+                summary = PortfolioSummary.from_dict(summary_data)
+                portfolio_data = prepare_portfolio_data_for_analysis(groups, summary)
+
+                # Use the synchronous version of the Gemini API call
+                logger.info("SEND_CHAT_MESSAGE: Calling Gemini API with portfolio data")
+                try:
+                    # Initialize Gemini client
+                    logger.info("SEND_CHAT_MESSAGE: Initializing GeminiClient")
+                    client = GeminiClient()
+
+                    # Get response from Gemini using the synchronous method
+                    logger.info(f"SEND_CHAT_MESSAGE: Calling chat_sync with message: '{new_message['content']}' and {len(chat_history)} history items")
+                    response = client.chat_sync(new_message['content'], chat_history, portfolio_data)
+
+                    # Check if there was an error in the response
+                    if response.get("error", False):
+                        logger.error(f"SEND_CHAT_MESSAGE: Error in Gemini API response: {response.get('response')}")
+                        ai_response = response.get("response", "I'm sorry, I couldn't generate a response. Please try again.")
+                    else:
+                        ai_response = response.get("response", "I'm sorry, I couldn't generate a response. Please try again.")
+                        logger.info(f"SEND_CHAT_MESSAGE: Received response from Gemini API: {len(ai_response)} characters")
+                except Exception as e:
+                    logger.error(f"SEND_CHAT_MESSAGE: Error calling Gemini API: {str(e)}", exc_info=True)
+                    ai_response = f"I encountered an error while processing your request: {str(e)}. Please try again later."
+        except Exception as e:
+            logger.error(f"Error in AI chat: {str(e)}", exc_info=True)
+            ai_response = f"I encountered an error while processing your request. Please try again later."
+
+        # Add AI message
+        logger.info("SEND_CHAT_MESSAGE: Adding AI response to display")
+        ai_message = {
+            "role": "assistant",
+            "content": ai_response
+        }
+
+        # Add AI response to chat history
+        chat_history.append({"role": "assistant", "content": ai_response})
+
+        # Return updated messages with AI response
+        logger.info("SEND_CHAT_MESSAGE: Returning updated messages")
+        return updated_messages + [ai_message]
 
     # Add callback to handle column sorting
     @app.callback(
