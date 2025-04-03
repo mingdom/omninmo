@@ -1,9 +1,8 @@
 import dash_bootstrap_components as dbc
 from dash import html
 
-from src.folio.data_model import PortfolioGroup
-from src.folio.utils import format_beta, format_currency, format_percentage
-
+from ..data_model import PortfolioGroup
+from ..utils.formatting import format_beta, format_currency, format_percentage
 from .portfolio_table import get_group_ticker
 
 

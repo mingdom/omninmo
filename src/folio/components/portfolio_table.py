@@ -3,8 +3,8 @@ from typing import Optional
 import dash_bootstrap_components as dbc
 from dash import html
 
-from src.folio.data_model import PortfolioGroup
-from src.folio.utils import format_beta, format_currency
+from ..data_model import PortfolioGroup
+from ..utils.formatting import format_beta, format_currency
 
 
 def get_group_ticker(group: PortfolioGroup) -> str:
