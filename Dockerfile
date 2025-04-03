@@ -24,10 +24,11 @@ RUN pip install --no-cache-dir -r requirements-docker.txt
 
 # Copy all necessary application code
 COPY src ./src
+COPY config ./config
 
 # Expose both ports (7860 for Hugging Face, 8050 for local)
 EXPOSE 7860 8050
 
-# Run the application with Uvicorn for improved security and performance
-# The entrypoint script will determine the correct port based on environment
-CMD ["sh", "-c", "if [ -n \"$HF_SPACE\" ]; then PORT=7860; fi && uvicorn src.folio.app:server --host 0.0.0.0 --port $PORT --workers 2 --timeout-keep-alive 60"]
+# Run the application with Gunicorn for production deployment
+# The command will determine the correct port based on environment
+CMD ["sh", "-c", "if [ -n \"$HF_SPACE\" ]; then PORT=7860; fi && gunicorn --bind 0.0.0.0:$PORT --workers 2 --timeout 60 src.folio.app:server"]

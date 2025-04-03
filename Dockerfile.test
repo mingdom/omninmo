@@ -1,9 +1,0 @@
-FROM python:3.11-slim
-
-WORKDIR /app
-
-# Create a simple test script
-RUN echo "from typing import NotRequired, TypedDict\n\nclass Test(TypedDict):\n    field: NotRequired[str]\n\nprint('NotRequired is available in this Python version')" > test.py
-
-# Run the test script
-CMD ["python", "test.py"]
