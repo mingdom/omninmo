@@ -11,20 +11,35 @@ pinned: false
 
 # Folio - Financial Portfolio Dashboard
 
-Folio is a web-based dashboard for analyzing financial portfolios. It provides visualizations and insights for stocks, options, and other financial instruments.
+Folio is a powerful web-based dashboard for analyzing and optimizing your investment portfolio. Get professional-grade insights into your stocks, options, and other financial instruments with an intuitive, user-friendly interface.
 
-## Features
+## Why Folio?
+
+- **Complete Portfolio Visibility**: See your entire financial picture in one place
+- **Smart Risk Assessment**: Understand your portfolio's risk profile with beta analysis
+- **AI-Powered Insights**: Get personalized investment advice from our AI portfolio advisor
+- **Cash & Equivalents Detection**: Automatically identifies money market and cash-like positions
+- **Option Analytics**: Detailed metrics for options including implied volatility and Greeks
+- **Zero Cost**: Free to use, with no hidden fees or subscriptions
+
+## Key Features
 
 - **Portfolio Summary**: View total exposure, beta, and allocation breakdown
 - **Position Details**: Analyze individual positions with detailed metrics
+- **AI Portfolio Advisor**: Get personalized investment advice powered by Google's Gemini AI
 - **Filtering & Sorting**: Filter by position type and sort by various metrics
-- **Data Integration**: Uses Yahoo Finance API for real-time market data
-- **Responsive Design**: Works on desktop and mobile devices
-- **Dark Mode**: Easy on the eyes for financial analysis
+- **Real-time Data**: Uses Yahoo Finance API for up-to-date market data
+- **Responsive Design**: Works seamlessly on desktop and mobile devices
+- **Dark Mode**: Easy on the eyes for late-night financial analysis
 
 ## Getting Started
 
-### Local Development
+### Try It Online
+
+The easiest way to try Folio is through our Hugging Face Spaces deployment:
+[https://huggingface.co/spaces/mingdom/folio](https://huggingface.co/spaces/mingdom/folio)
+
+### Local Installation
 
 1. Clone the repository:
    ```bash
@@ -32,56 +47,49 @@ Folio is a web-based dashboard for analyzing financial portfolios. It provides v
    cd omninmo
    ```
 
-2. Run the application:
-   ```bash
-   make folio
-   ```
-
-3. Or use the sample portfolio:
+2. Run with sample portfolio:
    ```bash
    make portfolio
    ```
 
+3. Or start with a blank slate:
+   ```bash
+   make folio
+   ```
+
 ### Docker Deployment
 
-1. Build the Docker image:
+1. Start the application with Docker:
    ```bash
-   docker build -t folio:latest .
+   make docker-up
    ```
 
-2. Run the container:
+2. Access the dashboard at http://localhost:8050
+
+3. View logs (if needed):
    ```bash
-   make docker-compose-up
+   make docker-logs
    ```
 
-3. Access the application at http://localhost:8050
+For more Docker commands and options, see [DOCKER.md](DOCKER.md).
 
-## Hugging Face Deployment
+## Using Folio
 
-The application is deployed on Hugging Face Spaces and can be accessed at:
-https://huggingface.co/spaces/mingdom/folio
+1. **Upload Your Portfolio**: Use the upload button to import a CSV file with your holdings
+2. **Explore Your Data**: View summary metrics and detailed breakdowns of your investments
+3. **Filter and Sort**: Focus on specific asset types or metrics that matter to you
+4. **Get AI Insights**: Click the "Robot Advisor" button to get personalized advice about your portfolio
+5. **Export or Share**: Save your analysis or share insights with your financial advisor
 
-For detailed deployment instructions, see [docs/huggingface-deployment.md](docs/huggingface-deployment.md).
+## Sample Portfolio
 
-## Project Structure
+Not ready to upload your own data? Click the "Load Sample Portfolio" button to explore Folio with our demo data.
 
-- `src/folio/`: Main application code
-  - `app.py`: Dash application entry point
-  - `components/`: UI components
-  - `utils.py`: Utility functions
-  - `data_model.py`: Data structures and models
-- `src/lab/`: Experimental features and utilities
-- `docs/`: Documentation
-  - `devlog/`: Development logs
-  - `devplan/`: Development plans
-- `scripts/`: Utility scripts for development and diagnostics
+## Privacy & Security
 
-## Contributing
-
-1. Create a new branch for your feature
-2. Make your changes
-3. Test your changes with `make test`
-4. Submit a pull request
+- **Your Data Stays Private**: All analysis happens in your browser or local environment
+- **No Account Required**: Use Folio without creating an account or sharing personal information
+- **Open Source**: All code is transparent and available for review
 
 ## License
 
