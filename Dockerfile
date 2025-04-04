@@ -10,17 +10,28 @@ ENV PORT=8050
 ENV HF_SPACE=1
 # Set logging level to WARNING for Hugging Face deployment (for privacy reasons)
 ENV LOG_LEVEL=WARNING
+# Allow passing Gemini API key at build time or runtime
+ARG GEMINI_API_KEY
+ENV GEMINI_API_KEY=${GEMINI_API_KEY}
+
+# Flag to install development dependencies
+ARG INSTALL_DEV=false
 
 # Install only the necessary system dependencies
 RUN apt-get update && \
     apt-get install -y --no-install-recommends gcc && \
     rm -rf /var/lib/apt/lists/*
 
-# Copy requirements file
-COPY requirements-docker.txt .
+# Copy requirements files
+COPY requirements-folio.txt .
+COPY requirements-dev.txt .
 
-# Install all required packages
-RUN pip install --no-cache-dir -r requirements-docker.txt
+# Install required packages
+RUN pip install --no-cache-dir -r requirements-folio.txt && \
+    if [ "$INSTALL_DEV" = "true" ]; then \
+    echo "Installing development dependencies..." && \
+    pip install --no-cache-dir -r requirements-dev.txt; \
+    fi
 
 # Copy all necessary application code
 COPY src ./src

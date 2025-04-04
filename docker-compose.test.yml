@@ -2,16 +2,19 @@ version: '3.8'
 
 services:
   folio:
-    build: .
-    ports:
-      - "8050:8050"
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - INSTALL_DEV=true
     environment:
-      - PORT=8050
       - PYTHONPATH=/app
       - DATA_SOURCE=yfinance
-      - LOG_LEVEL=INFO
+      - LOG_LEVEL=DEBUG
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
     volumes:
+      - ./src:/app/src
+      - ./tests:/app/tests
       - ./config:/app/config
-      - ./data:/app/data
       - ./.env:/app/.env
-    restart: unless-stopped
+    command: pytest tests/ -v

@@ -16,3 +16,6 @@ dash-bootstrap-components>=1.5.0
 
 # WSGI server for production - always use latest for security
 gunicorn>=21.2.0
+
+# AI/ML dependencies
+google-generativeai>=0.3.0  # For Gemini AI integration

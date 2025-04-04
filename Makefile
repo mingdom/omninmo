@@ -126,7 +126,7 @@ lint:
 .PHONY: portfolio folio stop-folio port
 
 # Docker targets
-.PHONY: docker-build docker-run docker-compose-up docker-compose-down deploy-hf
+.PHONY: docker-build docker-run docker-compose-up docker-compose-down docker-test deploy-hf
 
 portfolio:
 	@echo "Starting portfolio dashboard with sample portfolio.csv..."
@@ -203,6 +203,15 @@ docker-compose-up:
 docker-compose-down:
 	@echo "Stopping docker-compose services..."
 	docker-compose down
+
+# Run tests in Docker container
+docker-test:
+	@echo "Running tests in Docker container..."
+	@if [ -z "$$GEMINI_API_KEY" ]; then \
+		echo "Warning: GEMINI_API_KEY environment variable not set. Some tests may fail."; \
+	fi
+	@docker-compose -f docker-compose.test.yml build --build-arg INSTALL_DEV=true
+	@docker-compose -f docker-compose.test.yml run --rm folio
 
 # Deploy to Hugging Face Spaces
 deploy-hf:

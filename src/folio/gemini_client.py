@@ -17,26 +17,33 @@ class GeminiClient:
 
     def __init__(self):
         """Initialize the Gemini client with API key from environment."""
-        api_key = os.environ.get("GEMINI_API_KEY")
-        if not api_key:
+        self.api_key = os.environ.get("GEMINI_API_KEY")
+        self.is_available = False
+
+        if not self.api_key:
             logger.error("GEMINI_API_KEY environment variable not set")
             raise ValueError("GEMINI_API_KEY environment variable not set")
 
-        genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel(
-            model_name="gemini-2.5-pro-exp-03-25",
-            generation_config=GenerationConfig(
-                temperature=0.2,
-                top_p=0.95,
-                top_k=40,
-                max_output_tokens=4096,
-            ),
-            # Set the system prompt to ensure the AI stays focused on portfolio advising
-            system_instruction=PORTFOLIO_ADVISOR_SYSTEM_PROMPT,
-        )
-        logger.info(
-            "Gemini client initialized successfully with portfolio advisor system prompt"
-        )
+        try:
+            genai.configure(api_key=self.api_key)
+            self.model = genai.GenerativeModel(
+                model_name="gemini-2.5-pro-exp-03-25",
+                generation_config=GenerationConfig(
+                    temperature=0.2,
+                    top_p=0.95,
+                    top_k=40,
+                    max_output_tokens=4096,
+                ),
+                # Set the system prompt to ensure the AI stays focused on portfolio advising
+                system_instruction=PORTFOLIO_ADVISOR_SYSTEM_PROMPT,
+            )
+            self.is_available = True
+            logger.info(
+                "Gemini client initialized successfully with portfolio advisor system prompt"
+            )
+        except Exception as e:
+            logger.error(f"Failed to initialize Gemini client: {e!s}")
+            raise ValueError(f"Failed to initialize Gemini client: {e!s}") from e
 
     async def chat(
         self,
