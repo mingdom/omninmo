@@ -171,12 +171,12 @@ class YFinanceDataFetcher(DataFetcherInterface):
         except Exception as e:
             # Map yfinance-specific errors to consistent error messages
             if "No data found" in str(e):
-                raise ValueError(f"No historical data found for {ticker}")
+                raise ValueError(f"No historical data found for {ticker}") from e
             elif "Invalid ticker" in str(e):
-                raise ValueError(f"Invalid ticker: {ticker}")
+                raise ValueError(f"Invalid ticker: {ticker}") from e
             else:
                 # Re-raise with more context
-                raise ValueError(f"Error fetching data for {ticker}: {e}")
+                raise ValueError(f"Error fetching data for {ticker}: {e}") from e
 
     def _map_period_to_yfinance(self, period):
         """

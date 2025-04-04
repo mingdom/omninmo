@@ -12,7 +12,6 @@ import os
 import pandas as pd
 import yaml
 
-from src.lab.option_utils import calculate_option_delta, parse_option_description
 from src.stockdata import create_data_fetcher
 
 from .cash_detection import is_cash_or_short_term
@@ -24,6 +23,7 @@ from .data_model import (
     create_portfolio_group,
 )
 from .logger import logger
+from .option_utils import calculate_option_delta, parse_option_description
 from .utils import clean_currency_value, format_beta, format_currency, get_beta
 
 # Initialize data fetcher

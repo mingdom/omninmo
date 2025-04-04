@@ -32,7 +32,6 @@ def setup_logger() -> logging.Logger:
         log_level_str = log_level_str.upper()
         log_level = getattr(logging, log_level_str, None)
         if log_level is None:
-            print(f"Invalid LOG_LEVEL: {log_level_str}. Using default.")
             log_level = logging.WARNING if is_huggingface else logging.INFO
     else:
         # Use default log level based on environment

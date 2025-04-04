@@ -578,5 +578,4 @@ if __name__ == "__main__":
     feature_df = features.generate(data, use_enhanced_features=True)
 
     if feature_df is not None:
-        print(f"Generated {len(feature_df.columns)} features")
-        print(feature_df.columns.tolist())
+        pass

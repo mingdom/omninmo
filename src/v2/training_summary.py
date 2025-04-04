@@ -114,25 +114,10 @@ def save_training_summary(summary, base_dir="logs/training"):
     logger.info(f"\nTraining summary saved to: {filepath}")
 
     # Print executive summary to console
-    print("\n=== TRAINING EXECUTIVE SUMMARY ===")
-    print(f"Timestamp: {summary['timestamp']}")
-    print(f"Mode: {summary['mode']}")
-    print("\nData Coverage:")
-    print(f"- Processed tickers: {summary['data_coverage']['processed_tickers']}")
-    print(f"- Success rate: {summary['data_coverage']['processed_tickers']/summary['data_coverage']['total_tickers']*100:.1f}%")
 
-    print("\nModel Performance:")
-    print(f"- Cross-validation R²: {summary['cross_validation']['r2']['mean']:.4f} ± {summary['cross_validation']['r2']['std']:.4f}")
-    print(f"- Final model R²: {summary['final_model']['r2']:.4f}")
-    print(f"- Cross-validation RMSE: {summary['cross_validation']['rmse']['mean']:.4f} ± {summary['cross_validation']['rmse']['std']:.4f}")
-    print(f"- Final model RMSE: {summary['final_model']['rmse']:.4f}")
 
-    print("\nFeature Analysis:")
-    print(f"- Feature stability score: {summary['feature_analysis']['stability_score']:.4f}")
-    print("- Top 5 features:")
-    for i, (feature, importance) in enumerate(list(summary['feature_analysis']['top_features'].items())[:5], 1):
-        print(f"  {i}. {feature}: {importance:.4f}")
-    print(f"- Cumulative importance (top 10): {summary['feature_analysis']['cumulative_importance']:.4f}")
+    for _i, (_feature, _importance) in enumerate(list(summary['feature_analysis']['top_features'].items())[:5], 1):
+        pass
 
     return filepath
 
@@ -314,9 +299,5 @@ def log_mlflow_metrics(predictor, cv_results, training_results, X_data, processe
             mlflow.log_artifact(model_path)
 
         # Print MLflow tracking info
-        print("\nMLflow tracking info:")
-        print(f"- Run ID: {run.info.run_id}")
-        print(f"- Experiment ID: {run.info.experiment_id}")
-        print("- View results locally: mlflow ui")
 
         return run.info.run_id

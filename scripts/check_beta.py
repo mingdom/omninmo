@@ -108,7 +108,9 @@ def _validate_data(ticker: str, stock_data: pd.DataFrame | None) -> str | None:
     return None
 
 
-def _validate_variance_covariance(market_variance: float, covariance: float) -> str | None:
+def _validate_variance_covariance(
+    market_variance: float, covariance: float
+) -> str | None:
     """Validates variance and covariance calculations and returns error message if invalid."""
     if pd.isna(market_variance) or abs(market_variance) < 1e-12:
         return f"Error: Market variance is zero or near-zero ({market_variance})"
@@ -133,49 +135,41 @@ if __name__ == "__main__":
         "INVALID",  # Test an invalid ticker
     ]
 
-    print("Initializing DataFetcher...")
     try:
         fetcher = DataFetcher()
         if fetcher is None:
             raise RuntimeError("Fetcher initialization failed")
-        print("Fetching market data (SPY as proxy)...")
         # Fetch market data once
         market_data = (
             fetcher.fetch_market_data()
         )  # Assumes this fetches S&P500 or similar
         if market_data is None or market_data.empty:
-            print("Fatal: Could not fetch market data. Aborting.")
             sys.exit(1)
-        print(f"Market data fetched: {len(market_data)} rows.")
 
-    except Exception as e:
-        print(f"Fatal: Failed to initialize DataFetcher or fetch market data: {e}")
+    except Exception:
         sys.exit(1)
 
-    print("\n--- Checking Raw Beta Calculations ---")
+    # Calculate beta for each symbol and store results
     results = {}
     for symbol in symbols_to_check:
-        print(f"\nProcessing: {symbol}")
         beta_result = calculate_raw_beta(symbol, fetcher, market_data)
         results[symbol] = beta_result
-        if isinstance(beta_result, float):
-            print(f"Result for {symbol}: Beta = {beta_result:.4f}")
-        else:
-            print(f"Result for {symbol}: {beta_result}")
 
-    print("\n--- Summary --- ")
-    for symbol, result in results.items():
-        if isinstance(result, float):
-            print(f"{symbol:>10}: {result:.4f}")
-        else:
-            print(f"{symbol:>10}: {result}")
+    # Display results in a formatted table
 
-    # Check cash-like classification
-    print("\n--- Cash-Like Classification ---")
     for symbol, result in results.items():
         if isinstance(result, float):
             is_cash = is_cash_or_short_term(symbol, beta=result)
             classification = "CASH-LIKE" if is_cash else "MARKET-CORRELATED"
-            print(f"{symbol:>10}: Beta = {result:.4f} -> {classification}")
+        else:
+            # Error case
+            logger.error(f"Error for {symbol}: {result}")
 
-    print("\nScript finished.")
+    # Summary statistics
+    success_count = sum(1 for r in results.values() if isinstance(r, float))
+    error_count = len(results) - success_count
+    cash_like_count = sum(
+        1
+        for s, r in results.items()
+        if isinstance(r, float) and is_cash_or_short_term(s, beta=r)
+    )

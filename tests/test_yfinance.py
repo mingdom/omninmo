@@ -19,15 +19,12 @@ import pandas as pd
 import pytest
 
 # Add the project root to the Python path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from src.yfinance import YFinanceDataFetcher
 
 # Import mock data utilities
-from tests.test_data.mock_stock_data import (
-    get_real_beta,
-    get_real_data,
-)
+from tests.test_data.mock_stock_data import get_real_beta, get_real_data
 
 
 @pytest.fixture
@@ -146,7 +143,9 @@ class TestDataFetching:
             # Data should match sample
             pd.testing.assert_frame_equal(df, sample_dataframe)
 
-    def test_fetch_data_expired_cache(self, mock_ticker, temp_cache_dir, sample_dataframe):
+    def test_fetch_data_expired_cache(
+        self, mock_ticker, temp_cache_dir, sample_dataframe
+    ):
         """Test fetching data with expired cache."""
         # Create cache file
         cache_file = os.path.join(temp_cache_dir, "AAPL_1y_1d.csv")
@@ -181,7 +180,7 @@ class TestDataFetching:
                 assert col in df.columns, f"Column {col} not found in DataFrame"
 
             # Test with default period (should use beta_period)
-            with patch.object(YFinanceDataFetcher, 'beta_period', "6m"):
+            with patch.object(YFinanceDataFetcher, "beta_period", "6m"):
                 df_default = fetcher.fetch_market_data(market_index="SPY")
                 assert isinstance(df_default, pd.DataFrame)
                 assert len(df_default) > 0
@@ -220,7 +219,7 @@ class TestErrorHandling:
         # Simulate network error with no cache
         with patch("yfinance.Ticker", side_effect=Exception("Network error")):
             fetcher = YFinanceDataFetcher(cache_dir=temp_cache_dir)
-            with pytest.raises(Exception):
+            with pytest.raises(ValueError):
                 fetcher.fetch_data("AAPL", period="1y")
 
 
@@ -286,9 +285,12 @@ class TestBetaCalculation:
 
     def test_beta_calculation(self, mock_ticker, mock_spy_ticker, temp_cache_dir):
         """Test beta calculation with mock data."""
-        with patch("yfinance.Ticker", side_effect=lambda ticker:
-                  mock_spy_ticker if ticker == "SPY" else mock_ticker):
-
+        with patch(
+            "yfinance.Ticker",
+            side_effect=lambda ticker: mock_spy_ticker
+            if ticker == "SPY"
+            else mock_ticker,
+        ):
             fetcher = YFinanceDataFetcher(cache_dir=temp_cache_dir)
 
             # Get stock and market data
@@ -310,14 +312,13 @@ class TestBetaCalculation:
             beta = covariance / market_variance
 
             # Compare with expected beta from real data
-            expected_beta = get_real_beta("AAPL")
+            get_real_beta("AAPL")
 
             # Beta should be within a reasonable range of the expected value
             # The exact value will differ due to the mock data and date ranges
             assert 0.5 < beta < 2.0, f"Beta {beta} is outside reasonable range"
 
             # For information only - not a strict test
-            print(f"Calculated beta: {beta:.2f}, Expected beta: {expected_beta:.2f}")
 
 
 if __name__ == "__main__":

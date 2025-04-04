@@ -218,18 +218,6 @@ def test_sample_portfolio_regression(sample_portfolio_path):
     ), f"Cash-like value {summary.cash_like_value} differs significantly from expected {expected_values['cash_like_value']}"
 
     # Print summary for debugging
-    print("\nPortfolio Summary:")
-    print(f"  Total Groups: {len(groups)}")
-    print(f"  Total Net Value: ${summary.total_value_net:,.2f}")
-    print(f"  Total Absolute Value: ${summary.total_value_abs:,.2f}")
-    print(f"  Portfolio Beta: {summary.portfolio_beta:.2f}")
-    print(f"  Long Exposure: ${summary.long_exposure.total_value:,.2f}")
-    print(f"  Short Exposure: ${summary.short_exposure.total_value:,.2f}")
-    print(f"  Options Exposure: ${summary.options_exposure.total_value:,.2f}")
-    print(f"  Cash-like Positions: {summary.cash_like_count}")
-    print(f"  Cash-like Value: ${summary.cash_like_value:,.2f}")
-    print(f"  Short Percentage: {summary.short_percentage:.2f}%")
-    print(f"  Exposure Reduction: {summary.exposure_reduction_percentage:.2f}%")
 
 
 def test_sample_portfolio_serialization(sample_portfolio_path):

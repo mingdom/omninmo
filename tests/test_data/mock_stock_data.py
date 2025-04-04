@@ -55,19 +55,21 @@ def generate_price_series(base_price=100.0, volatility=0.01, days=252, seed=42):
         low_price = min(open_price, price) * (1 - abs(np.random.normal(0, 0.005)))
         volume = int(np.random.normal(1000000, 300000))
 
-        data.append({
-            'date': date,
-            'Open': open_price,
-            'High': high_price,
-            'Low': low_price,
-            'Close': price,
-            'Volume': max(0, volume)  # Ensure volume is positive
-        })
+        data.append(
+            {
+                "date": date,
+                "Open": open_price,
+                "High": high_price,
+                "Low": low_price,
+                "Close": price,
+                "Volume": max(0, volume),  # Ensure volume is positive
+            }
+        )
 
     # Create DataFrame
     df = pd.DataFrame(data)
-    df['date'] = pd.to_datetime(df['date'])
-    df = df.set_index('date')
+    df["date"] = pd.to_datetime(df["date"])
+    df = df.set_index("date")
 
     return df
 
@@ -75,28 +77,21 @@ def generate_price_series(base_price=100.0, volatility=0.01, days=252, seed=42):
 # Generate mock data for common test tickers
 MOCK_DATA = {
     # S&P 500 ETF (market benchmark)
-    'SPY': generate_price_series(base_price=450.0, volatility=0.008, seed=42),
-
+    "SPY": generate_price_series(base_price=450.0, volatility=0.008, seed=42),
     # High beta tech stock
-    'AAPL': generate_price_series(base_price=175.0, volatility=0.015, seed=43),
-
+    "AAPL": generate_price_series(base_price=175.0, volatility=0.015, seed=43),
     # Another high beta tech stock
-    'GOOGL': generate_price_series(base_price=140.0, volatility=0.016, seed=44),
-
+    "GOOGL": generate_price_series(base_price=140.0, volatility=0.016, seed=44),
     # Low volatility utility stock
-    'SO': generate_price_series(base_price=70.0, volatility=0.006, seed=45),
-
+    "SO": generate_price_series(base_price=70.0, volatility=0.006, seed=45),
     # Treasury ETF (negative correlation with market)
-    'TLT': generate_price_series(base_price=90.0, volatility=0.007, seed=46),
-
+    "TLT": generate_price_series(base_price=90.0, volatility=0.007, seed=46),
     # Short-term treasury (very low volatility)
-    'BIL': generate_price_series(base_price=91.5, volatility=0.001, seed=47),
-
+    "BIL": generate_price_series(base_price=91.5, volatility=0.001, seed=47),
     # International ETF
-    'EFA': generate_price_series(base_price=75.0, volatility=0.01, seed=48),
-
+    "EFA": generate_price_series(base_price=75.0, volatility=0.01, seed=48),
     # Emerging markets ETF
-    'EEM': generate_price_series(base_price=40.0, volatility=0.012, seed=49),
+    "EEM": generate_price_series(base_price=40.0, volatility=0.012, seed=49),
 }
 
 
@@ -104,44 +99,43 @@ MOCK_DATA = {
 def apply_correlations():
     """Apply realistic correlations between assets."""
     # Get SPY returns as market benchmark
-    spy_returns = MOCK_DATA['SPY']['Close'].pct_change().dropna()
+    spy_returns = MOCK_DATA["SPY"]["Close"].pct_change().dropna()
 
     # Define correlation targets with market
     correlations = {
-        'AAPL': 0.8,    # High correlation with market
-        'GOOGL': 0.75,  # High correlation with market
-        'SO': 0.3,      # Low correlation with market
-        'TLT': -0.4,    # Negative correlation with market
-        'BIL': 0.05,    # Very low correlation with market
-        'EFA': 0.7,     # Moderate-high correlation with market
-        'EEM': 0.6,     # Moderate correlation with market
+        "AAPL": 0.8,  # High correlation with market
+        "GOOGL": 0.75,  # High correlation with market
+        "SO": 0.3,  # Low correlation with market
+        "TLT": -0.4,  # Negative correlation with market
+        "BIL": 0.05,  # Very low correlation with market
+        "EFA": 0.7,  # Moderate-high correlation with market
+        "EEM": 0.6,  # Moderate correlation with market
     }
 
     for ticker, target_corr in correlations.items():
         # Get original returns
-        orig_returns = MOCK_DATA[ticker]['Close'].pct_change().dropna()
+        orig_returns = MOCK_DATA[ticker]["Close"].pct_change().dropna()
 
-        # Create correlated returns
-        # Formula: new_returns = target_corr * market_returns + sqrt(1-target_corr^2) * orig_returns
+        # Create correlated returns using the correlation formula
         new_returns = (
-            target_corr * spy_returns.values +
-            np.sqrt(1 - target_corr**2) * orig_returns.values
+            target_corr * spy_returns.values
+            + np.sqrt(1 - target_corr**2) * orig_returns.values
         )
 
         # Reconstruct prices from new returns
         cum_returns = np.cumprod(1 + new_returns)
-        base_price = MOCK_DATA[ticker]['Close'].iloc[0]
+        base_price = MOCK_DATA[ticker]["Close"].iloc[0]
         new_prices = base_price * cum_returns
 
         # Update Close prices
-        MOCK_DATA[ticker].loc[orig_returns.index, 'Close'] = new_prices
+        MOCK_DATA[ticker].loc[orig_returns.index, "Close"] = new_prices
 
         # Adjust other OHLC values to be consistent with new Close prices
         for i, idx in enumerate(orig_returns.index):
-            price_ratio = new_prices[i] / MOCK_DATA[ticker].loc[idx, 'Close']
-            MOCK_DATA[ticker].loc[idx, 'Open'] *= price_ratio
-            MOCK_DATA[ticker].loc[idx, 'High'] *= price_ratio
-            MOCK_DATA[ticker].loc[idx, 'Low'] *= price_ratio
+            price_ratio = new_prices[i] / MOCK_DATA[ticker].loc[idx, "Close"]
+            MOCK_DATA[ticker].loc[idx, "Open"] *= price_ratio
+            MOCK_DATA[ticker].loc[idx, "High"] *= price_ratio
+            MOCK_DATA[ticker].loc[idx, "Low"] *= price_ratio
 
 
 # Apply correlations to make the data more realistic
@@ -165,17 +159,17 @@ def get_mock_data(ticker, period="1y"):
     df = MOCK_DATA[ticker].copy()
 
     # Filter based on period
-    if period.endswith('y'):
+    if period.endswith("y"):
         years = int(period[:-1])
         days = years * 252  # Approximate trading days in a year
-    elif period.endswith('m'):
+    elif period.endswith("m"):
         months = int(period[:-1])
         days = months * 21  # Approximate trading days in a month
     else:
         days = 252  # Default to 1 year
 
     # Return the most recent 'days' rows
-    return df.iloc[-min(days, len(df)):]
+    return df.iloc[-min(days, len(df)) :]
 
 
 def get_beta(ticker, market_index="SPY"):
@@ -196,8 +190,8 @@ def get_beta(ticker, market_index="SPY"):
         raise ValueError(f"Missing mock data for {ticker} or {market_index}")
 
     # Get returns
-    stock_returns = MOCK_DATA[ticker]['Close'].pct_change().dropna()
-    market_returns = MOCK_DATA[market_index]['Close'].pct_change().dropna()
+    stock_returns = MOCK_DATA[ticker]["Close"].pct_change().dropna()
+    market_returns = MOCK_DATA[market_index]["Close"].pct_change().dropna()
 
     # Align data
     common_dates = stock_returns.index.intersection(market_returns.index)
@@ -258,9 +252,7 @@ def get_real_data(ticker, period="1y"):
     """
     try:
         return load_real_data(ticker, period)
-    except Exception as e:
-        print(f"Warning: Failed to load real data for {ticker}: {e}")
-        print("Falling back to synthetic data")
+    except Exception:
         return get_mock_data(ticker, period)
 
 
@@ -312,10 +304,7 @@ def get_mock_raw_data(ticker, period="1y"):
         historical.append(template)
 
     # Return in FMP API format
-    return {
-        "symbol": ticker,
-        "historical": historical
-    }
+    return {"symbol": ticker, "historical": historical}
 
 
 def get_real_beta(ticker, market_index="SPY"):
@@ -346,14 +335,14 @@ def get_real_beta(ticker, market_index="SPY"):
 
 # Expected beta values for test tickers (from real data)
 EXPECTED_BETAS = {
-    'SPY': 1.0,
-    'AAPL': 1.20,
-    'GOOGL': 1.27,
-    'SO': 0.47,
-    'TLT': -0.01,
-    'BIL': 0.00,
-    'EFA': 0.79,
-    'EEM': 0.75,
+    "SPY": 1.0,
+    "AAPL": 1.20,
+    "GOOGL": 1.27,
+    "SO": 0.47,
+    "TLT": -0.01,
+    "BIL": 0.00,
+    "EFA": 0.79,
+    "EEM": 0.75,
 }
 
 
@@ -361,37 +350,26 @@ if __name__ == "__main__":
     # Test tickers
     test_tickers = ["SPY", "AAPL", "GOOGL", "SO", "TLT", "BIL", "EFA", "EEM"]
 
-    print("\n=== REAL DATA FROM CSV FILES ===")
     for ticker in test_tickers:
         try:
-            print(f"\n{ticker} real data:")
             df = load_real_data(ticker, "1y")
-            print(df.tail(3))
 
             beta = get_real_beta(ticker)
-            print(f"{ticker} real beta vs SPY: {beta:.2f}")
-        except Exception as e:
-            print(f"Error processing real data for {ticker}: {e}")
+        except Exception:
+            pass
 
-    print("\n=== SYNTHETIC DATA ===")
     for ticker in test_tickers:
         try:
-            print(f"\n{ticker} synthetic data:")
             df = get_mock_data(ticker, "1y")
-            print(df.tail(3))
 
             beta = get_beta(ticker)
-            print(f"{ticker} synthetic beta vs SPY: {beta:.2f}")
-        except Exception as e:
-            print(f"Error processing synthetic data for {ticker}: {e}")
+        except Exception:
+            pass
 
-    print("\n=== MOCK RAW DATA (FMP API FORMAT) ===")
     try:
         raw_data = get_mock_raw_data("AAPL", "1y")
-        print("\nSample of AAPL raw data (first 2 records):")
-        for i, record in enumerate(raw_data["historical"][:2]):
-            print(f"\nRecord {i+1}:")
-            for key, value in record.items():
-                print(f"  {key}: {value}")
-    except Exception as e:
-        print(f"Error processing mock raw data: {e}")
+        for _i, record in enumerate(raw_data["historical"][:2]):
+            for _key, _value in record.items():
+                pass
+    except Exception:
+        pass

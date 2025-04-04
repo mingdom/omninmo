@@ -478,10 +478,9 @@ if __name__ == "__main__":
 
     # Test model creation
     model = Predictor()
-    print("Created model")
 
     # Test loading
     if os.path.exists("models/test_model.pkl"):
         loaded = Predictor.load("models/test_model.pkl")
         if loaded:
-            print("Successfully loaded existing model")
+            pass

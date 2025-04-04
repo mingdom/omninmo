@@ -103,6 +103,9 @@ Write code that is clear, maintainable, and robust against edge cases.
   - **Avoid Hardcoding**: Use pattern-based detection instead of hardcoding specific values
   - **Generic Solutions**: Prefer solutions that work for all cases over special-case handling
   - **Readability**: Prioritize readable code over clever optimizations
+  - **Code Quality**: Run `make lint` regularly to identify and fix code quality issues
+  - **Unused Code**: Avoid unused imports, functions, and variables; prefix intentionally unused variables with underscore
+  - **Clean Code**: Remove commented-out code and fix exception handling issues
 
 - **Configuration**:
   - **External Config**: Use configuration files for values that might change
@@ -148,6 +151,8 @@ Thorough testing prevents bugs and ensures code behaves as expected in all scena
 - **Testing Workflow**:
   - **Always Test Changes**: Run `make test` after ANY change - no exceptions!
   - **Check Test Logs**: Always review `logs/test_latest.log` after running tests to identify failures
+  - **Run Linter Regularly**: Run `make lint` to check for code quality issues, unused imports/functions, and other potential problems
+  - **Fix Linting Issues**: Address linting errors before committing code to maintain code quality
   - **Test Application**: Use `make portfolio` to test with sample data
   - **Review App Logs**: Check `logs/folio_latest.log` after running the application to catch errors
   - **Test Real Data**: Use `src/lab/portfolio.csv` for testing with real portfolio data

@@ -317,9 +317,7 @@ def main():
 
     # Run predictions
     try:
-        output = app.run_predictions(tickers, args.format)
-        print("\nPrediction Results:")
-        print(output)
+        app.run_predictions(tickers, args.format)
     except Exception as e:
         logger.error(f"Error running predictions: {e}")
         sys.exit(1)

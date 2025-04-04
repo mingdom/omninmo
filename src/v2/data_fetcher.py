@@ -207,5 +207,3 @@ if __name__ == "__main__":
     # Simple test
     fetcher = DataFetcher()
     data = fetcher.fetch_data("AAPL", period="1y")
-    print(data.head())
-    print(f"Got {len(data)} rows of data for AAPL")

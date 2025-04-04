@@ -36,7 +36,6 @@ PERIODS = ["1y", "5y"]
 
 def main():
     """Fetch sample data and save to files."""
-    print("Fetching sample data from FMP API...")
 
     # Initialize data fetcher
     fetcher = DataFetcher()
@@ -45,7 +44,6 @@ def main():
     for ticker in TICKERS:
         for period in PERIODS:
             try:
-                print(f"Fetching {ticker} for period {period}...")
 
                 # Fetch data
                 df = fetcher.fetch_data(ticker, period=period)
@@ -54,22 +52,19 @@ def main():
                     # Save to CSV
                     csv_path = os.path.join(OUTPUT_DIR, f"{ticker}_{period}.csv")
                     df.to_csv(csv_path)
-                    print(f"  Saved {len(df)} rows to {csv_path}")
 
                     # Save first 5 rows to JSON for reference
                     json_path = os.path.join(OUTPUT_DIR, f"{ticker}_{period}_sample.json")
                     sample_data = df.head(5).reset_index().to_dict(orient="records")
                     with open(json_path, "w") as f:
                         json.dump(sample_data, f, indent=2, default=str)
-                    print(f"  Saved sample to {json_path}")
                 else:
-                    print(f"  No data returned for {ticker} with period {period}")
+                    pass
 
-            except Exception as e:
-                print(f"  Error fetching {ticker} with period {period}: {e}")
+            except Exception:
+                pass
 
     # Calculate and save beta values
-    print("\nCalculating beta values...")
     betas = {}
 
     # Use 5-year data for more accurate beta calculation
@@ -90,7 +85,6 @@ def main():
             # Align data
             common_dates = stock_returns.index.intersection(market_returns.index)
             if len(common_dates) < 30:  # Require at least 30 data points
-                print(f"  Insufficient data for {ticker}, skipping beta calculation")
                 continue
 
             aligned_stock = stock_returns.loc[common_dates]
@@ -102,18 +96,15 @@ def main():
             beta = covariance / market_variance
 
             betas[ticker] = beta
-            print(f"  {ticker} beta: {beta:.2f}")
 
-        except Exception as e:
-            print(f"  Error calculating beta for {ticker}: {e}")
+        except Exception:
+            pass
 
     # Save beta values
     beta_path = os.path.join(OUTPUT_DIR, "beta_values.json")
     with open(beta_path, "w") as f:
         json.dump(betas, f, indent=2)
-    print(f"Saved beta values to {beta_path}")
 
-    print("\nDone!")
 
 if __name__ == "__main__":
     main()

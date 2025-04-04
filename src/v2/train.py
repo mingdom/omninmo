@@ -301,14 +301,11 @@ def main():
     if predictor is None:
         sys.exit(1)
 
-    print("\nTraining complete!")
-    print(f"Model saved to: {args.model_path or 'default path'}")
 
     # Print feature importance
     if predictor.feature_importance is not None:
-        print("\nTop 10 Feature Importance:")
-        for feature, importance in predictor.feature_importance[:10]:
-            print(f"{feature}: {importance:.4f}")
+        for _feature, _importance in predictor.feature_importance[:10]:
+            pass
 
 
 if __name__ == "__main__":

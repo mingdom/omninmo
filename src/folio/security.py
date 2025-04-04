@@ -94,7 +94,7 @@ def validate_csv_upload(
         decoded = base64.b64decode(content_string)
     except Exception as e:
         logger.error(f"Error decoding file content: {e}")
-        raise ValueError(f"Invalid file format: {e!s}")
+        raise ValueError(f"Invalid file format: {e!s}") from e
 
     # Check file size
     if len(decoded) > MAX_FILE_SIZE:
@@ -106,7 +106,7 @@ def validate_csv_upload(
         df = pd.read_csv(io.StringIO(decoded.decode("utf-8")))
     except Exception as e:
         logger.error(f"Error parsing CSV: {e}")
-        raise ValueError(f"Invalid CSV format: {e!s}")
+        raise ValueError(f"Invalid CSV format: {e!s}") from e
 
     # Check for required columns
     missing_columns = [col for col in REQUIRED_COLUMNS if col not in df.columns]

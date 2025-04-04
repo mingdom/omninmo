@@ -24,8 +24,6 @@ def main():
     mlruns_dir = os.path.join(project_root, 'mlruns')
     tracking_uri = f"file:{mlruns_dir}"
 
-    print(f"Starting MLflow UI on http://{args.host}:{args.port}")
-    print("Press Ctrl+C to stop the server.")
 
     # Start the MLflow UI
     cmd = [
@@ -38,9 +36,8 @@ def main():
     try:
         subprocess.run(cmd, check=False)
     except KeyboardInterrupt:
-        print("\nMLflow UI server stopped.")
-    except Exception as e:
-        print(f"Error starting MLflow UI: {e}")
+        pass
+    except Exception:
         sys.exit(1)
 
 if __name__ == "__main__":

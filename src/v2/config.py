@@ -127,6 +127,3 @@ config = Config()
 if __name__ == "__main__":
     # Simple test of the configuration
     logging.basicConfig(level=logging.DEBUG)
-    print("Model training period:", config.get("model.training.period"))
-    print("Default tickers:", config.get("model.training.default_tickers"))
-    print("Default watchlist:", config.get("watchlist.default"))

@@ -12,14 +12,11 @@ from typing import Any, TypeVar
 from .logger import logger
 
 # Type variable for function return type
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 def log_exception(
-    exc: Exception,
-    message: str,
-    include_traceback: bool = True,
-    level: str = "error"
+    exc: Exception, message: str, include_traceback: bool = True, level: str = "error"
 ) -> None:
     """
     Log an exception with consistent formatting.
@@ -43,7 +40,7 @@ def handle_callback_error(
     error_message: str = "Error in callback",
     include_traceback: bool = True,
     log_level: str = "error",
-    raise_exception: bool = False
+    raise_exception: bool = False,
 ) -> Callable:
     """
     Decorator for handling errors in Dash callbacks.
@@ -58,6 +55,7 @@ def handle_callback_error(
     Returns:
         A decorator function
     """
+
     def decorator(func: Callable[..., T]) -> Callable[..., T]:
         @functools.wraps(func)
         def wrapper(*args, **kwargs) -> T:
@@ -69,7 +67,7 @@ def handle_callback_error(
                     e,
                     f"{error_message} in {func.__name__}",
                     include_traceback=include_traceback,
-                    level=log_level
+                    level=log_level,
                 )
 
                 # Re-raise if requested
@@ -78,7 +76,9 @@ def handle_callback_error(
 
                 # Otherwise return the default value
                 return default_return
+
         return wrapper
+
     return decorator
 
 
@@ -87,7 +87,7 @@ def safe_operation(
     default_return: Any | None = None,
     include_traceback: bool = True,
     log_level: str = "error",
-    raise_exception: bool = False
+    raise_exception: bool = False,
 ) -> Callable:
     """
     Context manager for safely executing operations that might fail.
@@ -102,6 +102,7 @@ def safe_operation(
     Returns:
         A context manager
     """
+
     class SafeOperation:
         def __init__(self):
             self.result = default_return
@@ -109,14 +110,14 @@ def safe_operation(
         def __enter__(self):
             return self
 
-        def __exit__(self, exc_type, exc_val, exc_tb):
+        def __exit__(self, exc_type, exc_val, _exc_tb):
             if exc_type is not None:
                 # Log the exception
                 log_exception(
                     exc_val,
                     f"Error in {operation_name}",
                     include_traceback=include_traceback,
-                    level=log_level
+                    level=log_level,
                 )
 
                 # Don't re-raise if we're handling it

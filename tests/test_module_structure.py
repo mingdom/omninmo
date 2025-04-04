@@ -35,9 +35,8 @@ class TestModuleStructure:
         assert cash_detection.is_cash_or_short_term("FDRXX")
         assert not cash_detection.is_cash_or_short_term("AAPL")
 
-        # Test beta function with a known ticker
-        # Note: This might need to be mocked in a real test
-        # assert utils.get_beta("SPY") is not None
+        # Test beta function with a known ticker would go here
+        # This would need to be mocked in a real test
 
     def test_module_dependencies(self):
         """Test module dependencies and structure."""

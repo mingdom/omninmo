@@ -415,14 +415,13 @@ class TestBetaCalculation:
                 beta = covariance / market_variance
 
                 # Compare with expected beta from real data
-                expected_beta = get_real_beta("AAPL")
+                get_real_beta("AAPL")
 
                 # Beta should be within a reasonable range of the expected value
                 # The exact value will differ due to the mock data and date ranges
                 assert 0.5 < beta < 2.0, f"Beta {beta} is outside reasonable range"
 
                 # For information only - not a strict test
-                print(f"Calculated beta: {beta:.2f}, Expected beta: {expected_beta:.2f}")
 
 
 if __name__ == "__main__":

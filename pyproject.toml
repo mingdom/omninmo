@@ -30,27 +30,28 @@ target-version = "py311"
 [tool.ruff.lint]
 # Enable recommended rules + specific ones useful for data science projects
 select = [
-    "E",   # pycodestyle errors
-    "F",   # pyflakes
-    "I",   # isort
-    "N",   # pep8-naming
-    "UP",  # pyupgrade
-    "PL",  # pylint
-    "RUF", # ruff-specific rules
-    "W",   # pycodestyle warnings
-    "F401", # Module imported but unused
-    "F841", # Local variable is assigned to but never used
-    "F821", # Undefined name
-    "F811", # Redefined name
-    "F822", # Undefined name in __all__
-    "PLC0414", # Useless import alias
-    "PLE0101", # Function defined outside __init__
-    "PLE0604", # Invalid object in __all__, or invalid __all__ format
-    "PLE0605", # Invalid format for __all__
-    "A",       # Unused functions... etc.
-    "B",    # flake8-bugbear rules (includes B007 for unused loop variables)
-    "ERA",  # eradicate (commented out code)
-    "F",    # pyflakes (includes F401 for unused imports, F841 for unused variables)
+    "E",        # pycodestyle errors
+    "F",        # pyflakes
+    "I",        # isort
+    "N",        # pep8-naming
+    "UP",       # pyupgrade
+    "PL",       # pylint
+    "RUF",      # ruff-specific rules
+    "W",        # pycodestyle warnings
+    "F401",     # Module imported but unused
+    "F841",     # Local variable is assigned to but never used
+    "F821",     # Undefined name
+    "F811",     # Redefined name
+    "F822",     # Undefined name in __all__
+    "PLC0414",  # Useless import alias
+    "PLE0101",  # Function defined outside __init__
+    "PLE0604",  # Invalid object in __all__, or invalid __all__ format
+    "PLE0605",  # Invalid format for __all__
+    "A",        # Unused functions... etc.
+    "B",        # flake8-bugbear rules (includes B007 for unused loop variables)
+    "ERA",      # eradicate (commented out code)
+    "F",        # pyflakes (includes F401 for unused imports, F841 for unused variables)
+    "T201",     # print statements
 ]
 
 # Ignore specific rules

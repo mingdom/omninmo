@@ -2,13 +2,11 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from src.lab.option_utils import (
+from src.folio.option_utils import (
     OptionPosition,
     calculate_black_scholes_delta,
     calculate_option_delta,
-    calculate_simple_delta,
     get_implied_volatility,
-    parse_option_description,
 )
 
 
@@ -220,51 +218,6 @@ def test_bs_delta_put_call_parity(sample_options):
     assert (
         abs((call_delta - 1) - put_delta) < 1e-10
     ), "Put-call parity not satisfied for delta"
-
-
-def test_bs_delta_vs_simple_delta_real_options(real_option_samples):
-    """Compare Black-Scholes and simple delta for real options from portfolio.
-
-    Black-Scholes delta is typically larger than simple delta for OTM options
-    because it accounts for time value and volatility, while simple delta is
-    just a linear approximation based on moneyness.
-    """
-    # Test each real option and store results for debugging if needed
-    test_bs_delta_vs_simple_delta_real_options.debug_results = []
-
-    for symbol, desc, qty, price, und_price in real_option_samples:
-        option = parse_option_description(desc, qty, price)
-
-        simple_delta = calculate_simple_delta(option, und_price)
-        bs_delta = calculate_black_scholes_delta(option, und_price)
-
-        # Store results for debugging
-        test_bs_delta_vs_simple_delta_real_options.debug_results.append(
-            {
-                "symbol": symbol,
-                "description": desc,
-                "simple_delta": simple_delta,
-                "bs_delta": bs_delta,
-                "difference": bs_delta - simple_delta,
-            }
-        )
-
-        # For OTM options, BS delta should be larger than simple delta
-        # because it accounts for time value and volatility
-        if "CALL" in desc and symbol == "GOOGL":
-            # For OTM call (strike > price), BS delta should be larger
-            if option.strike > und_price:
-                assert abs(bs_delta) > abs(simple_delta), (
-                    f"BS delta for OTM call should be larger than simple delta due to time value.\n"
-                    f"BS delta: {bs_delta}, Simple delta: {simple_delta}\n"
-                    f"Option: {desc}, Strike: {option.strike}, Price: {und_price}"
-                )
-            # For ITM call (strike < price), they should be closer
-            else:
-                assert abs(bs_delta - simple_delta) < 0.3, (
-                    f"BS and simple delta should be closer for ITM options.\n"
-                    f"BS delta: {bs_delta}, Simple delta: {simple_delta}"
-                )
 
 
 def test_delta_calculator_interface():

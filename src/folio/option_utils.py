@@ -1,12 +1,20 @@
 """
 Utilities for handling option positions and calculations.
+
+This module provides functionality for parsing, analyzing, and calculating metrics for
+option positions. It includes tools for parsing option descriptions, calculating option
+deltas using both Black-Scholes and simplified models, and estimating implied volatility.
 """
 
+import logging
 import math
 from dataclasses import dataclass
 from datetime import datetime
 
 from scipy.stats import norm
+
+# Configure module logger
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -30,7 +38,6 @@ class OptionPosition:
         is_short (bool): True if the quantity is negative, indicating a short position.
 
     TODO:
-        - Add fields for cost basis and purchase date for P/L calculations.
         - Consider adding fields for Greeks (delta, gamma, theta, vega) if calculated elsewhere
           and need to be stored with the position.
     """
@@ -62,16 +69,20 @@ class OptionPosition:
 
 
 def parse_month(month_str: str) -> int:
-    """Converts a three-letter uppercase month abbreviation string to its corresponding month number.
+    """Convert a month abbreviation to its numerical value (1-12).
+
+    This function takes a three-letter month abbreviation (e.g., "JAN", "FEB") and
+    returns the corresponding month number (1-12). The function is case-insensitive
+    and will convert the input to uppercase before processing.
 
     Args:
-        month_str: The three-letter uppercase month abbreviation (e.g., "JAN", "FEB").
+        month_str: Three-letter month abbreviation (e.g., "JAN", "FEB")
 
     Returns:
-        The integer month number (1 for JAN, 2 for FEB, ..., 12 for DEC).
+        int: Month number (1-12)
 
     Raises:
-        KeyError: If the input string is not a valid three-letter uppercase month abbreviation.
+        ValueError: If the month abbreviation is invalid
     """
     month_map = {
         "JAN": 1,
@@ -87,12 +98,22 @@ def parse_month(month_str: str) -> int:
         "NOV": 11,
         "DEC": 12,
     }
-    # Using .get() with a default or handling KeyError is safer than direct access
-    # return month_map[month_str.upper()] # Original was case-sensitive implicitly
+
+    if not month_str or len(month_str) != 3:
+        logger.error(
+            f"Invalid month format: '{month_str}'. Expected 3-letter abbreviation."
+        )
+        raise ValueError(
+            f"Invalid month format: '{month_str}'. Expected 3-letter abbreviation."
+        )
+
     try:
-        return month_map[month_str.upper()]  # Ensure uppercase
-    except KeyError:
-        raise ValueError(f"Invalid month abbreviation: {month_str}")
+        month_num = month_map[month_str.upper()]  # Ensure uppercase
+        logger.debug(f"Parsed month '{month_str}' to {month_num}")
+        return month_num
+    except KeyError as err:
+        logger.error(f"Invalid month abbreviation: '{month_str}'")
+        raise ValueError(f"Invalid month abbreviation: '{month_str}'") from err
 
 
 def parse_option_description(
@@ -101,144 +122,125 @@ def parse_option_description(
     """Parses a specific option description string format into an OptionPosition object.
 
     This function expects a description string with exactly 6 space-separated parts:
-    `UNDERLYING MONTH DAY YEAR $STRIKE TYPE`
-    Example: "GOOGL MAY 16 2025 $170 CALL"
+    1. Underlying ticker (e.g., "AAPL")
+    2. Month abbreviation (e.g., "JAN", "FEB")
+    3. Day (e.g., "15")
+    4. Year (e.g., "2023")
+    5. Strike price with $ prefix (e.g., "$150")
+    6. Option type (e.g., "CALL", "PUT")
 
-    It extracts the components, converts them to the appropriate types (using `parse_month`),
-    and constructs an `OptionPosition` dataclass instance.
+    Example: "AAPL JAN 20 2023 $150 CALL"
 
     Args:
-        description: The option description string in the expected 6-part format.
-        quantity: The number of option contracts (positive for long, negative for short).
-        current_price: The current market price per contract of the option.
+        description: The option description string to parse
+        quantity: The number of contracts (positive for long, negative for short)
+        current_price: The current market price per contract
 
     Returns:
-        An `OptionPosition` object populated with the parsed details.
+        OptionPosition: A populated OptionPosition object
 
     Raises:
         ValueError: If the description string does not match the expected 6-part format,
                     if the month abbreviation is invalid, if the day/year/strike cannot
                     be converted to numbers, or if the option type is not 'CALL' or 'PUT'.
 
-    TODO:
-        - Increase robustness to handle variations in spacing or formatting.
-        - Support different date formats (e.g., YYMMDD). Use regex for flexibility?
-        - Handle weekly or non-standard options if their format differs.
-        - Consider passing the original symbol ('-GOOGL...') as well for reference.
     """
-    # Remove any extra whitespace and split
+    logger.debug(f"Parsing option description: '{description}'")
+
+    # Split the description into parts
     parts = description.strip().split()
 
+    # Validate the number of parts
     if len(parts) != 6:
-        raise ValueError(
-            f"Invalid option description format (expected 6 parts): {description}"
-        )
-    if not parts[4].startswith("$"):
-        raise ValueError(
-            f"Invalid option description format (strike missing '$'): {description}"
-        )
+        error_msg = f"Invalid option description format: {description}. Expected 6 parts, got {len(parts)}."
+        logger.error(error_msg)
+        raise ValueError(error_msg)
 
+    # Extract the parts
+    underlying = parts[0]
+    month_str = parts[1]
+    day_str = parts[2]
+    year_str = parts[3]
+    strike_str = parts[4]
+    option_type = parts[5]
+
+    # Validate and convert the month
     try:
-        underlying = parts[0]
-        month = parse_month(parts[1])  # Raises ValueError if invalid month
-        day = int(parts[2])
-        year = int(parts[3])
-        strike = float(parts[4].replace("$", ""))
-        option_type = parts[5].upper()
+        month = parse_month(month_str)
+    except ValueError as e:
+        logger.error(f"Invalid month in option description: {description}")
+        raise ValueError(f"Invalid month in option description: {description}") from e
 
-        if option_type not in ["CALL", "PUT"]:
-            raise ValueError(f"Invalid option type: {option_type}")
+    # Validate and convert the day
+    try:
+        day = int(day_str)
+        if not 1 <= day <= 31:
+            error_msg = f"Day out of range: {day}"
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+    except ValueError as e:
+        logger.error(f"Invalid day in option description: {description}")
+        raise ValueError(f"Invalid day in option description: {description}") from e
 
-        expiry = datetime(year, month, day)
+    # Validate and convert the year
+    try:
+        year = int(year_str)
+        if not 2000 <= year <= 2100:  # Reasonable range check
+            error_msg = f"Year out of range: {year}"
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+    except ValueError as e:
+        logger.error(f"Invalid year in option description: {description}")
+        raise ValueError(f"Invalid year in option description: {description}") from e
 
-        return OptionPosition(
-            underlying=underlying,
-            expiry=expiry,
-            strike=strike,
-            option_type=option_type,
-            quantity=quantity,
-            # Ensure price is positive; directionality is handled by quantity
-            current_price=abs(current_price),
-            description=description,  # Store the original description
+    # Validate and convert the strike price
+    if not strike_str.startswith("$"):
+        error_msg = (
+            f"Strike price must start with $ in option description: {description}"
         )
-    except ValueError as e:  # Catch conversion errors (int, float, parse_month)
+        logger.error(error_msg)
+        raise ValueError(error_msg)
+    try:
+        strike = float(strike_str[1:])  # Remove the $ and convert to float
+        if strike <= 0:
+            error_msg = f"Strike price must be positive: {strike}"
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+    except ValueError as e:
+        logger.error(f"Invalid strike price in option description: {description}")
         raise ValueError(
-            f"Error parsing components of description '{description}': {e}"
-        ) from e
-    except Exception as e:  # Catch unexpected errors
-        raise RuntimeError(
-            f"Unexpected error parsing option description '{description}': {e}"
+            f"Invalid strike price in option description: {description}"
         ) from e
 
+    # Validate the option type
+    option_type = option_type.upper()
+    if option_type not in ["CALL", "PUT"]:
+        error_msg = f"Invalid option type in option description: {description}. Expected 'CALL' or 'PUT', got '{option_type}'."
+        logger.error(error_msg)
+        raise ValueError(error_msg)
 
-def calculate_simple_delta(option: OptionPosition, underlying_price: float) -> float:
-    """Estimates option delta using a simplified linear approximation based on moneyness.
+    # Create the expiry date
+    try:
+        expiry = datetime(year, month, day)
+    except ValueError as e:
+        logger.error(f"Invalid date in option description: {description}")
+        raise ValueError(f"Invalid date in option description: {description}") from e
 
-    This function provides a very basic delta estimation:
-    - Deep In-The-Money (ITM): +/- 0.95
-    - Deep Out-of-The-Money (OTM): +/- 0.05
-    - Near-The-Money (NTM): Linearly interpolates between 0.05 and 0.95 based on moneyness.
-
-    Moneyness definition:
-    - Calls: `underlying_price / strike`
-    - Puts: `strike / underlying_price`
-
-    The delta sign depends on the option type (positive for calls, negative for puts)
-    and the position direction (long/short).
-
-    Args:
-        option: The `OptionPosition` object.
-        underlying_price: The current price of the underlying asset.
-
-    Returns:
-        An estimated delta value between -1.0 and 1.0.
-
-    Note:
-        This is a rough approximation and does NOT account for volatility, time to expiry,
-        or interest rates. Use `calculate_black_scholes_delta` for a more accurate calculation.
-
-    TODO:
-        - Consider deprecating this in favor of always using Black-Scholes or another
-          more standard model, unless a very fast, rough estimate is specifically required.
-        - The linear interpolation logic could be refined.
-    """
-    delta_unsigned = 0.0  # Initialize unsigned delta
-
-    if option.option_type == "CALL":
-        # Avoid division by zero if strike is 0 (shouldn't happen for valid options)
-        if option.strike <= 0:
-            return 0.0
-        moneyness = underlying_price / option.strike
-        if moneyness >= 1.1:  # Deep ITM
-            delta_unsigned = 0.95
-        elif moneyness <= 0.9:  # Deep OTM
-            delta_unsigned = 0.05
-        else:  # Near the money (interpolate between 0.9 and 1.1 moneyness)
-            # Linear interpolation: maps [0.9, 1.1] moneyness to [0.05, 0.95] delta
-            # Formula: delta = min_delta + (moneyness - min_moneyness) * (max_delta - min_delta) / (max_moneyness - min_moneyness)
-            delta_unsigned = 0.05 + (moneyness - 0.9) * (0.95 - 0.05) / (1.1 - 0.9)
-            delta_unsigned = max(0.05, min(delta_unsigned, 0.95))  # Clamp within bounds
-        delta_signed = delta_unsigned
-    else:  # PUT
-        # Avoid division by zero if underlying price is 0
-        if underlying_price <= 0:
-            return 0.0
-        moneyness = option.strike / underlying_price  # Invert moneyness for puts
-        if moneyness >= 1.1:  # Deep ITM for puts
-            delta_unsigned = 0.95
-        elif moneyness <= 0.9:  # Deep OTM for puts
-            delta_unsigned = 0.05
-        else:  # Near the money
-            delta_unsigned = 0.05 + (moneyness - 0.9) * (0.95 - 0.05) / (1.1 - 0.9)
-            delta_unsigned = max(0.05, min(delta_unsigned, 0.95))  # Clamp within bounds
-        delta_signed = -delta_unsigned  # Puts have negative delta
-
-    # Final delta depends on whether the position is long or short
-    # If short, invert the delta.
-    final_delta = delta_signed if not option.is_short else -delta_signed
-
-    # Ensure final delta is strictly within [-1.0, 1.0]
-    return max(-1.0, min(final_delta, 1.0))
+    # Create and return the OptionPosition
+    logger.debug(
+        f"Successfully parsed option: {underlying} {expiry.strftime('%b %d %Y')} ${strike} {option_type}"
+    )
+    return OptionPosition(
+        underlying=underlying,
+        expiry=expiry,
+        strike=strike,
+        option_type=option_type,
+        quantity=quantity,
+        current_price=abs(
+            current_price
+        ),  # Ensure price is positive; directionality is handled by quantity
+        description=description,
+    )
 
 
 def calculate_black_scholes_delta(
@@ -287,8 +289,8 @@ def calculate_black_scholes_delta(
         raise ValueError("Implied volatility must be positive.")
     if not (0 <= risk_free_rate < 1):
         # Warn if rate seems unusual, but allow calculation
-        print(
-            f"Warning: Risk-free rate ({risk_free_rate}) is outside typical [0, 1) range."
+        logger.warning(
+            f"Risk-free rate ({risk_free_rate}) is outside typical [0, 1) range."
         )
 
     # Calculate time to expiration in years
@@ -384,8 +386,8 @@ def calculate_bs_price(
     if implied_volatility <= 0:
         raise ValueError("Implied volatility must be positive.")
     if not (0 <= risk_free_rate < 1):
-        print(
-            f"Warning: Risk-free rate ({risk_free_rate}) is outside typical [0, 1) range."
+        logger.warning(
+            f"Risk-free rate ({risk_free_rate}) is outside typical [0, 1) range."
         )
 
     # Calculate time to expiration in years
@@ -486,13 +488,13 @@ def calculate_implied_volatility(
     if target_price <= 0:
         # If market price is zero or negative, IV is effectively zero or undefined.
         # Warn and return 0, as it often indicates an issue with the price data.
-        print(
-            f"Warning: Market price ({target_price}) for {option.description} is non-positive. Returning IV=0.0"
+        logger.warning(
+            f"Market price ({target_price}) for {option.description} is non-positive. Returning IV=0.0"
         )
         return 0.0
     if not (0 <= risk_free_rate < 1):
-        print(
-            f"Warning: Risk-free rate ({risk_free_rate}) is outside typical [0, 1) range."
+        logger.warning(
+            f"Risk-free rate ({risk_free_rate}) is outside typical [0, 1) range."
         )
 
     # Calculate time to expiration in years
@@ -517,7 +519,9 @@ def calculate_implied_volatility(
         # IV is highly sensitive and often meaningless. Returning a default might be necessary.
         # A low IV (e.g., 0.001) or a high one (0.9) could be argued. Let's use a low one
         # assuming minimal extrinsic value implies low expected future volatility.
-        # print(f"Warning: Option {option.description} trading near/below intrinsic value. Returning low default IV.")
+        logger.warning(
+            f"Option {option.description} trading near/below intrinsic value. Returning low default IV."
+        )
         return 0.01  # Return 1% as a default low IV
 
     # Initialize volatility search range [lower_bound, upper_bound]
@@ -531,7 +535,9 @@ def calculate_implied_volatility(
     # If the target price is higher than the price achievable even with max volatility,
     # it might indicate an arbitrage or data error. Return max vol as best guess.
     if target_price > price_at_high_vol:
-        # print(f"Warning: Market price {target_price} > theoretical max price {price_at_high_vol} for {option.description}. Returning max IV.")
+        logger.warning(
+            f"Market price {target_price} > theoretical max price {price_at_high_vol} for {option.description}. Returning max IV."
+        )
         return vol_high
 
     # Bisection method to find implied volatility
@@ -551,8 +557,8 @@ def calculate_implied_volatility(
             # Should not happen if vol_mid is positive, but handle defensively
             # If BSM calculation fails, try adjusting bounds slightly
             # This indicates potential instability, might need different approach
-            print(
-                f"Warning: BSM price calculation failed at IV={vol_mid}. Adjusting bounds."
+            logger.warning(
+                f"BSM price calculation failed at IV={vol_mid}. Adjusting bounds."
             )
             # If price tends to increase with vol (most common), failing likely means vol_low was too low
             # Try slightly increasing vol_low - this is heuristic
@@ -569,7 +575,9 @@ def calculate_implied_volatility(
 
     # After max_iterations, return the midpoint of the final range
     final_iv = (vol_low + vol_high) / 2.0
-    # print(f"IV calculation finished for {option.description}. IV: {final_iv:.4f}")
+    logger.debug(
+        f"IV calculation finished for {option.description}. IV: {final_iv:.4f}"
+    )
     return final_iv
 
 
@@ -618,8 +626,8 @@ def estimate_volatility_with_skew(
     if not (
         0.01 <= base_volatility <= 2.0
     ):  # Check if base vol is reasonable (1% to 200%)
-        print(
-            f"Warning: Base volatility ({base_volatility}) is outside typical [0.01, 2.0] range."
+        logger.warning(
+            f"Base volatility ({base_volatility}) is outside typical [0.01, 2.0] range."
         )
 
     # Calculate moneyness (how far ITM/OTM the option is)
@@ -672,7 +680,9 @@ def estimate_volatility_with_skew(
     # Ensure the estimated IV is within reasonable bounds (e.g., 1% to 150%)
     final_iv = max(0.01, min(estimated_iv, 1.5))
 
-    # print(f"Estimated IV for {option.description}: Base={base_volatility:.2f}, SkewF={skew_factor:.2f}, TermF={term_factor:.2f} => Final={final_iv:.3f}")
+    logger.debug(
+        f"Estimated IV for {option.description}: Base={base_volatility:.2f}, SkewF={skew_factor:.2f}, TermF={term_factor:.2f} => Final={final_iv:.3f}"
+    )
     return final_iv
 
 
@@ -714,7 +724,9 @@ def get_implied_volatility(
         # 1. Attempt calculation from market price if available and positive
         if hasattr(option, "current_price") and option.current_price > 0:
             try:
-                # print(f"Attempting IV calculation from market price {option.current_price} for {option.description}")
+                logger.debug(
+                    f"Attempting IV calculation from market price {option.current_price} for {option.description}"
+                )
                 calculated_iv = calculate_implied_volatility(
                     option=option,  # Pass the whole object
                     underlying_price=underlying_price,
@@ -725,45 +737,49 @@ def get_implied_volatility(
 
                 # 2. Check if calculated IV is within the reasonable range
                 if MIN_IV <= calculated_iv <= MAX_IV:
-                    # print(f"Successfully calculated IV from market price: {calculated_iv:.4f}")
+                    logger.debug(
+                        f"Successfully calculated IV from market price: {calculated_iv:.4f}"
+                    )
                     return calculated_iv
                 else:
                     # Calculated IV was outside the expected range (e.g., due to price near intrinsic)
-                    print(
-                        f"Warning: Calculated IV ({calculated_iv:.4f}) for {option.description} is outside range [{MIN_IV}, {MAX_IV}]. Falling back to estimation."
+                    logger.warning(
+                        f"Calculated IV ({calculated_iv:.4f}) for {option.description} is outside range [{MIN_IV}, {MAX_IV}]. Falling back to estimation."
                     )
 
             except ValueError as ve:
-                print(
+                logger.error(
                     f"ValueError during IV calculation for {option.description}: {ve}. Falling back to estimation."
                 )
             except RuntimeError as re:
-                print(
+                logger.error(
                     f"RuntimeError during IV calculation for {option.description}: {re}. Falling back to estimation."
                 )
             # Catch any other unexpected errors during calculation
             except Exception as iv_calc_err:
-                print(
+                logger.error(
                     f"Unexpected error during IV calculation for {option.description}: {iv_calc_err}. Falling back to estimation."
                 )
         else:
             # Market price not available or non-positive
-            # print(f"Market price missing or non-positive for {option.description}. Falling back to IV estimation.")
+            logger.debug(
+                f"Market price missing or non-positive for {option.description}. Falling back to IV estimation."
+            )
             pass  # Proceed to estimation
 
         # 3. Fallback: Estimate IV using skew model
-        # print(f"Estimating IV using skew model for {option.description}")
+        logger.debug(f"Estimating IV using skew model for {option.description}")
         estimated_iv = estimate_volatility_with_skew(
             option=option,
             underlying_price=underlying_price,
             base_volatility=DEFAULT_IV,  # Use the default as base for estimation
         )
-        # print(f"Estimated IV: {estimated_iv:.4f}")
+        logger.debug(f"Estimated IV: {estimated_iv:.4f}")
         return estimated_iv
 
     except Exception as e:
         # 4. Catch-all for errors in the estimation step or unexpected issues
-        print(
+        logger.error(
             f"Error getting IV for {option.description}: {e}. Returning default IV {DEFAULT_IV}."
         )
         return DEFAULT_IV  # Return conservative default on any failure
@@ -806,43 +822,75 @@ def calculate_option_delta(
         Propagates exceptions from the underlying calculation functions (e.g., `ValueError`
         from `calculate_black_scholes_delta` if inputs are invalid).
 
-    TODO:
-        - Add logging for which model (BSM or simple) was used and the IV value employed.
     """
-    if use_black_scholes:
-        # print(f"Calculating BSM delta for {option.description}")
-        # Determine the IV to use
-        iv_to_use = implied_volatility  # Use provided IV if available
-        if iv_to_use is None:
-            # print(f"  IV not provided, calling get_implied_volatility...")
-            iv_to_use = get_implied_volatility(option, underlying_price, risk_free_rate)
-            # print(f"  Obtained IV: {iv_to_use:.4f}")
-        elif not (0.001 <= iv_to_use <= 3.0):  # Basic sanity check on provided IV
-            print(
-                f"Warning: Provided IV ({iv_to_use}) for {option.description} seems unusual."
-            )
+    # Simple delta calculation based on moneyness
+    if not use_black_scholes:
+        logger.debug(f"Using simple delta calculation for {option.description}")
+        return _calculate_simple_delta(option, underlying_price)
 
-        try:
-            delta = calculate_black_scholes_delta(
-                option, underlying_price, risk_free_rate, iv_to_use
-            )
-            # print(f"  BSM Delta calculated: {delta:.4f}")
-            return delta
-        except (ValueError, ZeroDivisionError, RuntimeError) as e:
-            print(
-                f"Error calculating BSM delta for {option.description}: {e}. Falling back to simple delta."
-            )
-            # Fallback to simple delta on BSM calculation error
-            return calculate_simple_delta(option, underlying_price)
-        except Exception as e:
-            print(
-                f"Unexpected error in BSM delta calculation for {option.description}: {e}. Falling back to simple delta."
-            )
-            return calculate_simple_delta(option, underlying_price)
+    # Black-Scholes delta calculation
+    logger.debug(f"Calculating Black-Scholes delta for {option.description}")
 
-    else:
-        # print(f"Calculating simple delta for {option.description}")
-        return calculate_simple_delta(option, underlying_price)
+    # Determine the IV to use
+    iv_to_use = implied_volatility  # Use provided IV if available
+    if iv_to_use is None:
+        logger.debug(f"No IV provided, estimating IV for {option.description}")
+        iv_to_use = get_implied_volatility(option, underlying_price, risk_free_rate)
+        logger.debug(f"Estimated IV: {iv_to_use:.4f}")
+    elif not (0.001 <= iv_to_use <= 3.0):  # Basic sanity check on provided IV
+        logger.warning(f"Unusual IV value ({iv_to_use}) for {option.description}")
+
+    try:
+        delta = calculate_black_scholes_delta(
+            option, underlying_price, risk_free_rate, iv_to_use
+        )
+        logger.debug(f"Black-Scholes delta calculated: {delta:.4f}")
+        return delta
+    except Exception as e:
+        logger.error(f"Error calculating Black-Scholes delta: {e}")
+        logger.info("Falling back to simple delta calculation")
+        return _calculate_simple_delta(option, underlying_price)
+
+
+def _calculate_simple_delta(option: OptionPosition, underlying_price: float) -> float:
+    """Calculate a simplified delta based on moneyness.
+
+    This function provides a rough estimate of delta based on the moneyness of the option
+    (how far in-the-money or out-of-the-money it is).
+
+    Args:
+        option: The option position
+        underlying_price: The current price of the underlying asset
+
+    Returns:
+        float: The estimated delta of the option position, adjusted for quantity
+    """
+    # Calculate moneyness (price / strike for calls, strike / price for puts)
+    if option.option_type == "CALL":
+        moneyness = underlying_price / option.strike
+        # Deep ITM calls approach delta of 1, deep OTM approach 0
+        if moneyness >= 1.1:  # Deep in-the-money
+            delta = 0.95
+        elif moneyness <= 0.9:  # Deep out-of-the-money
+            delta = 0.05
+        else:  # Near the money
+            # Linear interpolation between 0.05 and 0.95
+            delta = 0.05 + (moneyness - 0.9) * (0.95 - 0.05) / (1.1 - 0.9)
+            delta = max(0.05, min(delta, 0.95))  # Clamp within bounds
+    else:  # PUT
+        moneyness = option.strike / underlying_price
+        # Deep ITM puts approach delta of -1, deep OTM approach 0
+        if moneyness >= 1.1:  # Deep in-the-money
+            delta = -0.95
+        elif moneyness <= 0.9:  # Deep out-of-the-money
+            delta = -0.05
+        else:  # Near the money
+            # Linear interpolation between -0.05 and -0.95
+            delta = -0.05 - (moneyness - 0.9) * (0.95 - 0.05) / (1.1 - 0.9)
+            delta = min(-0.05, max(delta, -0.95))  # Clamp within bounds
+
+    # Adjust for quantity
+    return delta * option.quantity
 
 
 def group_options_by_underlying(
@@ -860,144 +908,10 @@ def group_options_by_underlying(
     grouped = {}
     for option in options:
         if not isinstance(option, OptionPosition):
-            print(
-                f"Warning: Item in list is not an OptionPosition: {option}. Skipping."
+            logger.warning(
+                f"Item in list is not an OptionPosition: {option}. Skipping."
             )
             continue
-        # Use .setdefault() for cleaner dictionary population
+        # Add option to the list for its underlying ticker
         grouped.setdefault(option.underlying, []).append(option)
-        # if option.underlying not in grouped:
-        #     grouped[option.underlying] = []
-        # grouped[option.underlying].append(option)
     return grouped
-
-
-if __name__ == "__main__":
-    # Example Usage and Testing
-    print("--- Option Utils Testing ---")
-
-    # --- Test OptionPosition ---
-    try:
-        test_option_pos = OptionPosition(
-            underlying="XYZ",
-            expiry=datetime(2025, 6, 20),
-            strike=100.0,
-            option_type="CALL",
-            quantity=5,
-            current_price=2.50,
-            description="XYZ JUN 20 2025 $100 CALL",
-        )
-        print(f"Test OptionPosition: {test_option_pos}")
-        print(f"  Is Short: {test_option_pos.is_short}")
-        print(f"  Market Value: ${test_option_pos.market_value:,.2f}")
-        print(f"  Notional Value: ${test_option_pos.notional_value:,.2f}")
-
-        test_option_short = OptionPosition(
-            underlying="XYZ",
-            expiry=datetime(2025, 6, 20),
-            strike=90.0,
-            option_type="PUT",
-            quantity=-10,
-            current_price=1.50,
-            description="XYZ JUN 20 2025 $90 PUT",
-        )
-        print(f"Test Short Option: {test_option_short}")
-        print(f"  Is Short: {test_option_short.is_short}")
-        print(f"  Market Value: ${test_option_short.market_value:,.2f}")
-        print(f"  Notional Value: ${test_option_short.notional_value:,.2f}")
-    except Exception as e:
-        print(f"Error testing OptionPosition: {e}")
-
-    # --- Test parse_month ---
-    try:
-        print(f"Parse 'APR': {parse_month('APR')}")
-        # print(f"Parse 'XYZ': {parse_month('XYZ')}") # Should raise ValueError
-    except ValueError as e:
-        print(f"Error testing parse_month: {e}")
-
-    # --- Test parse_option_description ---
-    test_desc = "GOOGL MAY 16 2025 $170 CALL"
-    try:
-        parsed_option = parse_option_description(test_desc, -10, 2.75)
-        print(f"Parsed Option Desc: {parsed_option}")
-        # Test invalid format
-        # parse_option_description("INVALID DESC", 1, 1.0)
-        # parse_option_description("GOOGL MAY 16 2025 170 CALL", 1, 1.0) # Missing $
-    except (ValueError, RuntimeError) as e:
-        print(f"Error testing parse_option_description: {e}")
-
-    # --- Test Delta Calculations (using parsed_option) ---
-    underlying_price = 154.33  # Example GOOGL price
-    if "parsed_option" in locals():
-        try:
-            simple_delta = calculate_simple_delta(parsed_option, underlying_price)
-            print(f"Simple Delta ({parsed_option.description}): {simple_delta:.3f}")
-            print(
-                f"  Simple Delta Exposure: ${parsed_option.notional_value * simple_delta:,.2f}"
-            )
-        except Exception as e:
-            print(f"Error calculating simple delta: {e}")
-
-        # Test Black-Scholes delta
-        try:
-            # 1. Calculate IV first (will likely estimate as price is low)
-            iv = get_implied_volatility(parsed_option, underlying_price)
-            print(f"Implied Volatility for BSM Delta: {iv:.4f}")
-
-            # 2. Calculate delta using the obtained IV
-            bs_delta = calculate_black_scholes_delta(
-                parsed_option, underlying_price, implied_volatility=iv
-            )
-            print(f"Black-Scholes Delta ({parsed_option.description}): {bs_delta:.4f}")
-            print(
-                f"  BSM Delta Exposure: ${parsed_option.notional_value * bs_delta:,.2f}"
-            )
-
-            # 3. Test the wrapper function calculate_option_delta
-            wrapper_bs_delta = calculate_option_delta(
-                parsed_option, underlying_price, use_black_scholes=True
-            )
-            print(f"Wrapper BSM Delta: {wrapper_bs_delta:.4f}")
-            wrapper_simple_delta = calculate_option_delta(
-                parsed_option, underlying_price, use_black_scholes=False
-            )
-            print(f"Wrapper Simple Delta: {wrapper_simple_delta:.3f}")
-
-        except Exception as e:
-            print(f"Error calculating BSM delta: {e}")
-
-    # --- Test BSM Price Calculation ---
-    try:
-        call_option_price = OptionPosition(
-            "TEST", datetime(2025, 1, 17), 100, "CALL", 1, 0, "Desc"
-        )  # Price doesn't matter here
-        bsm_price = calculate_bs_price(
-            call_option_price,
-            underlying_price=105,
-            risk_free_rate=0.05,
-            implied_volatility=0.25,
-        )
-        print(f"BSM Price (105 SP, 100C, 25% IV): ${bsm_price:,.2f}")
-    except Exception as e:
-        print(f"Error testing BSM price: {e}")
-
-    # --- Test Grouping ---
-    try:
-        options_list = [
-            OptionPosition("AAPL", datetime(2025, 1, 17), 200, "CALL", 2, 5.5, "D1"),
-            OptionPosition("MSFT", datetime(2025, 1, 17), 400, "PUT", -3, 8.1, "D2"),
-            OptionPosition("AAPL", datetime(2025, 3, 21), 210, "CALL", 1, 3.2, "D3"),
-            "Not an option",  # Add invalid item
-        ]
-        grouped_opts = group_options_by_underlying(options_list)
-        print("Grouped Options:")
-        for underlying, opts in grouped_opts.items():
-            print(f"  {underlying}: {[o.description for o in opts]}")
-    except Exception as e:
-        print(f"Error testing grouping: {e}")
-
-    print("--- End Option Utils Testing ---")
-    print(
-        "\nFor more comprehensive testing, consider using pytest with dedicated test files."
-    )
-    # print("python -m pytest tests/test_option_delta.py -v")

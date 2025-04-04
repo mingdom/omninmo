@@ -26,8 +26,6 @@ def analyze_beta_differences(ticker, fmp_fetcher, yf_fetcher):
         fmp_fetcher: FMP data fetcher instance
         yf_fetcher: YFinance data fetcher instance
     """
-    print(f"\nDetailed Beta Analysis for {ticker}")
-    print("=" * 40)
 
     # Fetch data
     fmp_stock = fmp_fetcher.fetch_data(ticker)
@@ -36,10 +34,6 @@ def analyze_beta_differences(ticker, fmp_fetcher, yf_fetcher):
     yf_market = yf_fetcher.fetch_market_data()
 
     # Print basic info
-    print(f"FMP stock data: {len(fmp_stock)} rows, {fmp_stock.index.min()} to {fmp_stock.index.max()}")
-    print(f"YF stock data:  {len(yf_stock)} rows, {yf_stock.index.min()} to {yf_stock.index.max()}")
-    print(f"FMP market data: {len(fmp_market)} rows, {fmp_market.index.min()} to {fmp_market.index.max()}")
-    print(f"YF market data:  {len(yf_market)} rows, {yf_market.index.min()} to {yf_market.index.max()}")
 
     # Calculate returns
     fmp_stock_returns = fmp_stock["Close"].pct_change().dropna()
@@ -58,8 +52,6 @@ def analyze_beta_differences(ticker, fmp_fetcher, yf_fetcher):
     )
 
     # Print alignment info
-    print(f"FMP aligned data: {len(fmp_aligned_stock)} rows")
-    print(f"YF aligned data:  {len(yf_aligned_stock)} rows")
 
     # Calculate beta components
     fmp_market_variance = fmp_aligned_market.var()
@@ -68,20 +60,13 @@ def analyze_beta_differences(ticker, fmp_fetcher, yf_fetcher):
     yf_covariance = yf_aligned_stock.cov(yf_aligned_market)
 
     # Calculate beta
-    fmp_beta = fmp_covariance / fmp_market_variance
-    yf_beta = yf_covariance / yf_market_variance
+    fmp_covariance / fmp_market_variance
+    yf_covariance / yf_market_variance
 
     # Print beta components
-    print(f"FMP market variance: {fmp_market_variance:.6f}")
-    print(f"YF market variance:  {yf_market_variance:.6f}")
-    print(f"FMP covariance: {fmp_covariance:.6f}")
-    print(f"YF covariance:  {yf_covariance:.6f}")
-    print(f"FMP beta: {fmp_beta:.2f}")
-    print(f"YF beta:  {yf_beta:.2f}")
 
     # Find common dates
     common_dates = fmp_stock.index.intersection(yf_stock.index)
-    print(f"Common dates: {len(common_dates)} rows")
 
     if len(common_dates) > 0:
         # Compare prices on common dates
@@ -91,8 +76,6 @@ def analyze_beta_differences(ticker, fmp_fetcher, yf_fetcher):
         # Calculate price differences
         close_diff_pct = abs((fmp_subset - yf_subset) / fmp_subset * 100)
 
-        print(f"Average close price difference: {close_diff_pct.mean():.2f}%")
-        print(f"Max close price difference: {close_diff_pct.max():.2f}%")
 
         # Plot comparison
         plt.figure(figsize=(12, 8))
@@ -119,7 +102,6 @@ def analyze_beta_differences(ticker, fmp_fetcher, yf_fetcher):
         # Save the plot to .tmp directory
         os.makedirs(".tmp", exist_ok=True)
         plt.savefig(f".tmp/{ticker}_detailed_comparison.png")
-        print(f"Plot saved to .tmp/{ticker}_detailed_comparison.png")
 
         # Calculate beta using common dates only
         fmp_common_returns = fmp_stock.loc[common_dates]["Close"].pct_change().dropna()
@@ -136,20 +118,13 @@ def analyze_beta_differences(ticker, fmp_fetcher, yf_fetcher):
             yf_market_common_aligned = yf_market_common.loc[common_dates_returns]
 
             # Calculate beta
-            fmp_common_beta = fmp_common_aligned.cov(fmp_market_common_aligned) / fmp_market_common_aligned.var()
-            yf_common_beta = yf_common_aligned.cov(yf_market_common_aligned) / yf_market_common_aligned.var()
+            fmp_common_aligned.cov(fmp_market_common_aligned) / fmp_market_common_aligned.var()
+            yf_common_aligned.cov(yf_market_common_aligned) / yf_market_common_aligned.var()
 
-            print("Beta using common dates only:")
-            print(f"  FMP: {fmp_common_beta:.2f}")
-            print(f"  YF:  {yf_common_beta:.2f}")
-            print(f"  Diff: {abs(fmp_common_beta - yf_common_beta):.2f}")
-            print(f"  % Diff: {abs(fmp_common_beta - yf_common_beta) / abs(fmp_common_beta) * 100:.2f}%")
 
 
 def main():
     """Run the detailed beta comparison."""
-    print("Detailed Beta Comparison")
-    print("=======================")
 
     # Create data fetchers
     fmp_fetcher = DataFetcher(cache_dir=".cache_fmp")
@@ -161,10 +136,9 @@ def main():
     for ticker in tickers:
         try:
             analyze_beta_differences(ticker, fmp_fetcher, yf_fetcher)
-        except Exception as e:
-            print(f"Error analyzing {ticker}: {e}")
+        except Exception:
+            pass
 
-    print("\nDone!")
 
 
 if __name__ == "__main__":
