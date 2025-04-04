@@ -5,18 +5,18 @@ interactions and data updates.
 """
 
 import dash
-from dash import Input, Output, State, html
 import dash_bootstrap_components as dbc
+from dash import Input, Output, State, html
 
-from ..data_model import PortfolioGroup, PortfolioSummary
-from ..logger import logger
-from ..utils.chart_data import (
+from ..chart_data import (
     create_dashboard_metrics,
     transform_for_asset_allocation,
     transform_for_exposure_chart,
-    transform_for_position_treemap,
-    transform_for_sector_chart,
+    transform_for_sector_allocation,
+    transform_for_treemap,
 )
+from ..data_model import PortfolioGroup, PortfolioSummary
+from ..logger import logger
 
 
 def register_chart_callbacks(app):
@@ -78,7 +78,9 @@ def register_chart_callbacks(app):
         ],
         [State("allocation-percent-btn", "active")],
     )
-    def update_asset_allocation_chart(summary_data, value_clicks, percent_clicks, percent_active):
+    def update_asset_allocation_chart(
+        summary_data, value_clicks, percent_clicks, percent_active
+    ):
         """Update the asset allocation chart based on user selection."""
         if not summary_data:
             # Return empty figure if no data
@@ -107,7 +109,19 @@ def register_chart_callbacks(app):
             return transform_for_asset_allocation(portfolio_summary, use_percentage)
         except Exception as e:
             logger.error(f"Error updating asset allocation chart: {e}", exc_info=True)
-            return {"data": [], "layout": {"height": 300, "annotations": [{"text": f"Error: {e!s}", "showarrow": False, "font": {"color": "red"}}]}}
+            return {
+                "data": [],
+                "layout": {
+                    "height": 300,
+                    "annotations": [
+                        {
+                            "text": f"Error: {e!s}",
+                            "showarrow": False,
+                            "font": {"color": "red"},
+                        }
+                    ],
+                },
+            }
 
     # Exposure Chart callback
     @app.callback(
@@ -148,7 +162,19 @@ def register_chart_callbacks(app):
             return transform_for_exposure_chart(portfolio_summary, use_beta_adjusted)
         except Exception as e:
             logger.error(f"Error updating exposure chart: {e}", exc_info=True)
-            return {"data": [], "layout": {"height": 300, "annotations": [{"text": f"Error: {e!s}", "showarrow": False, "font": {"color": "red"}}]}}
+            return {
+                "data": [],
+                "layout": {
+                    "height": 300,
+                    "annotations": [
+                        {
+                            "text": f"Error: {e!s}",
+                            "showarrow": False,
+                            "font": {"color": "red"},
+                        }
+                    ],
+                },
+            }
 
     # Position Treemap callback
     @app.callback(
@@ -166,13 +192,27 @@ def register_chart_callbacks(app):
 
         try:
             # Convert the JSON data back to a list of PortfolioGroup objects
-            portfolio_groups = [PortfolioGroup.from_dict(group) for group in groups_data]
+            portfolio_groups = [
+                PortfolioGroup.from_dict(group) for group in groups_data
+            ]
 
             # Transform the data for the chart
-            return transform_for_position_treemap(portfolio_groups, group_by)
+            return transform_for_treemap(portfolio_groups, group_by)
         except Exception as e:
             logger.error(f"Error updating position treemap: {e}", exc_info=True)
-            return {"data": [], "layout": {"height": 400, "annotations": [{"text": f"Error: {e!s}", "showarrow": False, "font": {"color": "red"}}]}}
+            return {
+                "data": [],
+                "layout": {
+                    "height": 400,
+                    "annotations": [
+                        {
+                            "text": f"Error: {e!s}",
+                            "showarrow": False,
+                            "font": {"color": "red"},
+                        }
+                    ],
+                },
+            }
 
     # Sector Chart callback
     @app.callback(
@@ -190,13 +230,29 @@ def register_chart_callbacks(app):
 
         try:
             # Convert the JSON data back to a list of PortfolioGroup objects
-            portfolio_groups = [PortfolioGroup.from_dict(group) for group in groups_data]
+            portfolio_groups = [
+                PortfolioGroup.from_dict(group) for group in groups_data
+            ]
 
             # Determine whether to compare to benchmark
             compare_to_benchmark = len(benchmark_toggle) > 0
 
             # Transform the data for the chart
-            return transform_for_sector_chart(portfolio_groups, compare_to_benchmark)
+            return transform_for_sector_allocation(
+                portfolio_groups, compare_to_benchmark
+            )
         except Exception as e:
             logger.error(f"Error updating sector chart: {e}", exc_info=True)
-            return {"data": [], "layout": {"height": 300, "annotations": [{"text": f"Error: {e!s}", "showarrow": False, "font": {"color": "red"}}]}}
+            return {
+                "data": [],
+                "layout": {
+                    "height": 300,
+                    "annotations": [
+                        {
+                            "text": f"Error: {e!s}",
+                            "showarrow": False,
+                            "font": {"color": "red"},
+                        }
+                    ],
+                },
+            }
