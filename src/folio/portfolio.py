@@ -63,35 +63,25 @@ except ValueError as e:
 def process_portfolio_data(
     df: pd.DataFrame,
 ) -> tuple[list[PortfolioGroup], PortfolioSummary, list[dict]]:
-    """Processes a raw portfolio DataFrame to generate structured portfolio data and summary metrics.
+    """Process portfolio data from a DataFrame into structured groups and summary.
 
-    This core function takes a DataFrame, typically loaded from a broker's CSV export,
-    and transforms it into a list of `PortfolioGroup` objects and a `PortfolioSummary`.
-    Each `PortfolioGroup` aggregates a stock position and its associated option positions.
+    This function transforms raw portfolio data into an organized structure by:
+    1. Validating and cleaning the input data
+    2. Identifying cash-like positions (money market funds, etc.)
+    3. Grouping related positions (stocks with their options)
+    4. Calculating exposure metrics for each position and group
+    5. Generating a comprehensive portfolio summary
 
-    Steps:
-    1.  **Validation:** Checks for required columns in the input DataFrame.
-    2.  **Cleaning:** Strips whitespace from symbols, fills missing values in 'Type' and 'Description'.
-    3.  **Option Identification:** Defines a helper function `is_option_desc` to identify options based on
-        description format (e.g., 'AAPL APR 17 2025 $220 CALL').
-    4.  **Statistics:** Calculates basic portfolio stats (total positions, value, unique stocks/options).
-    5.  **Stock Processing:** Iterates through non-option rows, cleans data (price, quantity), calculates
-        beta using `get_beta`, and stores stock info in `stock_positions` dictionary.
-        *Important:* Skips rows with missing quantity or invalid price (<=0). This is where cash positions
-        like SPAXX might be filtered out if they lack a quantity.
-    6.  **Grouping:** Iterates through the identified `stock_positions`. For each stock:
-        a.  Creates `stock_data` dictionary.
-        b.  Finds all related option rows in the original DataFrame using `is_option_desc` and matching
-            the underlying symbol.
-        c.  Parses each related option using `parse_option_description` from `option_utils`.
-        d.  Calculates option delta using `calculate_option_delta` (Black-Scholes).
-        e.  Calculates various exposure metrics (notional, delta-adjusted, beta-adjusted).
-        f.  Collects option data in `option_data` list.
-        g.  Creates a `PortfolioGroup` using `create_portfolio_group` with stock and option data.
-        h.  Appends the group to the `groups` list.
-    7.  **Summary Calculation:** Calculates overall portfolio summary metrics (total values, beta,
-        exposure breakdowns) using `calculate_portfolio_summary`.
-    8.  **Return:** Returns the list of `PortfolioGroup` objects and the `PortfolioSummary`.
+    The processing flow includes:
+    - Validating required columns in the DataFrame
+    - Cleaning data (stripping whitespace, handling missing values)
+    - Identifying options based on description patterns
+    - Processing stock positions with beta calculations
+    - Matching options to their underlying stocks
+    - Calculating option metrics (delta, notional value, exposures)
+    - Creating portfolio groups that combine stocks with their options
+    - Identifying cash-like positions for separate tracking
+    - Calculating portfolio-level summary statistics
 
     Args:
         df: A pandas DataFrame containing the portfolio positions, expected to have columns like
@@ -252,139 +242,108 @@ def process_portfolio_data(
     # Create a dictionary to track cash-like positions by ticker for deduplication
     cash_like_by_ticker = {}
     logger.info("Processing stock-like positions...")
-    # Iterate only over rows identified as non-options
+    # Process non-option positions
     for index, row in stock_df.iterrows():
         symbol_raw = row["Symbol"]
         description = row["Description"]
 
         # Proceed with processing potentially valid stock/ETF positions
         try:
-            # Handle NaN or non-string symbols
-            if pd.isna(symbol_raw) or not isinstance(symbol_raw, str):
-                logger.warning(
-                    f"Row {index}: Invalid symbol type: {type(symbol_raw)}. Skipping."
-                )
+            # Skip invalid symbols
+            if (
+                pd.isna(symbol_raw)
+                or not isinstance(symbol_raw, str)
+                or not symbol_raw.strip()
+            ):
+                logger.warning(f"Row {index}: Invalid symbol: {symbol_raw}. Skipping.")
                 continue
 
-            symbol = symbol_raw.rstrip(
-                "*"
-            )  # Remove trailing asterisks (common for preferred shares etc.)
+            # Clean symbol (remove trailing asterisks for preferred shares)
+            symbol = symbol_raw.rstrip("*")
 
-            # Validate critical data is present
-            if not symbol:
-                logger.warning(
-                    f"Row {index}: Empty symbol found in row: {row.to_dict()}. Skipping."
-                )
-                continue
-
-            # Check for quantity - this is the key filter for SPAXX previously
+            # Process quantity
             if pd.isna(row["Quantity"]) or row["Quantity"] == "--":
-                # Allow positions with zero quantity if they have value (e.g., settled options?)
-                # But log a warning if value exists without quantity.
                 current_val = clean_currency_value(row["Current Value"])
-                if current_val != 0:
+                if current_val == 0:
                     logger.warning(
-                        f"Row {index}: Stock {symbol} has missing/invalid quantity ('{row['Quantity']}') but non-zero value ({format_currency(current_val)}). Processing based on value only."
-                    )
-                    # Assign quantity 0, maybe handle differently later
-                    quantity = 0
-                else:
-                    logger.warning(
-                        f"Row {index}: Stock {symbol} has missing/invalid quantity ('{row['Quantity']}') and zero value. Skipping."
+                        f"Row {index}: {symbol} has no quantity and zero value. Skipping."
                     )
                     continue
+                # Process based on value only
+                logger.warning(
+                    f"Row {index}: {symbol} missing quantity but has value. Using quantity=0."
+                )
+                quantity = 0
             else:
                 try:
-                    # Attempt to convert quantity to integer, handle potential errors
-                    quantity = int(
-                        float(row["Quantity"])
-                    )  # Convert potential float string first
-                except (ValueError, TypeError) as qty_err:
+                    quantity = int(float(row["Quantity"]))
+                except (ValueError, TypeError):
                     logger.warning(
-                        f"Row {index}: Stock {symbol} has invalid quantity format ('{row['Quantity']}'): {qty_err}. Skipping."
+                        f"Row {index}: {symbol} has invalid quantity: '{row['Quantity']}'. Skipping."
                     )
                     continue
 
-            # Check if this is a known cash-like position before handling missing price
+            # Check if this is a known cash-like position
             is_known_cash = is_cash_or_short_term(
                 symbol, beta=None, description=description
             )
 
-            # Check for price - required for beta and option calculations (unless it's a known cash-like position)
+            # Process price
             if pd.isna(row["Last Price"]) or row["Last Price"] in ("--", ""):
                 if is_known_cash:
-                    logger.info(
-                        f"Row {index}: Cash-like position {symbol} has missing price ('{row['Last Price']}'). Using default beta of 0."
-                    )
-                    # Continue processing with default values for cash-like positions
+                    # Use default values for cash-like positions with missing price
                     price = 0.0
                     beta = 0.0
                     is_cash_like = True
+                    logger.info(
+                        f"Row {index}: Cash-like position {symbol} missing price. Using defaults."
+                    )
                 else:
                     logger.warning(
-                        f"Row {index}: Stock {symbol} has missing price ('{row['Last Price']}'). Cannot calculate beta or use for options. Skipping."
+                        f"Row {index}: {symbol} has missing price. Skipping."
                     )
                     continue
+            else:
+                price = clean_currency_value(row["Last Price"])
+                if price < 0:
+                    logger.warning(
+                        f"Row {index}: {symbol} has negative price ({price}). Skipping."
+                    )
+                    continue
+                elif price == 0:
+                    logger.warning(
+                        f"Row {index}: {symbol} has zero price. Calculations may be affected."
+                    )
 
-            price = clean_currency_value(row["Last Price"])
-            # Allow zero price? Maybe for delisted stocks? Log carefully.
-            if price < 0:
-                logger.warning(
-                    f"Row {index}: Stock {symbol} has invalid negative price ({price}). Skipping."
-                )
-                continue
-            elif price == 0:
-                logger.warning(
-                    f"Row {index}: Stock {symbol} has zero price. Beta/Option calculations may be affected."
-                )
-
-            # Recalculate value based on cleaned price and quantity for consistency
-            # Use original 'Current Value' if quantity is zero or price is zero? Need a consistent rule.
+            # Calculate position value
             cleaned_current_value = clean_currency_value(row["Current Value"])
-            calculated_value = (
+            value_to_use = (
                 price * quantity
                 if quantity != 0 and price != 0
                 else cleaned_current_value
             )
 
-            # Sanity check: Compare calculated value with reported 'Current Value'
-            if (
-                quantity != 0
-                and price != 0
-                and abs(calculated_value - cleaned_current_value) > 0.01
-            ):  # Tolerance for float issues
-                logger.info(
-                    f"Row {index}: Stock {symbol} calculated value ({format_currency(calculated_value)}) differs from reported 'Current Value' ({format_currency(cleaned_current_value)}). Using calculated value as it's likely more up-to-date."
-                )
-            # Always use our calculated value as it's likely more up-to-date
-            value_to_use = calculated_value
-
             # Get Beta - requires valid ticker and fetcher
             beta = get_beta(symbol, description)
 
-            # Check if this is a cash-like instrument based on beta, symbol, or description
+            # Determine if position is cash-like
             is_cash_like = is_cash_or_short_term(
                 symbol, beta=beta, description=description
             )
 
             if is_cash_like:
+                # Process cash-like position
                 logger.info(
-                    f"Identified cash-like position: {symbol} (beta: {beta:.4f}, description: '{description}'), Value: {format_currency(value_to_use)}"
+                    f"Identified cash-like position: {symbol}, Value: {format_currency(value_to_use)}"
                 )
 
-                # Check if we already have a cash-like position with this ticker
+                # Add to existing cash position or create new one
                 if symbol in cash_like_by_ticker:
-                    # Add to existing position's market value
                     cash_like_by_ticker[symbol]["market_value"] += value_to_use
-                    # Update quantity if applicable
-                    if quantity != 0:  # Only update if the new quantity is non-zero
+                    if quantity != 0:
                         cash_like_by_ticker[symbol]["quantity"] += quantity
-                    # Recalculate beta-adjusted exposure
                     cash_like_by_ticker[symbol]["beta_adjusted_exposure"] = (
                         cash_like_by_ticker[symbol]["market_value"] * beta
-                    )
-                    logger.info(
-                        f"Combined with existing cash-like position for {symbol}. New total: {format_currency(cash_like_by_ticker[symbol]['market_value'])}"
                     )
                 else:
                     # Create new cash-like position
@@ -399,44 +358,36 @@ def process_portfolio_data(
                     cash_like_by_ticker[symbol] = cash_like_position
                     cash_like_positions.append(cash_like_position)
             else:
-                # Regular stock position
+                # Process regular stock position
+                percent_of_account = 0.0
+                if (
+                    pd.notna(row["Percent Of Account"])
+                    and row["Percent Of Account"] != "--"
+                ):
+                    percent_of_account = (
+                        float(str(row["Percent Of Account"]).replace("%", "")) / 100.0
+                    )
+
                 stock_positions[symbol] = {
                     "price": price,
                     "quantity": quantity,
                     "value": value_to_use,
                     "beta": beta,
-                    "percent_of_account": float(
-                        str(row["Percent Of Account"]).replace("%", "")
-                    )
-                    / 100.0
-                    if pd.notna(row["Percent Of Account"])
-                    and row["Percent Of Account"] != "--"
-                    else 0.0,
-                    "account_type": row[
-                        "Type"
-                    ],  # Store account type (Cash/Margin) for reference - not related to position type
+                    "percent_of_account": percent_of_account,
+                    "account_type": row["Type"],
+                    "description": description,
                 }
-                logger.debug(
-                    f"Successfully processed stock: {symbol}, Qty: {quantity}, Price: {price}, Value: {value_to_use}, Beta: {beta:.2f}"
-                )
 
-        except ValueError as e:
-            # More specific exception for data conversion errors (e.g., clean_currency_value)
+        except (ValueError, TypeError) as e:
+            # Handle data conversion and type errors
             logger.warning(
-                f"Row {index}: Data conversion error for stock '{symbol_raw}': {e}. Skipping row."
-            )
-            continue
-        except TypeError as e:
-            # More specific exception for type errors during processing
-            logger.warning(
-                f"Row {index}: Type error for stock '{symbol_raw}': {e}. Skipping row."
+                f"Row {index}: Error processing '{symbol_raw}': {e}. Skipping row."
             )
             continue
         except Exception as e:
-            # Catch unexpected errors during stock processing
+            # Catch unexpected errors
             logger.error(
-                f"Row {index}: Unexpected error processing stock '{symbol_raw}': {e}",
-                exc_info=True,  # Include stack trace in log
+                f"Row {index}: Unexpected error for '{symbol_raw}': {e}", exc_info=True
             )
             continue
 
@@ -743,53 +694,39 @@ def process_portfolio_data(
 def calculate_portfolio_summary(
     groups: list[PortfolioGroup], cash_like_positions: list[dict] | None = None
 ) -> PortfolioSummary:
-    """Calculates aggregated summary metrics for the entire portfolio.
+    """Calculate comprehensive summary metrics for the entire portfolio.
 
-    This function iterates through the provided list of `PortfolioGroup` objects
-    (each containing a stock and its options) and computes various portfolio-level
-    statistics like total value, overall beta, and exposure breakdowns (long, short, options).
+    This function aggregates data from all portfolio groups to produce a complete
+    portfolio summary with exposure breakdowns, risk metrics, and cash analysis.
 
-    It categorizes exposure based on:
-    - **Stocks:** Long stock positions contribute to long exposure, short stock positions
-      contribute to short exposure.
-    - **Options:** Delta-adjusted notional value is used.
-        - Long Calls & Short Puts contribute to *long* options delta exposure.
-        - Short Calls & Long Puts contribute to *short* options delta exposure.
-    Beta adjustments are applied to both stock and option exposures.
+    The calculation process:
+    1. Processes each portfolio group (stock + options)
+    2. Categorizes exposures into long and short components
+    3. Calculates beta-adjusted values for risk assessment
+    4. Computes portfolio-level statistics and ratios
+    5. Incorporates cash-like positions into the analysis
+
+    Exposure categorization rules:
+    - Long stocks → long exposure
+    - Short stocks → short exposure
+    - Long calls & short puts → long options exposure
+    - Short calls & long puts → short options exposure
 
     Args:
-        df: The original raw portfolio DataFrame (potentially used for fetching
-            overall values or cash balances in the future, currently unused).
-        groups: A list of `PortfolioGroup` objects representing the processed
-                and grouped portfolio positions.
-        cash_like_positions: A list of dictionaries representing cash-like positions
-                           identified during portfolio processing.
+        groups: List of PortfolioGroup objects containing processed positions
+        cash_like_positions: List of dictionaries representing cash-like positions
+                           (money markets, short-term bonds, etc.)
 
     Returns:
-        A `PortfolioSummary` object containing the calculated metrics:
-        - `total_value_net`: Net market value (Long Exposure - Short Exposure).
-        - `total_value_abs`: Absolute market value (Long Exposure + Short Exposure).
-        - `portfolio_beta`: Weighted average beta of the portfolio.
-        - `long_exposure`: Breakdown of long value (stocks, options, total, beta-adjusted).
-        - `short_exposure`: Breakdown of short value (stocks, options, total, beta-adjusted).
-        - `options_exposure`: Breakdown of total option delta exposure (long, short, total, beta-adjusted).
-        - `short_percentage`: Short exposure as a percentage of absolute total exposure.
-        - `exposure_reduction_percentage`: Short exposure as a percentage of long exposure.
-        - `cash_like_positions`: List of positions with very low beta (< 0.1).
-        - `cash_like_value`: Total value of cash-like positions.
-        - `cash_like_count`: Number of cash-like positions.
+        A PortfolioSummary object with calculated metrics including:
+        - Total values (net and absolute)
+        - Portfolio beta
+        - Exposure breakdowns (long/short/options)
+        - Risk ratios (short percentage, exposure reduction)
+        - Cash position analysis
 
     Raises:
-        Exception: Propagates any exceptions encountered during calculation.
-
-    TODO:
-        - Incorporate cash balances explicitly into the summary (e.g., from SPAXX).
-        - Enhance exposure classification for options: Consider moneyness, IV, expiry.
-          Deep ITM calls behave like stock, while far OTM options have different risk profiles.
-        - Calculate and include portfolio-level Greeks (Theta, Vega, Gamma) for more
-          advanced risk assessment.
-        - Add scenario analysis / stress testing capabilities.
-        - Utilize the input `df` for potentially missing information or cross-checks.
+        RuntimeError: If calculation fails due to data issues
     """
     logger.debug(f"Starting portfolio summary calculations for {len(groups)} groups.")
 
@@ -862,102 +799,97 @@ def calculate_portfolio_summary(
                         opt.beta_adjusted_exposure
                     )
 
-        # --- Create ExposureBreakdown objects ---
+        # Create exposure breakdown objects
+        # 1. Long exposure (stocks + positive delta options)
+        long_stock_value = long_stocks["value"]
+        long_option_value = long_options_delta["value"]
+        long_stock_beta_adj = long_stocks["beta_adjusted"]
+        long_option_beta_adj = long_options_delta["beta_adjusted"]
+
         long_exposure = ExposureBreakdown(
-            stock_value=long_stocks["value"],
-            stock_beta_adjusted=long_stocks["beta_adjusted"],
-            option_delta_value=long_options_delta["value"],
-            option_beta_adjusted=long_options_delta["beta_adjusted"],
-            total_value=long_stocks["value"] + long_options_delta["value"],
-            total_beta_adjusted=long_stocks["beta_adjusted"]
-            + long_options_delta["beta_adjusted"],
+            stock_value=long_stock_value,
+            stock_beta_adjusted=long_stock_beta_adj,
+            option_delta_value=long_option_value,
+            option_beta_adjusted=long_option_beta_adj,
+            total_value=long_stock_value + long_option_value,
+            total_beta_adjusted=long_stock_beta_adj + long_option_beta_adj,
             description="Long market exposure (Stocks + Positive Delta Options)",
             formula="Long Stocks + Long Calls Delta Exp + Short Puts Delta Exp",
             components={
-                "Long Stocks Value": long_stocks["value"],
-                "Long Options Delta Exp": long_options_delta["value"],
+                "Long Stocks Value": long_stock_value,
+                "Long Options Delta Exp": long_option_value,
             },
         )
 
+        # 2. Short exposure (stocks + negative delta options)
+        short_stock_value = short_stocks["value"]
+        short_option_value = short_options_delta["value"]
+        short_stock_beta_adj = short_stocks["beta_adjusted"]
+        short_option_beta_adj = short_options_delta["beta_adjusted"]
+
         short_exposure = ExposureBreakdown(
-            stock_value=short_stocks["value"],
-            stock_beta_adjusted=short_stocks["beta_adjusted"],
-            option_delta_value=short_options_delta["value"],
-            option_beta_adjusted=short_options_delta["beta_adjusted"],
-            total_value=short_stocks["value"] + short_options_delta["value"],
-            total_beta_adjusted=short_stocks["beta_adjusted"]
-            + short_options_delta["beta_adjusted"],
+            stock_value=short_stock_value,
+            stock_beta_adjusted=short_stock_beta_adj,
+            option_delta_value=short_option_value,
+            option_beta_adjusted=short_option_beta_adj,
+            total_value=short_stock_value + short_option_value,
+            total_beta_adjusted=short_stock_beta_adj + short_option_beta_adj,
             description="Short market exposure (Stocks + Negative Delta Options)",
             formula="Short Stocks + Short Calls Delta Exp + Long Puts Delta Exp",
             components={
-                "Short Stocks Value": short_stocks["value"],
-                "Short Options Delta Exp": short_options_delta["value"],
+                "Short Stocks Value": short_stock_value,
+                "Short Options Delta Exp": short_option_value,
             },
         )
 
-        # Total options exposure based on delta contributions
+        # 3. Options exposure (total delta exposure from all options)
         options_exposure = ExposureBreakdown(
             stock_value=0,  # Options only view
             stock_beta_adjusted=0,
-            option_delta_value=long_options_delta["value"]
-            + short_options_delta["value"],  # Sum of absolute delta exposures
-            option_beta_adjusted=long_options_delta["beta_adjusted"]
-            + short_options_delta[
-                "beta_adjusted"
-            ],  # Sum of absolute beta-adjusted delta exposures
-            total_value=long_options_delta["value"] + short_options_delta["value"],
-            total_beta_adjusted=long_options_delta["beta_adjusted"]
-            + short_options_delta["beta_adjusted"],
+            option_delta_value=long_option_value + short_option_value,
+            option_beta_adjusted=long_option_beta_adj + short_option_beta_adj,
+            total_value=long_option_value + short_option_value,
+            total_beta_adjusted=long_option_beta_adj + short_option_beta_adj,
             description="Total absolute delta exposure from options",
             formula="Sum(|Option Delta Exposures|)",
             components={
-                "Long Options Delta Exp": long_options_delta["value"],
-                "Short Options Delta Exp": short_options_delta["value"],
-                "Net Options Delta Exp": long_options_delta["value"]
-                - short_options_delta["value"],  # Add net for info
-                "Total Option Market Value": total_option_market_value,  # Add market value sum for info
+                "Long Options Delta Exp": long_option_value,
+                "Short Options Delta Exp": short_option_value,
+                "Net Options Delta Exp": long_option_value - short_option_value,
+                "Total Option Market Value": total_option_market_value,
             },
         )
 
-        # --- Calculate total portfolio values ---
-        # Net Value: Total market value of long positions minus short positions
-        # This should ideally align with the broker's total account value if cash is included.
-        # Currently calculated based on directional exposure.
+        # Calculate portfolio metrics
+        # 1. Portfolio values
         total_value_net = long_exposure.total_value - short_exposure.total_value
-
-        # Absolute Value: Sum of market values of all positions, ignoring direction.
-        # Represents the total capital deployed or leverage.
         total_value_abs = long_exposure.total_value + short_exposure.total_value
 
-        # --- Calculate portfolio beta ---
-        # Weighted average beta: (Net Beta-Adjusted Exposure) / (Net Total Value)
-        # This represents the portfolio's expected volatility relative to the market.
+        # 2. Portfolio beta (weighted average)
         net_beta_adjusted_exposure = (
             long_exposure.total_beta_adjusted - short_exposure.total_beta_adjusted
         )
         portfolio_beta = (
             net_beta_adjusted_exposure / total_value_net
-            if total_value_net != 0  # Avoid division by zero
+            if total_value_net != 0
             else 0.0
         )
 
-        # --- Calculate exposure percentages ---
-        # Short Percentage: How much of the total deployed capital is short?
+        # 3. Exposure percentages
         short_percentage = (
             short_exposure.total_value / total_value_abs if total_value_abs > 0 else 0.0
         )
-        # Exposure Reduction: How much is the long exposure offset by short positions?
         exposure_reduction = (
             short_exposure.total_value / long_exposure.total_value
-            if long_exposure.total_value > 0  # Avoid division by zero
-            else 0.0  # If no long exposure, reduction is 0 or undefined? Treat as 0.
+            if long_exposure.total_value > 0
+            else 0.0
         )
 
-        # --- Process cash-like positions ---
+        # Process cash-like positions
         cash_like_value = sum(pos["market_value"] for pos in cash_like_positions)
         cash_like_count = len(cash_like_positions)
 
-        # Create StockPosition objects for cash-like positions
+        # Convert to StockPosition objects for consistent handling
         cash_like_stock_positions = [
             StockPosition(
                 ticker=pos["ticker"],
@@ -969,18 +901,15 @@ def calculate_portfolio_summary(
             for pos in cash_like_positions
         ]
 
-        logger.info(
-            f"Processed {cash_like_count} cash-like positions with total value: {format_currency(cash_like_value)}"
-        )
-
-        # Include cash-like positions in total value
+        # Add cash to portfolio totals
         if cash_like_value > 0:
-            # Add cash-like value to total_value_abs
+            logger.info(
+                f"Adding {cash_like_count} cash positions worth {format_currency(cash_like_value)}"
+            )
             total_value_abs += cash_like_value
-            # Add cash-like value to total_value_net (cash is always positive)
             total_value_net += cash_like_value
 
-        # --- Create and return summary object ---
+        # Create and return the portfolio summary
         summary = PortfolioSummary(
             total_value_net=total_value_net,
             total_value_abs=total_value_abs,
@@ -997,153 +926,112 @@ def calculate_portfolio_summary(
         )
 
         logger.info("Portfolio summary created successfully.")
-        log_summary_details(summary)  # Add helper to log details
+        log_summary_details(summary)
         return summary
 
     except Exception as e:
         logger.error("Error calculating portfolio summary", exc_info=True)
-        # Re-raise the exception to signal failure
         raise RuntimeError("Failed to calculate portfolio summary") from e
 
 
 def log_summary_details(summary: PortfolioSummary):
-    """Helper function to log the details of the PortfolioSummary object."""
-    logger.info("--- Portfolio Summary Details ---")
-    logger.info(f"Net Total Value: {format_currency(summary.total_value_net)}")
-    logger.info(f"Absolute Total Value: {format_currency(summary.total_value_abs)}")
-    logger.info(f"Portfolio Beta: {format_beta(summary.portfolio_beta)}")
-    logger.info(f"Short Exposure % (of Abs Value): {summary.short_percentage:.1f}%")
-    logger.info(
-        f"Exposure Reduction % (Short/Long): {summary.exposure_reduction_percentage:.1f}%"
-    )
+    """Log detailed portfolio summary information for monitoring and debugging.
 
-    # Log cash-like information
-    logger.info(f"Cash-Like Value: {format_currency(summary.cash_like_value)}")
-    logger.info(f"Cash-Like Count: {summary.cash_like_count}")
-    logger.info(
-        f"Cash-Like % of Portfolio: {summary.cash_like_value / summary.total_value_abs * 100:.1f}% (of Abs Value)"
+    This function outputs formatted portfolio metrics to the logger, including:
+    - Portfolio valuation (net and absolute)
+    - Risk metrics (beta, exposure percentages)
+    - Cash position details
+    - Exposure breakdowns (long, short, options)
+
+    Args:
+        summary: The PortfolioSummary object containing calculated metrics
+    """
+    # Portfolio overview
+    logger.info("--- Portfolio Summary ---")
+    logger.info(f"Net Value: {format_currency(summary.total_value_net)}")
+    logger.info(f"Absolute Value: {format_currency(summary.total_value_abs)}")
+    logger.info(f"Beta: {format_beta(summary.portfolio_beta)}")
+    logger.info(f"Short %: {summary.short_percentage:.1f}%")
+    logger.info(f"Exposure Reduction: {summary.exposure_reduction_percentage:.1f}%")
+
+    # Cash positions
+    cash_pct = (
+        summary.cash_like_value / summary.total_value_abs * 100
         if summary.total_value_abs > 0
-        else "Cash-Like % of Portfolio: 0.0%"
+        else 0
+    )
+    logger.info(
+        f"Cash: {format_currency(summary.cash_like_value)} ({summary.cash_like_count} positions, {cash_pct:.1f}%)"
     )
 
-    logger.info("  Long Exposure Breakdown:")
+    # Long exposure
+    logger.info("Long Exposure:")
+    logger.info(f"  Total: {format_currency(summary.long_exposure.total_value)}")
+    logger.info(f"  Stocks: {format_currency(summary.long_exposure.stock_value)}")
     logger.info(
-        f"    Total Value: {format_currency(summary.long_exposure.total_value)}"
-    )
-    logger.info(
-        f"    Beta-Adj Value: {format_currency(summary.long_exposure.total_beta_adjusted)}"
-    )
-    logger.info(
-        f"    Stock Value: {format_currency(summary.long_exposure.stock_value)}"
-    )
-    logger.info(
-        f"    Option Delta Value: {format_currency(summary.long_exposure.option_delta_value)}"
+        f"  Options: {format_currency(summary.long_exposure.option_delta_value)}"
     )
 
-    logger.info("  Short Exposure Breakdown:")
+    # Short exposure
+    logger.info("Short Exposure:")
+    logger.info(f"  Total: {format_currency(summary.short_exposure.total_value)}")
+    logger.info(f"  Stocks: {format_currency(summary.short_exposure.stock_value)}")
     logger.info(
-        f"    Total Value: {format_currency(summary.short_exposure.total_value)}"
-    )
-    logger.info(
-        f"    Beta-Adj Value: {format_currency(summary.short_exposure.total_beta_adjusted)}"
-    )
-    logger.info(
-        f"    Stock Value: {format_currency(summary.short_exposure.stock_value)}"
-    )
-    logger.info(
-        f"    Option Delta Value: {format_currency(summary.short_exposure.option_delta_value)}"
+        f"  Options: {format_currency(summary.short_exposure.option_delta_value)}"
     )
 
-    logger.info("  Options Exposure Breakdown:")
+    # Options exposure
+    logger.info("Options Exposure:")
     logger.info(
-        f"    Total Absolute Delta Value: {format_currency(summary.options_exposure.total_value)}"
+        f"  Total Delta: {format_currency(summary.options_exposure.total_value)}"
     )
     logger.info(
-        f"    Total Absolute Beta-Adj Value: {format_currency(summary.options_exposure.total_beta_adjusted)}"
+        f"  Long Delta: {format_currency(summary.options_exposure.components.get('Long Options Delta Exp', 0))}"
     )
     logger.info(
-        f"    Long Delta Contribution: {format_currency(summary.options_exposure.components.get('Long Options Delta Exp', 0))}"
+        f"  Short Delta: {format_currency(summary.options_exposure.components.get('Short Options Delta Exp', 0))}"
     )
     logger.info(
-        f"    Short Delta Contribution: {format_currency(summary.options_exposure.components.get('Short Options Delta Exp', 0))}"
-    )
-    logger.info(
-        f"    Net Delta Contribution: {format_currency(summary.options_exposure.components.get('Net Options Delta Exp', 0))}"
-    )
-    logger.info(
-        f"    Total Option Market Value: {format_currency(summary.options_exposure.components.get('Total Option Market Value', 0))}"
+        f"  Net Delta: {format_currency(summary.options_exposure.components.get('Net Options Delta Exp', 0))}"
     )
     logger.info("--------------------------------")
 
 
 def calculate_position_metrics(group: PortfolioGroup) -> dict:
-    """Calculates display-focused metrics for a single PortfolioGroup.
+    """Format portfolio group metrics for display in the UI.
 
-    This function takes a `PortfolioGroup` (representing a stock and its associated options)
-    and computes several key metrics formatted for display in the UI or reports.
+    This function extracts key metrics from a PortfolioGroup and formats them as
+    human-readable strings for presentation. It handles formatting of currency values,
+    beta values, and special cases like missing options.
 
     Args:
-        group: The `PortfolioGroup` object to calculate metrics for.
+        group: The PortfolioGroup object containing a stock and its related options
 
     Returns:
-        A dictionary containing formatted string representations of:
-        - 'total_value': The combined market value of the stock and options in the group.
-        - 'beta': The beta of the underlying stock.
-        - 'beta_adjusted_exposure': The group's total value adjusted by the underlying's beta.
-        - 'options_delta_exposure': The net delta exposure contribution from all options
-          in the group (sum of individual option delta exposures). Returns "N/A" if
-          the group has no options.
+        A dictionary with formatted metrics including:
+        - 'total_value': Combined market value formatted as currency
+        - 'beta': Underlying stock beta formatted with precision
+        - 'beta_adjusted_exposure': Risk-adjusted exposure formatted as currency
+        - 'options_delta_exposure': Net options exposure or "N/A" if no options
 
     Raises:
-        ValueError: If the input `group` is None or if an error occurs during calculation.
-                    This is raised to prevent silently showing incorrect data in the UI.
+        ValueError: If group is None or missing required attributes
     """
-    logger.debug(
-        f"Calculating display metrics for group {group.ticker if group else 'None'}"
-    )
-
     if not group:
-        logger.error("Cannot calculate metrics for a None group.")
-        # Raising ValueError as per the docstring to signal failure clearly
         raise ValueError("Input PortfolioGroup cannot be None")
 
     try:
-        # Access pre-calculated values from the PortfolioGroup object
-        total_value = group.total_value
-        beta = group.beta  # This should be the underlying's beta stored in the group
-        beta_adjusted_exposure = group.beta_adjusted_exposure
-        options_delta_exposure = (
-            group.options_delta_exposure
-        )  # Net delta exposure from options
+        # Format the group's metrics for display
+        has_options = bool(group.option_positions)
 
         return {
-            "total_value": format_currency(total_value),
-            "beta": format_beta(beta),
-            "beta_adjusted_exposure": format_currency(beta_adjusted_exposure),
-            # Check if there were any options processed for this group
-            "options_delta_exposure": format_currency(options_delta_exposure)
-            if group.option_positions  # Check if the list is non-empty
+            "total_value": format_currency(group.total_value),
+            "beta": format_beta(group.beta),
+            "beta_adjusted_exposure": format_currency(group.beta_adjusted_exposure),
+            "options_delta_exposure": format_currency(group.options_delta_exposure)
+            if has_options
             else "N/A",
-            # TODO: Add other useful display metrics like:
-            # - Stock Weight within group
-            # - Options Weight within group
-            # - Net Options Premium Value
-            # - Total Gamma/Theta/Vega for the group (if calculated)
         }
-    except AttributeError as e:
-        logger.error(
-            f"Error accessing attributes for group {group.ticker}: {e}", exc_info=True
-        )
-        raise ValueError(
-            f"Missing expected attribute in PortfolioGroup for {group.ticker}"
-        ) from e
     except Exception as e:
-        # Catch any other unexpected errors during formatting or calculation
-        logger.error(
-            f"Unexpected error calculating metrics for group {group.ticker}: {e}",
-            exc_info=True,
-        )
-        # Raise to avoid silently showing incorrect data
-        raise ValueError(
-            f"Error calculating position metrics for {group.ticker}"
-        ) from e
+        logger.error(f"Error formatting metrics for {group.ticker}: {e}", exc_info=True)
+        raise ValueError(f"Error calculating metrics for {group.ticker}") from e
