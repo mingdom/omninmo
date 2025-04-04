@@ -13,10 +13,12 @@ from dash import ALL, Input, Output, State, dcc, html
 # Import portfolio processing functions
 # Import utility functions
 from . import portfolio, utils
+from .callbacks.chart_callbacks import register_chart_callbacks
 
 # Import AI utilities directly
 # Import components
 from .components import create_premium_chat_component, register_premium_chat_callbacks
+from .components.charts import create_dashboard_section
 from .components.portfolio_table import create_portfolio_table
 from .components.position_details import create_position_details
 from .data_model import OptionPosition, PortfolioGroup, Position, StockPosition
@@ -441,10 +443,41 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
                     children=[
                         html.Div(
                             [
+                                # Add visualization dashboard section near the top
+                                create_dashboard_section(),
+                                # Move header and filters below visualizations
                                 create_header(),
                                 create_filters(),
-                                # AI analysis removed from main content - now using chat panel
-                                create_main_table(),
+                                # Move table to the end
+                                dbc.Card(
+                                    [
+                                        dbc.CardHeader(
+                                            dbc.Button(
+                                                [
+                                                    html.I(
+                                                        className="fas fa-table me-2"
+                                                    ),
+                                                    "Portfolio Positions",
+                                                    html.I(
+                                                        className="fas fa-chevron-down ms-2",
+                                                        id="positions-collapse-icon",
+                                                    ),
+                                                ],
+                                                id="positions-collapse-button",
+                                                color="link",
+                                                className="text-decoration-none text-dark p-0 d-flex align-items-center w-100 justify-content-between",
+                                            ),
+                                        ),
+                                        dbc.Collapse(
+                                            dbc.CardBody(
+                                                create_main_table(),
+                                            ),
+                                            id="positions-collapse",
+                                            is_open=True,  # Initially open
+                                        ),
+                                    ],
+                                    className="mb-3",
+                                ),
                             ],
                             id="main-content",
                         )
@@ -601,9 +634,19 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
 
                 logger.info(f"Sample portfolio found at: {sample_path}")
 
+                # Debug the file content
+                with open(sample_path) as f:
+                    content = f.read()
+                    logger.info(
+                        f"Sample portfolio content (first 100 chars): {content[:100]}"
+                    )
+
                 # Read the sample portfolio file
                 with open(sample_path, "rb") as f:
-                    f.read()
+                    file_content = f.read()
+                    logger.info(
+                        f"Read {len(file_content)} bytes from sample portfolio file"
+                    )
 
                 # Validate the sample file content
                 # We'll sanitize it during the normal processing flow
@@ -1150,6 +1193,57 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
 
         logger.debug(f"Sorting by {clicked_column} in {new_direction} order")
         return {"column": clicked_column, "direction": new_direction}
+
+    # Add callbacks for collapsible chart sections
+    @app.callback(
+        [
+            Output("dashboard-collapse", "is_open"),
+            Output("dashboard-collapse-icon", "className"),
+        ],
+        [Input("dashboard-collapse-button", "n_clicks")],
+        [State("dashboard-collapse", "is_open")],
+        prevent_initial_call=True,
+    )
+    def toggle_dashboard_collapse(n_clicks, is_open):
+        """Toggle the dashboard section collapse state"""
+        if n_clicks:
+            # Toggle the collapse state
+            new_state = not is_open
+            # Update the icon based on the new state
+            icon_class = (
+                "fas fa-chevron-up ms-2" if new_state else "fas fa-chevron-down ms-2"
+            )
+            return new_state, icon_class
+        return is_open, "fas fa-chevron-down ms-2"
+
+    # Add callbacks for individual chart collapses
+    for section in ["allocation", "exposure", "sector", "treemap", "positions"]:
+
+        @app.callback(
+            [
+                Output(f"{section}-collapse", "is_open"),
+                Output(f"{section}-collapse-icon", "className"),
+            ],
+            [Input(f"{section}-collapse-button", "n_clicks")],
+            [State(f"{section}-collapse", "is_open")],
+            prevent_initial_call=True,
+        )
+        def toggle_chart_collapse(n_clicks, is_open, section=section):
+            """Toggle the chart section collapse state"""
+            if n_clicks:
+                # Toggle the collapse state
+                new_state = not is_open
+                # Update the icon based on the new state
+                icon_class = (
+                    "fas fa-chevron-up ms-2"
+                    if new_state
+                    else "fas fa-chevron-down ms-2"
+                )
+                return new_state, icon_class
+            return is_open, "fas fa-chevron-down ms-2"
+
+    # Register chart callbacks
+    register_chart_callbacks(app)
 
     # Register premium chat callbacks
     register_premium_chat_callbacks(app)

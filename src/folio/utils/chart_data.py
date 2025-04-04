@@ -4,17 +4,17 @@ This module provides functions to transform portfolio data into formats
 suitable for visualization with Plotly charts.
 """
 
-import pandas as pd
-from typing import Any, Dict, List, Optional
+from typing import Any
 
+# Import utility functions directly from the main utils module
+from .. import utils
 from ..data_model import PortfolioGroup, PortfolioSummary
 from ..logger import logger
-from ..utils import format_currency
 
 
 def transform_for_asset_allocation(
     portfolio_summary: PortfolioSummary, use_percentage: bool = True
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Transform portfolio summary data for the asset allocation chart.
 
     Args:
@@ -29,8 +29,8 @@ def transform_for_asset_allocation(
     # Extract values from portfolio summary
     long_stock_value = portfolio_summary.long_exposure.stock_value
     short_stock_value = abs(portfolio_summary.short_exposure.stock_value)
-    long_option_value = portfolio_summary.long_exposure.option_value
-    short_option_value = abs(portfolio_summary.short_exposure.option_value)
+    long_option_value = portfolio_summary.long_exposure.option_delta_value
+    short_option_value = abs(portfolio_summary.short_exposure.option_delta_value)
     cash_like_value = portfolio_summary.cash_like_value
 
     # Create labels and values arrays
@@ -48,6 +48,10 @@ def transform_for_asset_allocation(
         short_option_value,
         cash_like_value,
     ]
+
+    # Add options exposure as a separate category
+    labels.append("Options Exposure")
+    values.append(portfolio_summary.options_exposure.total_value)
 
     # Calculate total for percentage calculation if needed
     total_value = sum(values)
@@ -91,7 +95,7 @@ def transform_for_asset_allocation(
 
 def transform_for_exposure_chart(
     portfolio_summary: PortfolioSummary, use_beta_adjusted: bool = False
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Transform portfolio summary data for the exposure chart.
 
     Args:
@@ -107,19 +111,23 @@ def transform_for_exposure_chart(
     if use_beta_adjusted:
         long_value = portfolio_summary.long_exposure.total_beta_adjusted
         short_value = portfolio_summary.short_exposure.total_beta_adjusted
+        options_value = portfolio_summary.options_exposure.total_beta_adjusted
     else:
         long_value = portfolio_summary.long_exposure.total_value
         short_value = portfolio_summary.short_exposure.total_value
+        options_value = portfolio_summary.options_exposure.total_value
 
     # Calculate net value
-    net_value = long_value + short_value
+    net_value = (
+        long_value + short_value
+    )  # Note: options_value is already included in long/short
 
     # Categories and values for the chart
-    categories = ["Long", "Short", "Net"]
-    values = [long_value, short_value, net_value]
+    categories = ["Long", "Short", "Options", "Net"]
+    values = [long_value, short_value, options_value, net_value]
 
     # Format values for display
-    text_values = [format_currency(value) for value in values]
+    text_values = [utils.format_currency(value) for value in values]
 
     # Create colors based on values (positive/negative)
     colors = ["#4CAF50" if v >= 0 else "#F44336" for v in values]
@@ -150,8 +158,8 @@ def transform_for_exposure_chart(
 
 
 def transform_for_position_treemap(
-    portfolio_groups: List[PortfolioGroup], group_by: str = "type"
-) -> Dict[str, Any]:
+    portfolio_groups: list[PortfolioGroup], group_by: str = "type"
+) -> dict[str, Any]:
     """Transform portfolio groups data for the position treemap.
 
     Args:
@@ -185,7 +193,7 @@ def transform_for_position_treemap(
             if stock.market_value != 0:
                 # Determine parent based on grouping
                 parent = group.ticker if group_by == "ticker" else "All"
-                
+
                 # Add type category if grouping by type
                 if group_by == "type":
                     type_label = "Long Stocks" if stock.quantity > 0 else "Short Stocks"
@@ -195,14 +203,14 @@ def transform_for_position_treemap(
                         values.append(0)  # Will be updated as we add positions
                         colors.append(1 if "Long" in type_label else -1)
                     parent = type_label
-                
+
                 # Add the stock position
                 position_label = f"{stock.ticker} Stock"
                 labels.append(position_label)
                 parents.append(parent)
                 values.append(abs(stock.market_value))
                 colors.append(1 if stock.market_value > 0 else -1)
-                
+
                 # Update parent value
                 if parent != "All" and parent in labels:
                     parent_idx = labels.index(parent)
@@ -213,28 +221,32 @@ def transform_for_position_treemap(
             if option.market_value != 0:
                 # Determine parent based on grouping
                 parent = group.ticker if group_by == "ticker" else "All"
-                
+
                 # Add type category if grouping by type
                 if group_by == "type":
                     if option.option_type == "CALL":
-                        type_label = "Long Calls" if option.quantity > 0 else "Short Calls"
+                        type_label = (
+                            "Long Calls" if option.quantity > 0 else "Short Calls"
+                        )
                     else:  # PUT
-                        type_label = "Long Puts" if option.quantity > 0 else "Short Puts"
-                    
+                        type_label = (
+                            "Long Puts" if option.quantity > 0 else "Short Puts"
+                        )
+
                     if type_label not in labels:
                         labels.append(type_label)
                         parents.append("All")
                         values.append(0)  # Will be updated as we add positions
                         colors.append(1 if "Long" in type_label else -1)
                     parent = type_label
-                
+
                 # Add the option position
                 position_label = f"{option.ticker} {option.option_type} {option.strike} {option.expiry}"
                 labels.append(position_label)
                 parents.append(parent)
                 values.append(abs(option.market_value))
                 colors.append(1 if option.market_value > 0 else -1)
-                
+
                 # Update parent value
                 if parent != "All" and parent in labels:
                     parent_idx = labels.index(parent)
@@ -277,8 +289,8 @@ def transform_for_position_treemap(
 
 
 def transform_for_sector_chart(
-    portfolio_groups: List[PortfolioGroup], compare_to_benchmark: bool = False
-) -> Dict[str, Any]:
+    portfolio_groups: list[PortfolioGroup], compare_to_benchmark: bool = False
+) -> dict[str, Any]:
     """Transform portfolio groups data for the sector chart.
 
     Args:
@@ -292,7 +304,7 @@ def transform_for_sector_chart(
 
     # TODO: Implement actual sector classification
     # For now, use placeholder data
-    
+
     # Placeholder sector mapping (in a real implementation, this would come from yfinance or another data source)
     sector_mapping = {
         "AAPL": "Technology",
@@ -311,7 +323,7 @@ def transform_for_sector_chart(
         "SMH": "Technology",
         "UPRO": "ETF",
     }
-    
+
     # Default sectors to include
     sectors = [
         "Technology",
@@ -325,35 +337,35 @@ def transform_for_sector_chart(
         "ETF",
         "Other",
     ]
-    
+
     # Calculate sector values from portfolio groups
     sector_values = {sector: 0.0 for sector in sectors}
     total_value = 0.0
-    
+
     for group in portfolio_groups:
         # Get sector for this ticker
         sector = sector_mapping.get(group.ticker, "Other")
-        
+
         # Add stock position value
         if group.stock_position:
             sector_values[sector] += abs(group.stock_position.market_value)
             total_value += abs(group.stock_position.market_value)
-        
+
         # Add option position values
         for option in group.option_positions:
             sector_values[sector] += abs(option.market_value)
             total_value += abs(option.market_value)
-    
+
     # Convert to percentages
     sector_percentages = {
         sector: (value / total_value) * 100 if total_value > 0 else 0
         for sector, value in sector_values.items()
     }
-    
+
     # Filter out sectors with zero value
     active_sectors = [sector for sector in sectors if sector_percentages[sector] > 0]
     portfolio_values = [sector_percentages[sector] for sector in active_sectors]
-    
+
     # Create the data for the chart
     data = [
         {
@@ -365,7 +377,7 @@ def transform_for_sector_chart(
             "hovertemplate": "%{x}<br>%{y:.1f}%<extra></extra>",
         }
     ]
-    
+
     if compare_to_benchmark:
         # Placeholder benchmark data (S&P 500 sector weights)
         # In a real implementation, this would come from an API or database
@@ -386,9 +398,11 @@ def transform_for_sector_chart(
             "ETF": 0,
             "Other": 0,
         }
-        
-        benchmark_values = [benchmark_mapping.get(sector, 0) for sector in active_sectors]
-        
+
+        benchmark_values = [
+            benchmark_mapping.get(sector, 0) for sector in active_sectors
+        ]
+
         data.append(
             {
                 "x": active_sectors,
@@ -399,7 +413,7 @@ def transform_for_sector_chart(
                 "hovertemplate": "%{x}<br>%{y:.1f}%<extra></extra>",
             }
         )
-    
+
     # Create the figure data
     return {
         "data": data,
@@ -414,7 +428,9 @@ def transform_for_sector_chart(
     }
 
 
-def create_dashboard_metrics(portfolio_summary: PortfolioSummary) -> List[Dict[str, Any]]:
+def create_dashboard_metrics(
+    portfolio_summary: PortfolioSummary,
+) -> list[dict[str, Any]]:
     """Create dashboard metric cards from portfolio summary.
 
     Args:
@@ -424,12 +440,12 @@ def create_dashboard_metrics(portfolio_summary: PortfolioSummary) -> List[Dict[s
         List of metric card definitions
     """
     logger.debug("Creating dashboard metrics from portfolio summary")
-    
+
     # Define the metrics to display
     metrics = [
         {
             "title": "Total Value",
-            "value": format_currency(portfolio_summary.total_value_net),
+            "value": utils.format_currency(portfolio_summary.total_value_net),
             "help_text": portfolio_summary.help_text.get("total_value_net", ""),
         },
         {
@@ -439,14 +455,23 @@ def create_dashboard_metrics(portfolio_summary: PortfolioSummary) -> List[Dict[s
         },
         {
             "title": "Long Exposure",
-            "value": format_currency(portfolio_summary.long_exposure.total_value),
+            "value": utils.format_currency(portfolio_summary.long_exposure.total_value),
             "help_text": portfolio_summary.help_text.get("long_exposure", ""),
         },
         {
             "title": "Short Exposure",
-            "value": format_currency(portfolio_summary.short_exposure.total_value),
+            "value": utils.format_currency(
+                portfolio_summary.short_exposure.total_value
+            ),
             "help_text": portfolio_summary.help_text.get("short_exposure", ""),
         },
+        {
+            "title": "Options Exposure",
+            "value": utils.format_currency(
+                portfolio_summary.options_exposure.total_value
+            ),
+            "help_text": portfolio_summary.help_text.get("options_exposure", ""),
+        },
     ]
-    
+
     return metrics
