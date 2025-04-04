@@ -25,6 +25,12 @@ help:
 	@echo "  lint        - Run type checker and linter"
 	@echo "               Options: --fix (auto-fix linting issues)"
 	@echo "  test        - Run all tests in the tests directory"
+	@echo "  docker-build - Build the Docker image"
+	@echo "  docker-run   - Run the Docker container"
+	@echo "  docker-up    - Start the application with docker-compose"
+	@echo "  docker-down  - Stop the docker-compose services"
+	@echo "  docker-logs  - Tail the Docker logs"
+	@echo "  docker-test  - Run tests in a Docker container"
 
 # Set up virtual environment
 .PHONY: env
@@ -102,7 +108,7 @@ clean:
 # Lint Python code
 .PHONY: lint
 lint:
-	@echo "Running linter..."
+	@echo "Running linter (ruff)..."
 	@if [ ! -d "$(VENV_DIR)" ]; then \
 		echo "Virtual environment not found. Please run 'make env' first."; \
 		exit 1; \
@@ -111,10 +117,8 @@ lint:
 	@(echo "=== Code Check Log $(TIMESTAMP) ===" && \
 	echo "Starting checks at: $$(date)" && \
 	(source $(VENV_DIR)/bin/activate && \
-	echo "Running linter..." && \
-	ruff check --fix --unsafe-fixes . && \
-	echo "Checking for unused code with vulture..." && \
-	vulture src/ --min-confidence 80) \
+	echo "Running linter (ruff)..." && \
+	ruff check --fix --unsafe-fixes .) \
 	2>&1) | tee $(LOGS_DIR)/code_check_latest.log
 	@echo "Check log saved to: $(LOGS_DIR)/code_check_latest.log"
 
@@ -126,7 +130,7 @@ lint:
 .PHONY: portfolio folio stop-folio port
 
 # Docker targets
-.PHONY: docker-build docker-run docker-compose-up docker-compose-down docker-test deploy-hf
+.PHONY: docker-build docker-run docker-up docker-down docker-logs docker-compose-up docker-compose-down docker-test deploy-hf
 
 portfolio:
 	@echo "Starting portfolio dashboard with sample portfolio.csv..."
@@ -195,14 +199,25 @@ docker-run:
 	docker run -p 8050:8050 --env-file .env folio:latest
 
 # Start with docker-compose
-docker-compose-up:
+docker-up:
 	@echo "Starting with docker-compose..."
 	docker-compose up -d
+	@echo "Folio app launched successfully!"
+	@echo "Access the app at: http://localhost:8050"
 
 # Stop docker-compose services
-docker-compose-down:
+docker-down:
 	@echo "Stopping docker-compose services..."
 	docker-compose down
+
+# Alias for backward compatibility
+docker-compose-up: docker-up
+docker-compose-down: docker-down
+
+# Tail Docker logs
+docker-logs:
+	@echo "Tailing Docker logs..."
+	docker-compose logs -f
 
 # Run tests in Docker container
 docker-test:

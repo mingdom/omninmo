@@ -24,11 +24,10 @@ This document provides instructions for running the Folio application using Dock
 
    ```bash
    # Build and start the container in detached mode
-   make docker-compose-up
-
-   # Or use docker-compose directly
-   docker-compose up -d
+   make docker-up
    ```
+
+   After successful startup, you'll see a message with the URL where you can access the application.
 
 3. **Access the application**
 
@@ -38,35 +37,62 @@ This document provides instructions for running the Folio application using Dock
    http://localhost:8050
    ```
 
-4. **Stop the application**
+4. **View logs**
+
+   To monitor the application logs in real-time:
 
    ```bash
-   make docker-compose-down
-
-   # Or use docker-compose directly
-   docker-compose down
+   make docker-logs
    ```
 
-## Manual Docker Commands
+   Press Ctrl+C to stop viewing logs.
 
-If you prefer to use Docker directly without Docker Compose:
+5. **Stop the application**
+
+   ```bash
+   make docker-down
+   ```
+
+## Docker Commands Reference
+
+The following Make commands are available for working with Docker:
+
+| Command | Description |
+|---------|-------------|
+| `make docker-build` | Build the Docker image |
+| `make docker-run` | Run the Docker container |
+| `make docker-up` | Start the application with docker-compose |
+| `make docker-down` | Stop the docker-compose services |
+| `make docker-logs` | Tail the Docker logs |
+| `make docker-test` | Run tests in a Docker container |
+
+### Manual Docker Commands
+
+If you prefer to use Docker directly without Make:
 
 1. **Build the Docker image**
 
    ```bash
-   make docker-build
-
-   # Or use docker directly
    docker build -t folio:latest .
    ```
 
 2. **Run the Docker container**
 
    ```bash
-   make docker-run
-
-   # Or use docker directly
    docker run -p 8050:8050 --env-file .env folio:latest
+   ```
+
+3. **Use Docker Compose directly**
+
+   ```bash
+   # Start services
+   docker-compose up -d
+
+   # View logs
+   docker-compose logs -f
+
+   # Stop services
+   docker-compose down
    ```
 
 ## Troubleshooting
@@ -77,7 +103,21 @@ If you prefer to use Docker directly without Docker Compose:
 
 - **Volume mounting**: If you're making changes to the code and want to see them reflected immediately, ensure the volumes in `docker-compose.yml` are correctly mapping your local directories.
 
-- **Dependencies**: The Docker image uses `requirements-docker.txt` for its dependencies. If you need to add or update dependencies, modify this file instead of editing the Dockerfile directly.
+- **Dependencies**: The Docker image uses `requirements-folio.txt` for its dependencies. If you need to add or update dependencies, modify this file instead of editing the Dockerfile directly.
+
+- **Development dependencies**: For development and testing, the Docker image can also install dependencies from `requirements-dev.txt`. These are installed automatically when running `make docker-test`.
+
+- **API Keys**: Sensitive data like API keys should be passed at runtime using environment variables or the `.env` file, not hardcoded in the Dockerfile.
+
+## Testing in Docker
+
+To run tests in a Docker container:
+
+```bash
+make docker-test
+```
+
+This will build a Docker image with development dependencies and run the test suite inside the container.
 
 ## Next Steps
 

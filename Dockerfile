@@ -10,9 +10,8 @@ ENV PORT=8050
 ENV HF_SPACE=1
 # Set logging level to WARNING for Hugging Face deployment (for privacy reasons)
 ENV LOG_LEVEL=WARNING
-# Allow passing Gemini API key at build time or runtime
-ARG GEMINI_API_KEY
-ENV GEMINI_API_KEY=${GEMINI_API_KEY}
+# Note: Sensitive environment variables like GEMINI_API_KEY should be passed at runtime
+# rather than build time for security reasons
 
 # Flag to install development dependencies
 ARG INSTALL_DEV=false
