@@ -212,7 +212,7 @@ class ConsoleApp:
         widths = [10, 12, 12, 16, 8]
 
         # Create header row
-        header = "  ".join(h.ljust(w) for h, w in zip(headers, widths))
+        header = "  ".join(h.ljust(w) for h, w in zip(headers, widths, strict=False))
         separator = "-" * len(header)
 
         # Create rows

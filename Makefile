@@ -112,7 +112,9 @@ lint:
 	echo "Starting checks at: $$(date)" && \
 	(source $(VENV_DIR)/bin/activate && \
 	echo "Running linter..." && \
-	ruff check --fix --unsafe-fixes .) \
+	ruff check --fix --unsafe-fixes . && \
+	echo "Checking for unused code with vulture..." && \
+	vulture src/ --min-confidence 80) \
 	2>&1) | tee $(LOGS_DIR)/code_check_latest.log
 	@echo "Check log saved to: $(LOGS_DIR)/code_check_latest.log"
 

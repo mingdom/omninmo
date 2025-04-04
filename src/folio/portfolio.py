@@ -423,9 +423,8 @@ def process_portfolio_data(
                 "market_value": value,
                 "beta": beta,
                 "beta_adjusted_exposure": value * beta,
-                # 'clean_value': value, # Redundant? market_value is clean
                 "weight": percent_of_account,
-                "position_beta": beta,  # Seems redundant with 'beta'? Clarify usage.
+                "position_beta": beta,  # Used for compatibility with existing code
                 # TODO: Add other relevant stock fields if needed (e.g., cost basis)
             }
 

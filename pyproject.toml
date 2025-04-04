@@ -38,6 +38,19 @@ select = [
     "PL",  # pylint
     "RUF", # ruff-specific rules
     "W",   # pycodestyle warnings
+    "F401", # Module imported but unused
+    "F841", # Local variable is assigned to but never used
+    "F821", # Undefined name
+    "F811", # Redefined name
+    "F822", # Undefined name in __all__
+    "PLC0414", # Useless import alias
+    "PLE0101", # Function defined outside __init__
+    "PLE0604", # Invalid object in __all__, or invalid __all__ format
+    "PLE0605", # Invalid format for __all__
+    "A",       # Unused functions... etc.
+    "B",    # flake8-bugbear rules (includes B007 for unused loop variables)
+    "ERA",  # eradicate (commented out code)
+    "F",    # pyflakes (includes F401 for unused imports, F841 for unused variables)
 ]
 
 # Ignore specific rules
@@ -49,6 +62,7 @@ ignore = [
     "PLR0912",  # too many branches - common in ML data processing and training loops
     "PLR0915",  # too many statements - common in ML training and evaluation functions
     "PLR2004",  # magic value used in comparison - common in data processing code
+    "ARG002",  # Unused method argument - we use underscore prefix for intentionally unused arguments
 ]
 
 # Allow autofix for all enabled rules (when `--fix`) is provided

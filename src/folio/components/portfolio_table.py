@@ -1,4 +1,3 @@
-
 import dash_bootstrap_components as dbc
 from dash import html
 
@@ -15,13 +14,12 @@ def get_group_ticker(group: PortfolioGroup) -> str:
     return "Unknown"
 
 
-def create_position_row(group: PortfolioGroup, metrics: dict) -> dbc.Row:
+def create_position_row(group: PortfolioGroup, _metrics: dict) -> dbc.Row:
     """Create a row for a position in the portfolio table
 
     Args:
         group: PortfolioGroup containing position data
-        metrics: Dictionary of additional metrics to display (currently unused)
-               TODO: Implement metrics usage or remove parameter if not needed
+        _metrics: Dictionary of additional metrics to display (currently unused, reserved for future use)
 
     Returns:
         Dash Bootstrap Components Row for the portfolio table

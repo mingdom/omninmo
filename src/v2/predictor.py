@@ -91,11 +91,11 @@ class Predictor:
         # Get feature importance
         if hasattr(self.model, "feature_importances_"):
             results["feature_importance"] = dict(
-                zip(X.columns, self.model.feature_importances_)
+                zip(X.columns, self.model.feature_importances_, strict=False)
             )
         elif hasattr(self.model, "coef_"):
             results["feature_importance"] = dict(
-                zip(X.columns, np.abs(self.model.coef_))
+                zip(X.columns, np.abs(self.model.coef_), strict=False)
             )
 
         return results
@@ -429,7 +429,7 @@ class Predictor:
             # Store top features
             top_features = mean_importance.head(20)
             self.feature_importance = list(
-                zip(top_features["feature"], top_features["importance"])
+                zip(top_features["feature"], top_features["importance"], strict=False)
             )
         else:
             stability_score = 0

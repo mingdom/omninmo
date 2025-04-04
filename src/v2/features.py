@@ -363,7 +363,7 @@ class Features:
 
     # Enhanced risk-adjusted features
 
-    def _add_beta_features(self, df, market_data, windows=[60, 120]):
+    def _add_beta_features(self, df, market_data, windows=None):
         """
         Calculate beta and correlation with market indices
 
@@ -373,6 +373,8 @@ class Features:
             windows (list): List of window sizes for rolling calculations
         """
         # Calculate returns for the stock
+        if windows is None:
+            windows = [60, 120]
         stock_returns = df["Close"].pct_change()
 
         # Calculate returns for market indices
@@ -401,7 +403,7 @@ class Features:
                 stock_cum_return / market_cum_return.replace(0, np.nan)
             )
 
-    def _add_volatility_features(self, df, windows=[30, 60, 90]):
+    def _add_volatility_features(self, df, windows=None):
         """
         Add volatility and downside risk metrics
 
@@ -409,6 +411,8 @@ class Features:
             df (pandas.DataFrame): DataFrame with stock data
             windows (list): List of window sizes for rolling calculations
         """
+        if windows is None:
+            windows = [30, 60, 90]
         returns = df["Close"].pct_change()
 
         for window in windows:
