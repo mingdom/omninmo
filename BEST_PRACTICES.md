@@ -153,8 +153,11 @@ Thorough testing prevents bugs and ensures code behaves as expected in all scena
   - **Check Test Logs**: Always review `logs/test_latest.log` after running tests to identify failures
   - **Run Linter Regularly**: Run `make lint` to check for code quality issues, unused imports/functions, and other potential problems
   - **Fix Linting Issues**: Address linting errors before committing code to maintain code quality
-  - **Test Application**: Use `make portfolio` to test with sample data
-  - **Review App Logs**: Check `logs/folio_latest.log` after running the application to catch errors
+  - **Automated vs. Manual Testing**:
+    - For AI assistants: Only run `make test` and `make lint` to verify changes
+    - Leave UI testing with `make folio` or `make portfolio` to human users
+    - Add unit tests for new functionality instead of manual testing when possible
+  - **Review App Logs**: Check `logs/test_latest.log` after running tests to catch errors
   - **Test Real Data**: Use `src/lab/portfolio.csv` for testing with real portfolio data
 
 - **Testing Strategy**:
@@ -162,6 +165,19 @@ Thorough testing prevents bugs and ensures code behaves as expected in all scena
   - **Edge Cases**: Test boundary conditions (empty inputs, maximum values, etc.)
   - **Regression Tests**: Add tests for bugs to prevent recurrence
   - **Test Coverage**: Aim for high coverage of critical paths and business logic
+  - **Test New Functionality**: Always write tests for new features and components
+  - **Test Naming**: Name tests specifically to the method/module being tested
+  - **Test Public API**: Test only public functions to avoid coupling tests to implementation details
+  - **Test Independence**: Each test should be independent and not rely on other tests
+
+- **Writing Tests**:
+  - **Test Structure**: Follow the Arrange-Act-Assert pattern
+  - **Mock External Dependencies**: Use mocks for external services, APIs, and databases
+  - **Test Edge Cases**: Include tests for error conditions and boundary cases
+  - **Parameterized Tests**: Use pytest's parameterize for testing multiple inputs
+  - **Fixtures**: Create fixtures for common test setup
+  - **Test Isolation**: Reset state between tests to prevent test interdependence
+  - **Never Change Test Logic**: Fix implementation to make tests pass, not the other way around
 
 ### 📝 Documentation
 *Supports USABILITY and RELIABILITY*
