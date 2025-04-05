@@ -68,17 +68,16 @@ class PortfolioSummaryDict(TypedDict):
     """Type definition for portfolio summary dictionary"""
 
     net_market_exposure: float  # Long - Short (excluding cash)
-    gross_market_exposure: float  # Long + Short (excluding cash)
     portfolio_beta: float  # Weighted average beta of all positions
     long_exposure: ExposureBreakdownDict  # Detailed breakdown of long exposures
     short_exposure: ExposureBreakdownDict  # Detailed breakdown of short exposures
     options_exposure: ExposureBreakdownDict  # Detailed breakdown of option exposures
-    short_percentage: float  # Short / Gross Market Exposure
+    short_percentage: float  # Short / (Long + Short)
     cash_like_positions: list[StockPositionDict]  # List of cash positions
     cash_like_value: float  # Total value of cash positions
     cash_like_count: int  # Number of cash positions
-    cash_percentage: float  # Cash / (Cash + Gross Market Exposure)
-    total_portfolio_size: float  # Gross Market Exposure + Cash
+    cash_percentage: float  # Cash / Portfolio Estimated Value
+    portfolio_estimate_value: float  # Net Market Exposure + Cash
     help_text: dict[str, str]  # Explanations of each metric
 
 
@@ -338,7 +337,12 @@ class PortfolioGroup:
 
 @dataclass
 class ExposureBreakdown:
-    """Detailed breakdown of exposure by type"""
+    """Detailed breakdown of exposure by type
+
+    This class provides a comprehensive view of market exposure, separating
+    stock exposure from options exposure to help users understand the
+    different risk components in their portfolio.
+    """
 
     stock_exposure: float  # Represents the market exposure from stock positions
     stock_beta_adjusted: float  # Risk-adjusted stock exposure
@@ -389,7 +393,13 @@ class ExposureBreakdown:
 
 @dataclass
 class PortfolioSummary:
-    """Summary of portfolio metrics with detailed breakdowns"""
+    """Summary of portfolio metrics with detailed breakdowns
+
+    This class provides a comprehensive view of your portfolio's market exposure,
+    risk characteristics, and defensive positioning. It helps you understand your
+    portfolio's directional bias, sensitivity to market movements, and overall
+    risk profile.
+    """
 
     # Market exposure metrics (excluding cash)
     net_market_exposure: float  # Long - Short (excluding cash)
@@ -419,66 +429,110 @@ class PortfolioSummary:
         """Initialize help text for metrics"""
         self.help_text = {
             "net_market_exposure": """
-                Net market exposure (Long - Short, excluding cash)
-                Formula: Long exposure - Short exposure
-                Represents the directional risk in the portfolio
+                Net Market Exposure: Your portfolio's overall directional bias
+
+                This metric shows whether your portfolio is net long or short the market.
+                A positive value means you have more long exposure than short exposure,
+                indicating a bullish stance. A negative value indicates a bearish stance.
+
+                Use this to understand how your portfolio might perform in different market
+                environments and to ensure your market exposure aligns with your outlook.
             """,
             "portfolio_beta": """
-                Portfolio's overall market sensitivity
-                Formula: Weighted average of position betas
-                Note: Options contribute through delta-adjusted exposure
+                Portfolio Beta: Your portfolio's sensitivity to market movements
+
+                This metric shows how much your portfolio is expected to move relative to
+                the overall market. A beta of 1.5 means your portfolio would be expected
+                to move 1.5% for every 1% move in the market.
+
+                Use this to gauge your portfolio's risk level and to ensure it matches
+                your risk tolerance and market outlook.
             """,
             "long_exposure": """
-                Long market exposure
-                Includes:
-                - Long stock positions
-                - Long call options (delta-adjusted)
-                - Short put options (delta-adjusted)
-                Formula: Stock exposure + Option delta exposure
+                Long Exposure: Your portfolio's bullish positioning
+
+                This metric shows your total positive market exposure from both stocks
+                and options. It includes long stock positions, long call options, and
+                short put options.
+
+                Use this to understand your potential upside in rising markets and to
+                ensure your bullish positioning aligns with your market outlook.
             """,
             "short_exposure": """
-                Short market exposure
-                Includes:
-                - Short stock positions
-                - Short call options (delta-adjusted)
-                - Long put options (delta-adjusted)
-                Formula: |Stock exposure + Option delta exposure|
+                Short Exposure: Your portfolio's bearish positioning
+
+                This metric shows your total negative market exposure from both stocks
+                and options. It includes short stock positions, short call options, and
+                long put options.
+
+                Use this to understand your downside protection in falling markets and
+                to ensure your hedging strategy is adequate for your risk tolerance.
             """,
             "options_exposure": """
-                Option positions' market exposure
-                Calculation:
-                - Calls: +delta * notional for long, -delta * notional for short
-                - Puts: -delta * notional for long, +delta * notional for short
-                Note: This is shown for reference, already included in long/short
+                Options Exposure: Your market exposure from options
+
+                This breakdown shows how options contribute to your overall market exposure.
+                Options can provide leverage, income, or hedging depending on the strategy.
+
+                Use this to understand how much of your market risk comes from options
+                versus stocks, and to ensure your options strategies align with your
+                investment goals.
             """,
             "short_percentage": """
-                Percentage of portfolio in short positions
-                Formula: Short exposure / (Long exposure + Short exposure)
-                Represents the portion of market risk that is short
+                Short Percentage: Your portfolio's hedge ratio
+
+                This metric shows what percentage of your market exposure is short.
+                A higher percentage indicates more downside protection.
+
+                Use this to gauge your defensive positioning and to ensure your
+                hedging strategy aligns with your market outlook and risk tolerance.
             """,
             "cash_like_positions": """
-                List of positions with very low beta (< 0.1)
-                Includes: Money market funds, short-term treasuries, etc.
-                These positions have minimal market correlation
+                Cash-like Positions: Your portfolio's defensive assets
+
+                These are positions with very low market correlation, such as money
+                market funds, short-term treasuries, and other highly liquid assets.
+
+                Use this to understand your defensive positioning and available capital
+                for new opportunities.
             """,
             "cash_like_value": """
-                Total value of cash-like positions
-                Formula: Sum of market values of cash-like positions
-                Represents low-risk portion of portfolio
+                Cash-like Value: Your portfolio's defensive capital
+
+                This is the total value of your cash and cash-equivalent positions.
+                It represents your most liquid and lowest-risk assets.
+
+                Use this to understand your defensive positioning and available
+                dry powder for new investment opportunities.
             """,
             "cash_like_count": """
-                Number of cash-like positions in portfolio
-                Helps track diversification of low-risk assets
+                Cash-like Count: Diversification of your defensive assets
+
+                This shows how many different cash or cash-equivalent positions
+                you hold in your portfolio.
+
+                Use this to ensure you're not overly concentrated in a single
+                cash-like instrument.
             """,
             "cash_percentage": """
-                Percentage of portfolio in cash or cash equivalents
-                Formula: Cash value / Portfolio estimated value
-                Represents the defensive/liquid portion of the portfolio
+                Cash Percentage: Your portfolio's defensive allocation
+
+                This shows what percentage of your portfolio is in cash or cash equivalents.
+                A higher percentage indicates more safety in market downturns but potentially
+                lower returns in bull markets.
+
+                Use this to gauge your defensive positioning and to ensure it aligns with
+                your market outlook and risk tolerance.
             """,
             "portfolio_estimate_value": """
-                Estimated value of the portfolio including cash
-                Formula: Net market exposure + Cash value
-                Represents the total capital deployed
+                Portfolio Estimated Value: Your portfolio's total size
+
+                This is an estimate of your portfolio's total value, including both
+                market exposure and cash. It provides a baseline for calculating
+                percentage allocations.
+
+                Use this to track your portfolio's overall size and to calculate
+                meaningful percentage allocations for different exposures.
             """,
         }
 
@@ -493,7 +547,6 @@ class PortfolioSummary:
 
         return {
             "net_market_exposure": self.net_market_exposure,
-            "gross_market_exposure": self.gross_market_exposure,
             "portfolio_beta": self.portfolio_beta,
             "long_exposure": self.long_exposure.to_dict(),
             "short_exposure": self.short_exposure.to_dict(),
@@ -503,7 +556,7 @@ class PortfolioSummary:
             "cash_like_value": self.cash_like_value,
             "cash_like_count": self.cash_like_count,
             "cash_percentage": self.cash_percentage,
-            "total_portfolio_size": self.total_portfolio_size,
+            "portfolio_estimate_value": self.portfolio_estimate_value,
             "help_text": self.help_text if self.help_text is not None else {},
         }
 
@@ -531,15 +584,11 @@ class PortfolioSummary:
         net_market_exposure = data.get(
             "net_market_exposure", data.get("total_value_net", 0.0)
         )
-        gross_market_exposure = data.get(
-            "gross_market_exposure", data.get("total_value_abs", 0.0)
-        )
         cash_percentage = data.get("cash_percentage", 0.0)
-        total_portfolio_size = data.get("total_portfolio_size", 0.0)
+        portfolio_estimate_value = data.get("portfolio_estimate_value", 0.0)
 
         return cls(
             net_market_exposure=net_market_exposure,
-            gross_market_exposure=gross_market_exposure,
             portfolio_beta=data["portfolio_beta"],
             long_exposure=long_exposure,
             short_exposure=short_exposure,
@@ -549,7 +598,7 @@ class PortfolioSummary:
             cash_like_value=data["cash_like_value"],
             cash_like_count=data["cash_like_count"],
             cash_percentage=cash_percentage,
-            total_portfolio_size=total_portfolio_size,
+            portfolio_estimate_value=portfolio_estimate_value,
             help_text=data.get("help_text"),
         )
 

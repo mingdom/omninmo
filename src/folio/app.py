@@ -797,41 +797,7 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
                     + ["$0.00", "0.0%"]
                 )
 
-            # Get the market exposure metrics
-            net_market_exposure = summary_data.get("net_market_exposure", 0.0)
-            gross_market_exposure = summary_data.get("gross_market_exposure", 0.0)
-            total_portfolio_size = summary_data.get("total_portfolio_size", 0.0)
-
-            # Get percentages directly from the summary data
-            net_percent = (
-                summary_data.get("net_market_exposure", 0.0)
-                / total_portfolio_size
-                * 100
-                if total_portfolio_size > 0
-                else 0.0
-            )
-            long_percent = (
-                summary_data["long_exposure"]["total_exposure"]
-                / total_portfolio_size
-                * 100
-                if total_portfolio_size > 0
-                else 0.0
-            )
-            short_percent = (
-                abs(summary_data["short_exposure"]["total_exposure"])
-                / total_portfolio_size
-                * 100
-                if total_portfolio_size > 0
-                else 0.0
-            )
-            options_percent = (
-                summary_data["options_exposure"]["total_exposure"]
-                / total_portfolio_size
-                * 100
-                if total_portfolio_size > 0
-                else 0.0
-            )
-            cash_percent = summary_data.get("cash_percentage", 0.0)
+            # No need to calculate percentages as we're not displaying them
 
             return [
                 # Net Exposure

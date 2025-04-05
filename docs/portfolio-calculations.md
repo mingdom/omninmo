@@ -1,38 +1,39 @@
 # Portfolio Calculations
 
-This document provides a comprehensive overview of how portfolio metrics are calculated in the Folio application.
+This document provides a comprehensive overview of how portfolio metrics are calculated in the Folio application and why they matter for effective portfolio management.
 
 ## Core Principles
 
-1. **Focus on Exposure**: We focus on market exposure rather than value, as prices in CSV files change frequently.
-2. **Beta Adjustment**: We adjust exposures by beta to account for different market sensitivities.
-3. **Cash Separation**: Cash and cash-like instruments are tracked separately from market exposure.
+1. **Focus on Exposure**: We focus on market exposure rather than value, as prices in CSV files change frequently. This approach gives you a more accurate picture of your true market risk regardless of when your positions were established.
+
+2. **Beta Adjustment**: We adjust exposures by beta to account for different market sensitivities. This helps you understand your true market risk - a $10,000 position in a high-beta stock (β=2.0) has twice the market exposure of a $10,000 position in a market-neutral stock (β=1.0).
+
+3. **Cash Separation**: Cash and cash-like instruments are tracked separately from market exposure. This allows you to clearly see your defensive positioning and available dry powder for new opportunities.
 
 ## Key Metrics
 
 ### Exposure Metrics
 
-| Metric | Formula | Description |
-|--------|---------|-------------|
-| Long Exposure | Long Stocks + Long Options Delta | Total positive market exposure |
-| Short Exposure | Short Stocks + Short Options Delta | Total negative market exposure (stored as positive value) |
-| Net Market Exposure | Long Exposure - Short Exposure | Directional market exposure |
-| Options Exposure | Long Options Delta + Short Options Delta | Total options exposure (both long and short) |
-| Net Options Exposure | Long Options Delta - Short Options Delta | Directional options exposure |
-| Portfolio Estimated Value | Net Market Exposure + Cash | Estimated total value of the portfolio |
+| Metric | Formula | Description | Why It Matters |
+|--------|---------|-------------|----------------|
+| Long Exposure | Long Stocks + Long Options Delta | Total positive market exposure | Helps you understand your potential upside in rising markets and your overall bullish positioning |
+| Short Exposure | Short Stocks + Short Options Delta | Total negative market exposure (stored as positive value) | Helps you understand your potential downside protection in falling markets and your overall bearish positioning |
+| Net Market Exposure | Long Exposure - Short Exposure | Directional market exposure | Shows your overall market bias (bullish vs bearish) and helps you understand how your portfolio might perform in different market environments |
+| Net Options Exposure | Long Options Delta - Short Options Delta | Directional options exposure | Reveals how much of your market exposure comes from options, which can have different risk characteristics than stocks |
+| Portfolio Estimated Value | Net Market Exposure + Cash | Estimated total value of the portfolio | Provides a baseline for calculating percentage allocations and understanding your total portfolio size |
 
 ### Percentage Metrics
 
-| Metric | Formula | Description |
-|--------|---------|-------------|
-| Short Percentage | Short Exposure / (Long Exposure + Short Exposure) * 100 | Percentage of market exposure that is short |
-| Cash Percentage | Cash Value / Portfolio Estimated Value * 100 | Percentage of portfolio in cash |
+| Metric | Formula | Description | Why It Matters |
+|--------|---------|-------------|----------------|
+| Short Percentage | Short Exposure / (Long Exposure + Short Exposure) * 100 | Percentage of market exposure that is short | Helps you gauge your defensive positioning and hedge ratio - a higher percentage indicates more downside protection |
+| Cash Percentage | Cash Value / Portfolio Estimated Value * 100 | Percentage of portfolio in cash | Shows your defensive positioning and available capital for new opportunities - higher percentages indicate more safety in market downturns |
 
 ### Beta Metrics
 
-| Metric | Formula | Description |
-|--------|---------|-------------|
-| Portfolio Beta | Net Beta-Adjusted Exposure / Net Market Exposure | Weighted average beta of all positions |
+| Metric | Formula | Description | Why It Matters |
+|--------|---------|-------------|----------------|
+| Portfolio Beta | Net Beta-Adjusted Exposure / Net Market Exposure | Weighted average beta of all positions | Helps you understand your portfolio's sensitivity to market movements - a beta of 1.5 means your portfolio is expected to move 1.5% for every 1% move in the market |
 
 ## Calculation Details
 
@@ -65,9 +66,8 @@ Options exposure is calculated based on the option's delta and the underlying se
    - **Long Exposure**: Options with positive delta exposure (long calls, short puts)
    - **Short Exposure**: Options with negative delta exposure (short calls, long puts)
 
-4. **Total Options Exposure** = Sum of absolute values of all options delta exposures
-
-5. **Net Options Exposure** = Long Options Exposure - Short Options Exposure
+4. **Net Options Exposure** = Long Options Exposure - Short Options Exposure
+   - This is the key metric for understanding your directional exposure from options
 
 ### Cash-like Positions
 
@@ -119,6 +119,6 @@ This structure makes it easy to determine the portion of long/short exposure tha
 - `long_exposure.option_delta_exposure`: Long options-only exposure
 - `short_exposure.stock_exposure`: Short stock-only exposure
 - `short_exposure.option_delta_exposure`: Short options-only exposure
-- `options_exposure.total_exposure`: Total options exposure (both long and short)
+- `options_exposure.components["Net Options Delta Exp"]`: Net directional exposure from all options
 
 The components dictionary in each breakdown provides even more detailed information about specific exposure types.
