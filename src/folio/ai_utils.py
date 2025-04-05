@@ -54,8 +54,8 @@ def prepare_portfolio_data_for_analysis(
                     "position_type": "stock",
                     "market_value": stock.market_value,
                     "beta": stock.beta,
-                    "weight": stock.market_value / summary.total_exposure
-                    if summary.total_exposure
+                    "weight": stock.market_value / summary.net_market_exposure
+                    if summary.net_market_exposure
                     else 0,
                     "quantity": stock.quantity,
                 }
@@ -69,8 +69,8 @@ def prepare_portfolio_data_for_analysis(
                     "position_type": "option",
                     "market_value": option.market_value,
                     "beta": option.beta,
-                    "weight": option.market_value / summary.total_exposure
-                    if summary.total_exposure
+                    "weight": option.market_value / summary.net_market_exposure
+                    if summary.net_market_exposure
                     else 0,
                     "option_type": option.option_type,
                     "strike": option.strike,
@@ -81,7 +81,7 @@ def prepare_portfolio_data_for_analysis(
 
     # Create summary data
     summary_data = {
-        "total_exposure": summary.total_exposure,
+        "net_market_exposure": summary.net_market_exposure,
         "portfolio_beta": summary.portfolio_beta,
         "long_exposure": {
             "total": summary.long_exposure.total_value,

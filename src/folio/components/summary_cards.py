@@ -613,7 +613,10 @@ def register_callbacks(app):
         app: The Dash app
     """
     logger.info("Registering summary cards callbacks")
-    logger.info(f"App callback_map before: {list(app.callback_map.keys())}")
+    # Debug logging for callback registration
+    logger.debug(
+        f"Callback map before summary cards registration: {len(app.callback_map)} callbacks"
+    )
 
     from dash import Input, Output
 
@@ -671,5 +674,7 @@ def register_callbacks(app):
             logger.error(f"Error in update_summary_cards: {e}", exc_info=True)
             return error_values()
 
-    # Log the callback map after registering the callback
-    logger.info(f"App callback_map after: {list(app.callback_map.keys())}")
+    # Debug logging for callback registration
+    logger.debug(
+        f"Callback map after summary cards registration: {len(app.callback_map)} callbacks"
+    )

@@ -1077,7 +1077,7 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
     register_chart_callbacks(app)
 
     # Register premium chat callbacks
-    register_premium_chat_callbacks(app)
+    register_premium_chat_callbacks(app)  # This is now an alias for register_callbacks
 
     return app
 

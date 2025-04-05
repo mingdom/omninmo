@@ -28,12 +28,9 @@ class TestAIIntegration:
             ticker="AAPL",
             position_type="option",
             quantity=10,
-            market_value=1500.0,
+            market_value=1500.0,  # Using market_value for backward compatibility
             beta=1.2,
             beta_adjusted_exposure=1800.0,
-            clean_value=1500.0,
-            weight=0.1,
-            position_beta=1.2,
             strike=150.0,
             expiry="2023-01-01",
             option_type="CALL",
@@ -71,13 +68,12 @@ class TestAIIntegration:
 
         # Create portfolio summary
         summary = PortfolioSummary(
-            total_exposure=16500.0,
+            net_market_exposure=16500.0,
             portfolio_beta=1.2,
             long_exposure=exposure,
             short_exposure=exposure,
             options_exposure=exposure,
             short_percentage=0.0,
-            exposure_reduction_percentage=0.0,
             cash_like_positions=[],
             cash_like_value=0.0,
             cash_like_count=0,
@@ -111,7 +107,7 @@ class TestAIIntegration:
         assert option_data["strike"] == 150.0
 
         # Verify summary data
-        assert ai_data["summary"]["total_exposure"] == 16500.0
+        assert ai_data["summary"]["net_market_exposure"] == 16500.0
         assert ai_data["summary"]["portfolio_beta"] == 1.2
         assert "long_exposure" in ai_data["summary"]
         assert "short_exposure" in ai_data["summary"]
@@ -131,12 +127,9 @@ class TestAIIntegration:
             ticker="AAPL",
             position_type="option",
             quantity=10,
-            market_value=1500.0,
+            market_value=1500.0,  # Using market_value for backward compatibility
             beta=1.2,
             beta_adjusted_exposure=1800.0,
-            clean_value=1500.0,
-            weight=0.1,
-            position_beta=1.2,
             strike=150.0,
             expiry="2023-01-01",
             option_type="CALL",
@@ -174,13 +167,12 @@ class TestAIIntegration:
 
         # Create portfolio summary
         summary = PortfolioSummary(
-            total_exposure=16500.0,
+            net_market_exposure=16500.0,
             portfolio_beta=1.2,
             long_exposure=exposure,
             short_exposure=exposure,
             options_exposure=exposure,
             short_percentage=0.0,
-            exposure_reduction_percentage=0.0,
             cash_like_positions=[],
             cash_like_value=0.0,
             cash_like_count=0,
@@ -198,7 +190,7 @@ class TestAIIntegration:
 
         # Test that PortfolioSummary.from_dict works with this data
         restored_summary = PortfolioSummary.from_dict(summary_data)
-        assert restored_summary.total_exposure == 16500.0
+        assert restored_summary.net_market_exposure == 16500.0
         assert restored_summary.portfolio_beta == 1.2
 
         # Test prepare_portfolio_data_for_analysis with the restored objects
