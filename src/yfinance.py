@@ -10,8 +10,8 @@ import os
 import time
 
 import pandas as pd
-import yfinance as yf
 
+import yfinance as yf
 from src.stockdata import DataFetcherInterface
 
 logger = logging.getLogger(__name__)

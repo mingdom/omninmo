@@ -22,11 +22,11 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy requirements files
-COPY requirements-folio.txt .
+COPY requirements.txt .
 COPY requirements-dev.txt .
 
 # Install required packages
-RUN pip install --no-cache-dir -r requirements-folio.txt && \
+RUN pip install --no-cache-dir -r requirements.txt && \
     if [ "$INSTALL_DEV" = "true" ]; then \
     echo "Installing development dependencies..." && \
     pip install --no-cache-dir -r requirements-dev.txt; \

@@ -641,7 +641,6 @@ def process_portfolio_data(
 
             empty_summary = PortfolioSummary(
                 net_market_exposure=0.0,
-                gross_market_exposure=0.0,
                 portfolio_beta=0.0,
                 long_exposure=empty_exposure,
                 short_exposure=empty_exposure,
@@ -651,7 +650,7 @@ def process_portfolio_data(
                 cash_like_value=0.0,
                 cash_like_count=0,
                 cash_percentage=0.0,
-                total_portfolio_size=0.0,
+                portfolio_estimate_value=0.0,
             )
             return [], empty_summary, []
 
@@ -833,20 +832,22 @@ def calculate_portfolio_summary(
             },
         )
 
-        # 3. Options exposure (total delta exposure from all options)
+        # 3. Options exposure (net delta exposure from all options)
+        net_option_value = long_option_value - short_option_value
+        net_option_beta_adj = long_option_beta_adj - short_option_beta_adj
         options_exposure = ExposureBreakdown(
             stock_exposure=0,  # Options only view
             stock_beta_adjusted=0,
-            option_delta_exposure=long_option_value + short_option_value,
-            option_beta_adjusted=long_option_beta_adj + short_option_beta_adj,
-            total_exposure=long_option_value + short_option_value,
-            total_beta_adjusted=long_option_beta_adj + short_option_beta_adj,
-            description="Total absolute delta exposure from options",
-            formula="Sum(|Option Delta Exposures|)",
+            option_delta_exposure=net_option_value,
+            option_beta_adjusted=net_option_beta_adj,
+            total_exposure=net_option_value,
+            total_beta_adjusted=net_option_beta_adj,
+            description="Net delta exposure from options",
+            formula="Long Options Delta - Short Options Delta",
             components={
                 "Long Options Delta Exp": long_option_value,
                 "Short Options Delta Exp": short_option_value,
-                "Net Options Delta Exp": long_option_value - short_option_value,
+                "Net Options Delta Exp": net_option_value,
             },
         )
 
@@ -856,9 +857,9 @@ def calculate_portfolio_summary(
         net_market_exposure = (
             long_exposure.total_exposure - short_exposure.total_exposure
         )
-        # Calculate total market exposure (excluding cash)
+        # Calculate gross market exposure (long + short, excluding cash)
         # This is used for percentage calculations
-        total_market_exposure = (
+        gross_market_exposure = (
             long_exposure.total_exposure + short_exposure.total_exposure
         )
 
@@ -873,10 +874,10 @@ def calculate_portfolio_summary(
         )
 
         # 3. Exposure percentages
-        # Calculate short percentage as a percentage of the total market exposure
+        # Calculate short percentage as a percentage of the gross market exposure
         short_percentage = (
-            (short_exposure.total_exposure / total_market_exposure) * 100
-            if total_market_exposure > 0
+            (short_exposure.total_exposure / gross_market_exposure) * 100
+            if gross_market_exposure > 0
             else 0.0
         )
 

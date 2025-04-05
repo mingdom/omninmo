@@ -5,15 +5,10 @@ This document is the single source of truth for the Folio project's best practic
 ---
 
 # 📋 CORE TENETS
-
 1. **SIMPLICITY** - Prefer simple, focused solutions over complex ones. Question every bit of added complexity.
-
 2. **PRECISION** - Make the smallest necessary changes. Don't modify unrelated code or remove what you don't understand.
-
-3. **RELIABILITY** - Debug thoroughly and test rigorously. Never hide errors or compromise data integrity.
-
+3. **RELIABILITY** - Debug thoroughly and test rigorously. AVOID SWALLOW EXCEPTIONS or hiding errors
 4. **USABILITY** - Prioritize user experience. Design for clarity and ease of use, not technical elegance alone.
-
 5. **SAFETY** - Never modify Git history or hide Git commands in scripts. All version control operations must be explicit, visible, and performed manually by the user.
 
 ---
@@ -22,20 +17,6 @@ This document is the single source of truth for the Folio project's best practic
 *When in doubt, follow the CORE TENETS above.*
 This section adds specific guidelines for various aspects of the project.
 
-### 📂 Code Organization
-*Supports SIMPLICITY and PRECISION*
-Organize code to maximize readability and minimize maintenance overhead.
-
-- **Structure**:
-  - **Module Structure**: Use `__init__.py` files for clean imports and hierarchical organization
-  - **File Naming**: Use hyphens instead of underscores; include timestamps when appropriate
-  - **Dependencies**: Minimize dependencies between modules; use interfaces when needed
-
-- **Refactoring**:
-  - **Preserve Interfaces**: Maintain function signatures when refactoring
-  - **Copy Carefully**: Copy implementations 1:1 when moving code; avoid subtle changes
-  - **Test Thoroughly**: Always test refactored code extensively
-
 ### � Development Workflow
 *Supports PRECISION and SIMPLICITY*
 Follow consistent development practices to maintain code quality and developer productivity.
@@ -43,11 +24,6 @@ Follow consistent development practices to maintain code quality and developer p
 - **Code Changes**:
   - **Incremental Changes**: Make small, focused changes rather than large rewrites
   - **Performance**: Optimize only after identifying actual bottlenecks
-  - **Testing Changes**: Always verify UI changes by running and interacting with the app
-
-- **Application Testing**:
-  - **Running the App**: Use `make portfolio` with sample data or `make folio` for a clean start
-  - **Manual Testing**: Test critical user flows after any UI or logic changes
 
 - **File Management**:
   - **Version Control**: Update .gitignore for new temporary files or directories
@@ -113,6 +89,12 @@ Write code that is clear, maintainable, and robust against edge cases.
   - **Sensible Defaults**: Provide reasonable defaults for all configurable options
   - **Validate Inputs**: Check and validate all external inputs and configuration
 
+- **Framework-Specific Patterns**:
+  - **Dash Callback Registration**: Always register callbacks in a centralized location in the app creation process
+  - **Explicit Registration**: Never rely on side effects of imports for critical functionality like callback registration
+  - **Avoid Duplicate Registration**: Be careful about registering callbacks multiple times, which can cause conflicts
+  - **Component Documentation**: Document the relationship between components and their callbacks
+
 ### 🛡️ Error Handling and Logging
 *Supports RELIABILITY and PRECISION*
 Handle errors gracefully and log information that helps diagnose issues quickly.
@@ -126,6 +108,7 @@ Handle errors gracefully and log information that helps diagnose issues quickly.
   - **Structured Messages**: Include context (e.g., "Failed to process AAPL: missing price data")
   - **Include Stack Traces**: For unexpected errors, use `exc_info=True`
   - **Distinguish States vs. Errors**: Log normal states as DEBUG/INFO, not as errors
+  - **Verification Logs**: Add logs that verify critical operations like callback registration by checking the app's callback_map
 
 - **Log Levels**:
   - **DEBUG**: Detailed flow information ("Processing portfolio entry 5 of 20")
@@ -150,9 +133,9 @@ Handle errors gracefully and log information that helps diagnose issues quickly.
 Thorough testing prevents bugs and ensures code behaves as expected in all scenarios.
 
 - **Testing Workflow**:
+  - **Run Linter Regularly**: Run `make lint` to check for code quality issues, unused imports/functions, and other potential problems
   - **Always Test Changes**: Run `make test` after ANY change - no exceptions!
   - **Check Test Logs**: Always review `logs/test_latest.log` after running tests to identify failures
-  - **Run Linter Regularly**: Run `make lint` to check for code quality issues, unused imports/functions, and other potential problems
   - **Fix Linting Issues**: Address linting errors before committing code to maintain code quality
   - **Automated vs. Manual Testing**:
     - For AI assistants: Only run `make test` and `make lint` to verify changes
@@ -176,6 +159,8 @@ Thorough testing prevents bugs and ensures code behaves as expected in all scena
   - **Test Naming**: Name tests specifically to the method/module being tested
   - **Test Public API**: Test only public functions to avoid coupling tests to implementation details
   - **Test Independence**: Each test should be independent and not rely on other tests
+  - **Fail-First Testing**: Write tests that fail first to confirm they're testing the right thing
+  - **Test Callback Registration**: For Dash apps, always include tests that verify callbacks are properly registered
 
 - **Writing Tests**:
   - **Test Structure**: Follow the Arrange-Act-Assert pattern
@@ -185,6 +170,8 @@ Thorough testing prevents bugs and ensures code behaves as expected in all scena
   - **Fixtures**: Create fixtures for common test setup
   - **Test Isolation**: Reset state between tests to prevent test interdependence
   - **Never Change Test Logic**: Fix implementation to make tests pass, not the other way around
+  - **Simple Tests**: Keep tests simple and focused on specific behaviors
+  - **Avoid Implementation Details**: Don't test implementation details like DOM structure that might change
 
 ### 📝 Documentation
 *Supports USABILITY and RELIABILITY*
@@ -199,6 +186,7 @@ Clear, accurate documentation helps onboard new developers and maintain institut
   - **Keep Updated**: Update documentation when code changes
   - **Code Comments**: Document complex logic and "why" decisions, not obvious code
   - **README Files**: Ensure each major component has a clear, concise README
+  - **Component Documentation**: Document component relationships and callback dependencies
 
 - **Development Planning**:
   - **Create Devplans**: Document detailed plans in `docs/devplan/` for significant features, design changes, or deployments
@@ -211,3 +199,4 @@ Clear, accurate documentation helps onboard new developers and maintain institut
   - **Devlog Format**: Include date, summary, implementation details, and lessons learned
   - **Technical Details**: Document key technical decisions, challenges overcome, and solutions implemented
   - **Future Considerations**: Note any follow-up tasks or potential improvements identified during implementation
+  - **Retrospectives**: Create retrospectives in `docs/retrospective/` for significant issues or challenges to document lessons learned
