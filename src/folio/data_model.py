@@ -478,6 +478,8 @@ class PortfolioGroup:
         )
         return self.net_exposure
 
+    # net_option_value property removed as it's based on unreliable market values
+
     # Option counts
     call_count: int = 0
     put_count: int = 0

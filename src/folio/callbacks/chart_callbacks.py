@@ -85,7 +85,7 @@ def register_chart_callbacks(app):
         ],
     )
     def update_asset_allocation_chart(
-        summary_data, value_clicks, percent_clicks, value_active, percent_active
+        summary_data, _value_clicks, _percent_clicks, value_active, percent_active
     ):
         """Update the asset allocation chart based on user selection."""
         if not summary_data:
@@ -159,7 +159,7 @@ def register_chart_callbacks(app):
         ],
     )
     def update_exposure_chart(
-        summary_data, net_clicks, beta_clicks, net_active, beta_active
+        summary_data, _net_clicks, _beta_clicks, net_active, beta_active
     ):
         """Update the exposure chart based on user selection."""
         if not summary_data:

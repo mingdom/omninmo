@@ -2,6 +2,7 @@ import dash_bootstrap_components as dbc
 from dash import html
 
 from ..data_model import PortfolioGroup
+from ..portfolio import calculate_position_weight
 from ..utils import format_beta, format_currency, format_percentage
 from .portfolio_table import get_group_ticker
 
@@ -62,8 +63,16 @@ def create_stock_section(group: PortfolioGroup) -> dbc.Card:
                                         [
                                             html.Strong("Portfolio Weight: "),
                                             html.Span(
-                                                format_percentage(stock.weight * 100)
-                                                if stock.weight is not None
+                                                # Calculate weight on the fly
+                                                format_percentage(
+                                                    calculate_position_weight(
+                                                        stock.market_exposure,
+                                                        group.net_exposure,
+                                                    )
+                                                    * 100
+                                                )
+                                                if stock.market_exposure is not None
+                                                and group.net_exposure
                                                 else "N/A"
                                             ),
                                         ]
@@ -191,16 +200,7 @@ def create_options_section(group: PortfolioGroup) -> dbc.Card:
                             ),
                         ]
                     ),
-                    html.P(
-                        [
-                            html.Strong("Net Option Value: "),
-                            html.Span(
-                                format_currency(group.net_option_value)
-                                if group.net_option_value is not None
-                                else "N/A"
-                            ),
-                        ]
-                    ),
+                    # Net Option Value removed - based on unreliable market values
                     html.P(
                         [
                             html.Strong("Total Delta Exposure: "),

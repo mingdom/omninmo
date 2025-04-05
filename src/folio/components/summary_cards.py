@@ -52,203 +52,122 @@ def format_summary_card_values(summary_data):
     Returns:
         Tuple of formatted values for all summary cards
     """
-    # Log the entire summary_data for debugging
-    logger.info(f"Formatting summary cards with data: {summary_data}")
+    logger.debug(f"Formatting summary cards with data: {summary_data}")
 
-    # Flag to track if we should return error values
-    show_error_values = False
-
-    # Ensure summary_data is a dictionary
+    # Return error values if summary_data is invalid
     if not summary_data or not isinstance(summary_data, dict):
         logger.error(f"Invalid summary data: {type(summary_data)}")
-        show_error_values = True
-
-    if not show_error_values:
-        # Check for required keys
-        required_keys = [
-            "portfolio_estimate_value",
-            "net_market_exposure",
-            "portfolio_beta",
-            "long_exposure",
-            "short_exposure",
-            "options_exposure",
-            "cash_like_value",
-        ]
-        missing_keys = [key for key in required_keys if key not in summary_data]
-        if missing_keys:
-            logger.error(f"Missing required keys in summary data: {missing_keys}")
-
-            # Try to fix missing portfolio_estimate_value
-            if (
-                "portfolio_estimate_value" in missing_keys
-                and "net_market_exposure" in summary_data
-                and "cash_like_value" in summary_data
-            ):
-                logger.warning(
-                    "portfolio_estimate_value not found in summary data, calculating it"
-                )
-                # Calculate it as net_market_exposure + cash_like_value
-                net_market_exposure = summary_data.get("net_market_exposure", 0.0)
-                cash_like_value = summary_data.get("cash_like_value", 0.0)
-                summary_data["portfolio_estimate_value"] = (
-                    net_market_exposure + cash_like_value
-                )
-                logger.info(
-                    f"Calculated portfolio_estimate_value: {summary_data['portfolio_estimate_value']}"
-                )
-                # Remove from missing keys if we fixed it
-                missing_keys.remove("portfolio_estimate_value")
-
-            # If we still have missing keys, show error values
-            if missing_keys:
-                logger.error(f"Still missing required keys after fixes: {missing_keys}")
-                show_error_values = True
-
-    if not show_error_values:
-        # Log all the keys in the summary_data
-        logger.info(f"Summary data keys: {list(summary_data.keys())}")
-
-        # Log the specific values we're going to use
-        logger.info(
-            f"Portfolio estimate value: {summary_data.get('portfolio_estimate_value')}"
-        )
-        logger.info(f"Net market exposure: {summary_data.get('net_market_exposure')}")
-        logger.info(f"Portfolio beta: {summary_data.get('portfolio_beta')}")
-
-        # Validate exposure dictionaries
-        for exposure_key in ["long_exposure", "short_exposure", "options_exposure"]:
-            if exposure_key not in summary_data:
-                logger.error(f"'{exposure_key}' key missing from summary_data")
-                show_error_values = True
-                break
-
-            if not isinstance(summary_data[exposure_key], dict):
-                logger.error(
-                    f"'{exposure_key}' is not a dictionary: {type(summary_data[exposure_key])}"
-                )
-                show_error_values = True
-                break
-
-            # Check for required sub-keys - support both old and new field names
-            required_sub_keys = []
-            if "total_beta_adjusted" not in summary_data[exposure_key]:
-                required_sub_keys.append("total_beta_adjusted")
-
-            if required_sub_keys:
-                logger.error(
-                    f"Missing required sub-keys in {exposure_key}: {required_sub_keys}"
-                )
-                show_error_values = True
-                break
-
-    if show_error_values:
         return error_values()
 
-    # Log exposure values
+    # Check for required keys
+    required_keys = [
+        "net_market_exposure",
+        "portfolio_beta",
+        "long_exposure",
+        "short_exposure",
+        "options_exposure",
+        "cash_like_value",
+    ]
+    missing_keys = [key for key in required_keys if key not in summary_data]
+
+    # Try to fix missing portfolio_estimate_value
+    if "portfolio_estimate_value" not in summary_data:
+        if "net_market_exposure" in summary_data and "cash_like_value" in summary_data:
+            net_market_exposure = summary_data.get("net_market_exposure", 0.0)
+            cash_like_value = summary_data.get("cash_like_value", 0.0)
+            summary_data["portfolio_estimate_value"] = (
+                net_market_exposure + cash_like_value
+            )
+            logger.debug(
+                f"Calculated portfolio_estimate_value: {summary_data['portfolio_estimate_value']}"
+            )
+        else:
+            missing_keys.append("portfolio_estimate_value")
+
+    # Return error values if any required keys are still missing
+    if missing_keys:
+        logger.error(f"Missing required keys in summary data: {missing_keys}")
+        return error_values()
+
     # Helper function to get exposure value (supports both total_exposure and total_value field names)
     def get_exposure_value(exposure_dict):
-        if "total_exposure" in exposure_dict:
-            return exposure_dict["total_exposure"]
-        elif "total_value" in exposure_dict:
-            return exposure_dict["total_value"]
-        return 0.0
+        if not isinstance(exposure_dict, dict):
+            return 0.0
+        return exposure_dict.get(
+            "total_exposure", exposure_dict.get("total_value", 0.0)
+        )
 
-    # Log the values we're using
-    logger.info(f"Long exposure: {get_exposure_value(summary_data['long_exposure'])}")
-    logger.info(
-        f"Long beta adjusted: {summary_data['long_exposure'].get('total_beta_adjusted')}"
-    )
-    logger.info(f"Short exposure: {get_exposure_value(summary_data['short_exposure'])}")
-    logger.info(
-        f"Short beta adjusted: {summary_data['short_exposure'].get('total_beta_adjusted')}"
-    )
-    logger.info(
-        f"Options exposure: {get_exposure_value(summary_data['options_exposure'])}"
-    )
-    logger.info(
-        f"Options beta adjusted: {summary_data['options_exposure'].get('total_beta_adjusted')}"
-    )
-    logger.info(f"Cash like value: {summary_data.get('cash_like_value')}")
-
-    # Get values with defaults to prevent KeyError
+    # Extract values with defaults
     portfolio_estimate_value = summary_data.get("portfolio_estimate_value", 0.0)
     net_market_exposure = summary_data.get("net_market_exposure", 0.0)
     portfolio_beta = summary_data.get("portfolio_beta", 0.0)
     cash_like_value = summary_data.get("cash_like_value", 0.0)
 
-    # Get exposure values with defaults
+    # Get exposure values
     long_exposure = summary_data.get("long_exposure", {})
     short_exposure = summary_data.get("short_exposure", {})
     options_exposure = summary_data.get("options_exposure", {})
 
-    # Get total exposure values with defaults (supporting both field names)
+    # Get total exposure values
     long_total_exposure = get_exposure_value(long_exposure)
-    long_total_beta_adjusted = long_exposure.get("total_beta_adjusted", 0.0)
     short_total_exposure = get_exposure_value(short_exposure)
-    short_total_beta_adjusted = short_exposure.get("total_beta_adjusted", 0.0)
     options_total_exposure = get_exposure_value(options_exposure)
+
+    # Get beta-adjusted values
+    long_total_beta_adjusted = long_exposure.get("total_beta_adjusted", 0.0)
+    short_total_beta_adjusted = short_exposure.get("total_beta_adjusted", 0.0)
     options_total_beta_adjusted = options_exposure.get("total_beta_adjusted", 0.0)
 
     # Calculate betas safely
-    if not show_error_values:
-        try:
-            long_beta = (
-                long_total_beta_adjusted / long_total_exposure
-                if long_total_exposure != 0
-                else 0
-            )
-            short_beta = (
-                short_total_beta_adjusted / short_total_exposure
-                if short_total_exposure != 0
-                else 0
-            )
-            options_beta = (
-                options_total_beta_adjusted / options_total_exposure
-                if options_total_exposure != 0
-                else 0
-            )
-        except Exception as e:
-            logger.error(f"Error calculating betas: {e}", exc_info=True)
-            show_error_values = True
+    try:
+        long_beta = (
+            long_total_beta_adjusted / long_total_exposure
+            if long_total_exposure != 0
+            else 0
+        )
+        short_beta = (
+            short_total_beta_adjusted / short_total_exposure
+            if short_total_exposure != 0
+            else 0
+        )
+        options_beta = (
+            options_total_beta_adjusted / options_total_exposure
+            if options_total_exposure != 0
+            else 0
+        )
+    except Exception as e:
+        logger.error(f"Error calculating betas: {e}")
+        return error_values()
 
     # Format the values for display
-    if not show_error_values:
-        try:
-            formatted_values = (
-                # Portfolio Value
-                utils.format_currency(portfolio_estimate_value),
-                # Net Exposure
-                utils.format_currency(net_market_exposure),
-                "",  # Removed percentage
-                # Net Beta
-                utils.format_beta(portfolio_beta),
-                # Long Exposure
-                utils.format_currency(long_total_exposure),
-                "",  # Removed percentage
-                utils.format_beta(long_beta),
-                # Short Exposure
-                utils.format_currency(short_total_exposure),
-                "",  # Removed percentage
-                utils.format_beta(short_beta),
-                # Options Exposure
-                utils.format_currency(options_total_exposure),
-                "",  # Removed percentage
-                utils.format_beta(options_beta),
-                # Cash & Equivalents
-                utils.format_currency(cash_like_value),
-                "",  # Removed percentage
-            )
-
-            # Log the formatted values
-            logger.info(f"Formatted values: {formatted_values}")
-
-            return formatted_values
-        except Exception as e:
-            logger.error(f"Error formatting values: {e}", exc_info=True)
-            show_error_values = True
-
-    # If we get here, we need to show error values
-    return error_values()
+    try:
+        return (
+            # Portfolio Value
+            utils.format_currency(portfolio_estimate_value),
+            # Net Exposure
+            utils.format_currency(net_market_exposure),
+            "",  # Removed percentage
+            # Net Beta
+            utils.format_beta(portfolio_beta),
+            # Long Exposure
+            utils.format_currency(long_total_exposure),
+            "",  # Removed percentage
+            utils.format_beta(long_beta),
+            # Short Exposure
+            utils.format_currency(short_total_exposure),
+            "",  # Removed percentage
+            utils.format_beta(short_beta),
+            # Options Exposure
+            utils.format_currency(options_total_exposure),
+            "",  # Removed percentage
+            utils.format_beta(options_beta),
+            # Cash & Equivalents
+            utils.format_currency(cash_like_value),
+            "",  # Removed percentage
+        )
+    except Exception as e:
+        logger.error(f"Error formatting values: {e}")
+        return error_values()
 
 
 def create_portfolio_value_card():
@@ -645,18 +564,18 @@ def register_callbacks(app):
     def update_summary_cards(summary_data):
         """Update summary cards with latest data"""
         logger.info("Updating summary cards")
-        logger.info(f"Summary data type: {type(summary_data)}")
+        logger.debug(f"Summary data type: {type(summary_data)}")
 
         # Log the structure of the summary data
         if summary_data:
-            logger.info("Summary data keys: %s", list(summary_data.keys()))
+            logger.debug("Summary data keys: %s", list(summary_data.keys()))
             for key in summary_data.keys():
                 if isinstance(summary_data[key], dict):
-                    logger.info(f"  {key} (dict): {list(summary_data[key].keys())}")
+                    logger.debug(f"  {key} (dict): {list(summary_data[key].keys())}")
                 elif isinstance(summary_data[key], list):
-                    logger.info(f"  {key} (list): {len(summary_data[key])} items")
+                    logger.debug(f"  {key} (list): {len(summary_data[key])} items")
                 else:
-                    logger.info(f"  {key}: {summary_data[key]}")
+                    logger.debug(f"  {key}: {summary_data[key]}")
         else:
             logger.warning("No summary data available, returning error values")
             return error_values()

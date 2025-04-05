@@ -22,7 +22,7 @@ from .components.charts import create_dashboard_section
 from .components.portfolio_table import create_portfolio_table
 from .components.position_details import create_position_details
 from .components.summary_cards import create_summary_cards
-from .data_model import OptionPosition, PortfolioGroup, Position, StockPosition
+from .data_model import OptionPosition, PortfolioGroup, StockPosition
 from .error_utils import handle_callback_error
 from .exceptions import StateError
 from .logger import logger
@@ -669,7 +669,7 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
                         stock_position_data.pop("sector")
                     if "is_cash_like" in stock_position_data:
                         stock_position_data.pop("is_cash_like")
-                    stock_position = Position(**stock_position_data)
+                    stock_position = StockPosition(**stock_position_data)
                 option_positions = [
                     OptionPosition(**opt) for opt in g["option_positions"]
                 ]
@@ -941,7 +941,7 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
                 stock_position_data.pop("sector")
             if "is_cash_like" in stock_position_data:
                 stock_position_data.pop("is_cash_like")
-            stock_position = Position(**stock_position_data)
+            stock_position = StockPosition(**stock_position_data)
 
         option_positions = [
             OptionPosition(**opt) for opt in position_data["option_positions"]
@@ -1037,7 +1037,7 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
             [State(f"{section}-collapse", "is_open")],
             prevent_initial_call=True,
         )
-        def toggle_chart_collapse(n_clicks, is_open, section=section):
+        def toggle_chart_collapse(n_clicks, is_open, _section=section):
             """Toggle the chart section collapse state"""
             if n_clicks:
                 # Toggle the collapse state

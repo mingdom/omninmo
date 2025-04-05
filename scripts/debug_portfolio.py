@@ -23,14 +23,15 @@ script_dir = Path(__file__).resolve().parent
 src_dir = script_dir.parent
 sys.path.append(str(src_dir))
 
-from src.folio.portfolio import process_portfolio_data
+# Import after adding to path
+from src.folio.portfolio import process_portfolio_data  # noqa: E402
 
 
-def print_section_header(title):
+def print_section_header(_title):
     """Print a section header with formatting."""
 
 
-def print_exposure_breakdown(name, breakdown):
+def print_exposure_breakdown(_name, breakdown):
     """Print details of an exposure breakdown."""
 
     # Calculate percentages
@@ -47,7 +48,6 @@ def print_exposure_breakdown(name, breakdown):
 def print_portfolio_summary(summary):
     """Print a detailed portfolio summary."""
     print_section_header("PORTFOLIO SUMMARY")
-
 
     # Calculate options metrics
     long_options = summary.long_exposure.option_delta_exposure
@@ -70,7 +70,6 @@ def print_portfolio_summary(summary):
     # Calculate options exposure (absolute sum of long and short)
     options_exposure = long_options + short_options
 
-
     # Print exposure breakdowns
     print_exposure_breakdown("LONG EXPOSURE", summary.long_exposure)
     print_exposure_breakdown("SHORT EXPOSURE", summary.short_exposure)
@@ -82,7 +81,6 @@ def print_portfolio_groups(groups):
     print_section_header("PORTFOLIO GROUPS")
 
     for _i, group in enumerate(groups):
-
         # Print stock position if available
         if group.stock_position:
             pass
@@ -120,7 +118,6 @@ def main():
     # Check if file exists
     if not os.path.exists(args.portfolio_path):
         sys.exit(1)
-
 
     try:
         # Load portfolio data

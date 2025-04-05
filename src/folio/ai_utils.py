@@ -4,6 +4,7 @@ import logging
 from typing import Any
 
 from .data_model import PortfolioGroup, PortfolioSummary
+from .portfolio import calculate_position_weight
 
 logger = logging.getLogger(__name__)
 
@@ -54,9 +55,9 @@ def prepare_portfolio_data_for_analysis(
                     "position_type": "stock",
                     "market_value": stock.market_value,
                     "beta": stock.beta,
-                    "weight": stock.market_value / summary.net_market_exposure
-                    if summary.net_market_exposure
-                    else 0,
+                    "weight": calculate_position_weight(
+                        stock.market_value, summary.net_market_exposure
+                    ),
                     "quantity": stock.quantity,
                 }
             )
@@ -69,9 +70,9 @@ def prepare_portfolio_data_for_analysis(
                     "position_type": "option",
                     "market_value": option.market_value,
                     "beta": option.beta,
-                    "weight": option.market_value / summary.net_market_exposure
-                    if summary.net_market_exposure
-                    else 0,
+                    "weight": calculate_position_weight(
+                        option.market_value, summary.net_market_exposure
+                    ),
                     "option_type": option.option_type,
                     "strike": option.strike,
                     "expiry": option.expiry,

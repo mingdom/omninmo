@@ -2,11 +2,13 @@
 
 **Date:** 2025-04-05
 **Author:** Augment AI Assistant
-**Status:** Proposed
+**Status:** Completed
 
 ## Overview
 
-This development plan outlines a comprehensive refactoring of the Folio data model to transition from value-based metrics to exposure-based metrics. The refactoring is necessary because value cannot be accurately calculated for options, making exposure-based metrics more appropriate for a unified view of portfolio risk.
+This development plan outlines a comprehensive refactoring of the Folio data model to transition from value-based metrics to exposure-based metrics. The refactoring is necessary because **we cannot calculate value accurately**. Portfolio values in CSV files are constantly changing, making them unreliable for risk assessment. Instead, we must focus exclusively on market exposure as our core metric.
+
+This refactoring aligns with the fundamental principle outlined in the [Market Exposure Critical Analysis](./2025-04-04-market-exposure-critical-analysis.md) document.
 
 ## Background
 
@@ -14,12 +16,30 @@ The Folio application has been transitioning from value-based metrics (e.g., `ma
 
 These inconsistencies are causing errors in the application, particularly in the AI integration features where the old field names are still being used.
 
+## Core Principles
+
+1. **WE CANNOT CALCULATE VALUE ACCURATELY**: This is the most critical insight that drives our entire approach. Portfolio values in CSV files are constantly changing, making them unreliable for risk assessment.
+
+2. **Focus on Exposure-Based Metrics**: We must focus exclusively on market exposure as our core metric:
+   - For stocks: Exposure = Quantity × Current Price × Beta
+   - For options: Exposure = Delta × 100 × Underlying Price × Quantity × Underlying Beta
+
+3. **Consistent Terminology**: We must use consistent naming throughout the codebase:
+   - Eliminate all references to "value" when we mean "exposure"
+   - Be explicit about what each metric represents
+
+4. **Proper Cash Handling**: Cash has zero market exposure (beta = 0) and should be tracked separately from market exposure.
+
+5. **Accurate Short Percentage Calculation**: Should be calculated as: (Short Exposure / Gross Market Exposure) × 100
+
 ## Current Issues
 
 1. **Inconsistent Field Names**: Some classes use `market_value` while others use `market_exposure` for the same concept
 2. **Missing Backward Compatibility**: Classes have been updated without providing backward compatibility for code that still uses the old field names
 3. **Incomplete Refactoring**: Some parts of the codebase have been updated to use the new field names while others have not
 4. **Test Failures**: Tests are failing because they use the old field names that no longer exist in the updated classes
+5. **Missing Fields**: Some code is trying to access fields that don't exist in the data model, such as `weight` in the `Position` class
+6. **UI Errors**: The position details modal is failing because it's trying to access the `weight` attribute that doesn't exist
 
 ## Goals
 
@@ -32,6 +52,14 @@ These inconsistencies are causing errors in the application, particularly in the
 ## Field Mapping and Action Items
 
 Below is a comprehensive list of all fields that need to be addressed, organized by class:
+
+### Position
+
+| Old Field | New Field | Action |
+|-----------|-----------|--------|
+| `market_value` | `market_exposure` | ✅ Added property that returns `market_exposure` with deprecation warning |
+| | | ✅ Updated constructor to accept `market_value` parameter |
+| `weight` | N/A | ✅ Created a utility function `calculate_position_weight` in `portfolio.py` to calculate this value on the fly |
 
 ### StockPosition
 
@@ -105,20 +133,21 @@ Below is a comprehensive list of all fields that need to be addressed, organized
 2. ✅ Add backward compatibility to `OptionPosition` for `market_value`
 3. ✅ Add backward compatibility to `PortfolioGroup` for `total_value`
 4. ✅ Add backward compatibility to `ExposureBreakdown` for `stock_value`, `option_delta_value`, and `total_value`
-5. ❌ Rename all usages of `total_exposure` and `net_exposure` to `net_market_exposure` in `PortfolioSummary` without compatibility layer
-6. ❌ Remove all usages of `exposure_reduction_percentage` field
+5. ✅ Rename all usages of `total_exposure` and `net_exposure` to `net_market_exposure` in `PortfolioSummary` without compatibility layer
+6. ✅ Remove all usages of `exposure_reduction_percentage` field
+7. ✅ Created a utility function `calculate_position_weight` in `portfolio.py` and updated `position_details.py` and `ai_utils.py` to use it
 
 ### Phase 2: Update AI Utils
 
-1. ❌ Rename all usages of `total_exposure` to `net_market_exposure` in `ai_utils.py` without compatibility layer
+1. ✅ Renamed all usages of `total_exposure` to `net_market_exposure` in `ai_utils.py` without compatibility layer
 2. ✅ Keep using other old field names with compatibility layers (will log warnings)
-3. ❌ Update tests to verify that the AI utils work with the compatibility layers
+3. ✅ Updated tests to verify that the AI utils work with the compatibility layers
 
 ### Phase 3: Update Tests
 
-1. ❌ Rename all usages of `total_exposure` and `net_exposure` to `net_market_exposure` in tests without compatibility layer
-2. ❌ Add tests that verify backward compatibility works correctly
-3. ❌ Add tests that verify deprecation warnings are issued when using old field names
+1. ✅ Renamed all usages of `total_exposure` and `net_exposure` to `net_market_exposure` in tests without compatibility layer
+2. ✅ Added tests that verify backward compatibility works correctly
+3. ✅ Added tests that verify deprecation warnings are issued when using old field names
 
 ### Phase 4: Documentation and Cleanup
 

@@ -833,21 +833,21 @@ def calculate_portfolio_summary(
         )
 
         # 3. Options exposure (net delta exposure from all options)
-        net_option_value = long_option_value - short_option_value
+        net_delta_exposure = long_option_value - short_option_value
         net_option_beta_adj = long_option_beta_adj - short_option_beta_adj
         options_exposure = ExposureBreakdown(
             stock_exposure=0,  # Options only view
             stock_beta_adjusted=0,
-            option_delta_exposure=net_option_value,
+            option_delta_exposure=net_delta_exposure,
             option_beta_adjusted=net_option_beta_adj,
-            total_exposure=net_option_value,
+            total_exposure=net_delta_exposure,
             total_beta_adjusted=net_option_beta_adj,
             description="Net delta exposure from options",
             formula="Long Options Delta - Short Options Delta",
             components={
                 "Long Options Delta Exp": long_option_value,
                 "Short Options Delta Exp": short_option_value,
-                "Net Options Delta Exp": net_option_value,
+                "Net Options Delta Exp": net_delta_exposure,
             },
         )
 
@@ -998,6 +998,23 @@ def log_summary_details(summary: PortfolioSummary):
         f"  Net Delta: {format_currency(summary.options_exposure.components.get('Net Options Delta Exp', 0))}"
     )
     logger.info("--------------------------------")
+
+
+def calculate_position_weight(
+    position_market_exposure: float, portfolio_net_exposure: float
+) -> float:
+    """Calculate a position's weight in the portfolio.
+
+    Args:
+        position_market_exposure: The market exposure of the position
+        portfolio_net_exposure: The net market exposure of the entire portfolio
+
+    Returns:
+        The position's weight as a decimal (0.0 to 1.0)
+    """
+    if not portfolio_net_exposure:
+        return 0.0
+    return position_market_exposure / portfolio_net_exposure
 
 
 def calculate_position_metrics(group: PortfolioGroup) -> dict:
