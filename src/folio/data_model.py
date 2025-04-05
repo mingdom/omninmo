@@ -393,7 +393,6 @@ class PortfolioSummary:
 
     # Market exposure metrics (excluding cash)
     net_market_exposure: float  # Long - Short (excluding cash)
-    gross_market_exposure: float  # Long + Short (excluding cash)
     portfolio_beta: float  # Weighted average beta of all positions
 
     # Exposure breakdowns
@@ -402,16 +401,16 @@ class PortfolioSummary:
     options_exposure: ExposureBreakdown  # Detailed breakdown of option exposures
 
     # Derived metrics
-    short_percentage: float  # Short / Gross Market Exposure
+    short_percentage: float  # Short / (Long + Short)
 
     # Cash metrics (separate from market exposure)
     cash_like_positions: list[StockPosition] = None  # List of cash positions
     cash_like_value: float = 0.0  # Total value of cash positions
     cash_like_count: int = 0  # Number of cash positions
-    cash_percentage: float = 0.0  # Cash / (Cash + Gross Market Exposure)
+    cash_percentage: float = 0.0  # Cash / Portfolio Estimated Value
 
-    # Total portfolio size (for reference only)
-    total_portfolio_size: float = 0.0  # Gross Market Exposure + Cash
+    # Portfolio estimated value (for reference only)
+    portfolio_estimate_value: float = 0.0  # Net Market Exposure + Cash
 
     # Help text for each metric
     help_text: dict[str, str] | None = None
@@ -423,11 +422,6 @@ class PortfolioSummary:
                 Net market exposure (Long - Short, excluding cash)
                 Formula: Long exposure - Short exposure
                 Represents the directional risk in the portfolio
-            """,
-            "gross_market_exposure": """
-                Gross market exposure (Long + Short, excluding cash)
-                Formula: Long exposure + Short exposure
-                Represents the total market risk regardless of direction
             """,
             "portfolio_beta": """
                 Portfolio's overall market sensitivity
@@ -459,7 +453,7 @@ class PortfolioSummary:
             """,
             "short_percentage": """
                 Percentage of portfolio in short positions
-                Formula: Short exposure / Gross market exposure
+                Formula: Short exposure / (Long exposure + Short exposure)
                 Represents the portion of market risk that is short
             """,
             "cash_like_positions": """
@@ -478,12 +472,12 @@ class PortfolioSummary:
             """,
             "cash_percentage": """
                 Percentage of portfolio in cash or cash equivalents
-                Formula: Cash value / Total portfolio size
+                Formula: Cash value / Portfolio estimated value
                 Represents the defensive/liquid portion of the portfolio
             """,
-            "total_portfolio_size": """
-                Total size of the portfolio including cash
-                Formula: Gross market exposure + Cash value
+            "portfolio_estimate_value": """
+                Estimated value of the portfolio including cash
+                Formula: Net market exposure + Cash value
                 Represents the total capital deployed
             """,
         }

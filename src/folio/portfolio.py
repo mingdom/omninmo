@@ -736,7 +736,6 @@ def calculate_portfolio_summary(
 
         return PortfolioSummary(
             net_market_exposure=0.0,
-            gross_market_exposure=0.0,
             portfolio_beta=0.0,
             long_exposure=empty_exposure,
             short_exposure=empty_exposure,
@@ -746,7 +745,7 @@ def calculate_portfolio_summary(
             cash_like_value=0.0,
             cash_like_count=0,
             cash_percentage=0.0,
-            total_portfolio_size=0.0,
+            portfolio_estimate_value=0.0,
         )
 
     try:
@@ -853,10 +852,13 @@ def calculate_portfolio_summary(
 
         # Calculate portfolio metrics
         # 1. Market exposure metrics
+        # Note: short_exposure is already stored as a positive value, so we need to subtract it
         net_market_exposure = (
             long_exposure.total_exposure - short_exposure.total_exposure
         )
-        gross_market_exposure = (
+        # Calculate total market exposure (excluding cash)
+        # This is used for percentage calculations
+        total_market_exposure = (
             long_exposure.total_exposure + short_exposure.total_exposure
         )
 
@@ -871,10 +873,10 @@ def calculate_portfolio_summary(
         )
 
         # 3. Exposure percentages
-        # Calculate short percentage as a percentage of the gross market exposure
+        # Calculate short percentage as a percentage of the total market exposure
         short_percentage = (
-            (short_exposure.total_exposure / gross_market_exposure) * 100
-            if gross_market_exposure > 0
+            (short_exposure.total_exposure / total_market_exposure) * 100
+            if total_market_exposure > 0
             else 0.0
         )
 
@@ -896,11 +898,11 @@ def calculate_portfolio_summary(
             for pos in cash_like_positions
         ]
 
-        # Calculate total portfolio size and cash percentage
-        total_portfolio_size = gross_market_exposure + cash_like_value
+        # Calculate portfolio estimated value and cash percentage
+        portfolio_estimate_value = net_market_exposure + cash_like_value
         cash_percentage = (
-            (cash_like_value / total_portfolio_size * 100)
-            if total_portfolio_size > 0
+            (cash_like_value / portfolio_estimate_value * 100)
+            if portfolio_estimate_value > 0
             else 0.0
         )
 
@@ -909,13 +911,12 @@ def calculate_portfolio_summary(
                 f"Adding {cash_like_count} cash positions worth {format_currency(cash_like_value)}"
             )
             logger.info(
-                f"Cash represents {cash_percentage:.2f}% of the total portfolio size"
+                f"Cash represents {cash_percentage:.2f}% of the portfolio estimated value"
             )
 
         # Create and return the portfolio summary
         summary = PortfolioSummary(
             net_market_exposure=net_market_exposure,
-            gross_market_exposure=gross_market_exposure,
             portfolio_beta=portfolio_beta,
             long_exposure=long_exposure,
             short_exposure=short_exposure,
@@ -925,7 +926,7 @@ def calculate_portfolio_summary(
             cash_like_value=cash_like_value,
             cash_like_count=cash_like_count,
             cash_percentage=cash_percentage,
-            total_portfolio_size=total_portfolio_size,
+            portfolio_estimate_value=portfolio_estimate_value,
         )
 
         logger.info("Portfolio summary created successfully.")
@@ -952,11 +953,9 @@ def log_summary_details(summary: PortfolioSummary):
     # Portfolio overview
     logger.info("--- Portfolio Summary ---")
     logger.info(f"Net Market Exposure: {format_currency(summary.net_market_exposure)}")
+
     logger.info(
-        f"Gross Market Exposure: {format_currency(summary.gross_market_exposure)}"
-    )
-    logger.info(
-        f"Total Portfolio Size: {format_currency(summary.total_portfolio_size)}"
+        f"Portfolio Estimated Value: {format_currency(summary.portfolio_estimate_value)}"
     )
     logger.info(f"Beta: {format_beta(summary.portfolio_beta)}")
     logger.info(f"Short %: {summary.short_percentage:.1f}%")
