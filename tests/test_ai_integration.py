@@ -71,8 +71,7 @@ class TestAIIntegration:
 
         # Create portfolio summary
         summary = PortfolioSummary(
-            total_value_net=16500.0,
-            total_value_abs=16500.0,
+            total_exposure=16500.0,
             portfolio_beta=1.2,
             long_exposure=exposure,
             short_exposure=exposure,
@@ -112,7 +111,7 @@ class TestAIIntegration:
         assert option_data["strike"] == 150.0
 
         # Verify summary data
-        assert ai_data["summary"]["total_value_net"] == 16500.0
+        assert ai_data["summary"]["total_exposure"] == 16500.0
         assert ai_data["summary"]["portfolio_beta"] == 1.2
         assert "long_exposure" in ai_data["summary"]
         assert "short_exposure" in ai_data["summary"]
@@ -175,8 +174,7 @@ class TestAIIntegration:
 
         # Create portfolio summary
         summary = PortfolioSummary(
-            total_value_net=16500.0,
-            total_value_abs=16500.0,
+            total_exposure=16500.0,
             portfolio_beta=1.2,
             long_exposure=exposure,
             short_exposure=exposure,
@@ -200,7 +198,7 @@ class TestAIIntegration:
 
         # Test that PortfolioSummary.from_dict works with this data
         restored_summary = PortfolioSummary.from_dict(summary_data)
-        assert restored_summary.total_value_net == 16500.0
+        assert restored_summary.total_exposure == 16500.0
         assert restored_summary.portfolio_beta == 1.2
 
         # Test prepare_portfolio_data_for_analysis with the restored objects

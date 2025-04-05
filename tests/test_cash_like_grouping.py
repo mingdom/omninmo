@@ -91,8 +91,13 @@ def test_portfolio_summary_cash_like_metrics():
     assert summary.cash_like_positions[0].ticker == "SPAXX"
     assert summary.cash_like_positions[0].market_value == 1000.00
 
-    # Check that the cash-like value is included in the total value
-    assert summary.total_value_abs >= summary.cash_like_value
+    # Check that the cash-like value is included in the total size
+    total_size = (
+        summary.long_exposure.total_value
+        + summary.short_exposure.total_value
+        + summary.cash_like_value
+    )
+    assert total_size >= summary.cash_like_value
 
 
 def test_empty_portfolio():
@@ -146,8 +151,8 @@ def test_only_cash_portfolio():
     assert summary.cash_like_count == 3
     assert summary.cash_like_value == 6000.00  # Sum of all values
 
-    # Check that the total value equals the cash-like value
-    assert summary.total_value_abs == summary.cash_like_value
+    # Check that the total exposure equals the cash-like value for an all-cash portfolio
+    assert summary.total_exposure == summary.cash_like_value
 
     # Check that the portfolio beta is 0
     assert summary.portfolio_beta == 0.0

@@ -21,77 +21,86 @@ def transform_for_asset_allocation(
         use_percentage: Whether to use percentage values (True) or absolute values (False)
 
     Returns:
-        Dict containing data and layout for the pie chart
+        Dict containing data and layout for the stacked bar chart
     """
     logger.debug("Transforming data for asset allocation chart")
 
     # Extract values from portfolio summary
-    long_stock_value = portfolio_summary.long_exposure.stock_value
-    short_stock_value = abs(portfolio_summary.short_exposure.stock_value)
-    long_option_value = portfolio_summary.long_exposure.option_delta_value
-    short_option_value = abs(portfolio_summary.short_exposure.option_delta_value)
+    long_stock_value = portfolio_summary.long_exposure.stock_exposure
+    long_option_value = portfolio_summary.long_exposure.option_delta_exposure
+    short_stock_value = abs(portfolio_summary.short_exposure.stock_exposure)
+    short_option_value = abs(portfolio_summary.short_exposure.option_delta_exposure)
     cash_like_value = portfolio_summary.cash_like_value
 
-    # Create labels and values arrays
-    labels = [
-        "Long Stocks",
-        "Short Stocks",
-        "Long Options",
-        "Short Options",
-        "Cash-like",
-    ]
-    values = [
-        long_stock_value,
-        short_stock_value,
-        long_option_value,
-        short_option_value,
-        cash_like_value,
-    ]
+    # Create data for the three bars: long exposure, short exposure, and cash
+    long_exposure = long_stock_value + long_option_value
+    short_exposure = short_stock_value + short_option_value
 
-    # Add options exposure as a separate category
-    labels.append("Options Exposure")
-    values.append(portfolio_summary.options_exposure.total_value)
+    # Create the stacked bar chart data
+    categories = ["Long Exposure", "Short Exposure", "Cash & Bonds"]
 
-    # Calculate total for percentage calculation
-    total_value = sum(values)
+    # Values for each category
+    values = [long_exposure, short_exposure, cash_like_value]
 
-    # Convert to percentages if requested
+    # Note: In the future, we could implement stacked bars for each category
+    # to show the breakdown of stocks vs options within each exposure type
+
+    # Format text for display
     if use_percentage:
-        values = [(v / total_value) * 100 for v in values]
-        text_values = [f"{v:.1f}%" for v in values]
+        total_value = sum(values)
         title_text = "Asset Allocation (% of Portfolio)"
-    else:
-        text_values = [format_currency(value) for value in values]
-        title_text = "Asset Allocation (Value)"
 
-    # Create the chart data
+        def text_format(v):
+            return f"{(v / total_value * 100):.1f}%" if total_value > 0 else "0.0%"
+    else:
+        title_text = "Asset Allocation (Exposure)"
+        text_format = format_currency
+
+    # Create the chart data with three separate traces
     chart_data = {
         "data": [
+            # Long Exposure Bar
             {
-                "type": "pie",
-                "labels": labels,
-                "values": values,
-                "text": text_values,
-                "textinfo": "label+text",
-                "hoverinfo": "label+text+percent",
-                "marker": {
-                    "colors": [
-                        "#4CAF50",  # Green for long stocks
-                        "#F44336",  # Red for short stocks
-                        "#2196F3",  # Blue for long options
-                        "#FF9800",  # Orange for short options
-                        "#9E9E9E",  # Grey for cash
-                        "#673AB7",  # Purple for options exposure
-                    ]
-                },
-            }
+                "type": "bar",
+                "name": "Long Exposure",
+                "x": [categories[0]],
+                "y": [values[0]],
+                "text": [text_format(values[0])],
+                "textposition": "auto",
+                "marker": {"color": "#4CAF50"},  # Green for long
+                "hoverinfo": "text",
+            },
+            # Short Exposure Bar
+            {
+                "type": "bar",
+                "name": "Short Exposure",
+                "x": [categories[1]],
+                "y": [values[1]],
+                "text": [text_format(values[1])],
+                "textposition": "auto",
+                "marker": {"color": "#F44336"},  # Red for short
+                "hoverinfo": "text",
+            },
+            # Cash Bar
+            {
+                "type": "bar",
+                "name": "Cash & Bonds",
+                "x": [categories[2]],
+                "y": [values[2]],
+                "text": [text_format(values[2])],
+                "textposition": "auto",
+                "marker": {"color": "#9E9E9E"},  # Grey for cash
+                "hoverinfo": "text",
+            },
         ],
         "layout": {
             "title": title_text,
             "showlegend": True,
             "legend": {"orientation": "h", "y": -0.1},
-            "margin": {"l": 0, "r": 0, "t": 30, "b": 0},
-            "autosize": True,  # Allow the chart to resize with its container
+            "margin": {"l": 50, "r": 20, "t": 50, "b": 50},
+            "autosize": True,
+            "barmode": "group",
+            "yaxis": {"title": "Exposure" if not use_percentage else "Percentage"},
         },
     }
 
@@ -118,9 +127,9 @@ def transform_for_exposure_chart(
         short_value = portfolio_summary.short_exposure.total_beta_adjusted
         options_value = portfolio_summary.options_exposure.total_beta_adjusted
     else:
-        long_value = portfolio_summary.long_exposure.total_value
-        short_value = portfolio_summary.short_exposure.total_value
-        options_value = portfolio_summary.options_exposure.total_value
+        long_value = portfolio_summary.long_exposure.total_exposure
+        short_value = portfolio_summary.short_exposure.total_exposure
+        options_value = portfolio_summary.options_exposure.total_exposure
 
     # Calculate net value
     net_value = (
@@ -154,7 +163,7 @@ def transform_for_exposure_chart(
             "title": "Market Exposure"
             + (" (Beta-Adjusted)" if use_beta_adjusted else ""),
             "xaxis": {"title": "Exposure Type"},
-            "yaxis": {"title": "Value ($)"},
+            "yaxis": {"title": "Exposure ($)"},
             "margin": {"l": 50, "r": 20, "t": 30, "b": 50},
             "autosize": True,  # Allow the chart to resize with its container
         },
@@ -200,12 +209,12 @@ def transform_for_treemap(
 
         # Add stock position exposure
         if group.stock_position:
-            # Use market value for stocks
-            exposure += group.stock_position.market_value
+            # Use market exposure for stocks
+            exposure += group.stock_position.market_exposure
 
-        # Add option positions exposure (market value)
+        # Add option positions exposure (delta exposure)
         for option in group.option_positions:
-            exposure += option.market_value
+            exposure += option.delta_exposure
 
         # Store the net exposure value for sizing (not absolute)
         ticker_exposures[ticker] = exposure

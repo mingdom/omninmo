@@ -228,8 +228,7 @@ class TestDataModelSerialization:
 
         # Create portfolio summary
         summary = PortfolioSummary(
-            total_value_net=21050.0,
-            total_value_abs=21050.0,
+            total_exposure=21050.0,
             portfolio_beta=0.91,
             long_exposure=exposure,
             short_exposure=exposure,
@@ -248,8 +247,7 @@ class TestDataModelSerialization:
         summary_restored = PortfolioSummary.from_dict(summary_dict)
 
         # Verify key attributes
-        assert summary_restored.total_value_net == summary.total_value_net
-        assert summary_restored.total_value_abs == summary.total_value_abs
+        assert summary_restored.total_exposure == summary.total_exposure
         assert summary_restored.portfolio_beta == summary.portfolio_beta
         assert summary_restored.short_percentage == summary.short_percentage
         assert (
@@ -344,8 +342,7 @@ class TestDataModelSerialization:
 
         # Create portfolio summary
         summary = PortfolioSummary(
-            total_value_net=16500.0,
-            total_value_abs=16500.0,
+            total_exposure=16500.0,
             portfolio_beta=1.2,
             long_exposure=exposure,
             short_exposure=exposure,
@@ -369,5 +366,5 @@ class TestDataModelSerialization:
         assert len(restored_groups) == 1
         assert restored_groups[0].ticker == "AAPL"
         assert restored_groups[0].total_value == 16500.0
-        assert restored_summary.total_value_net == 16500.0
+        assert restored_summary.total_exposure == 16500.0
         assert restored_summary.portfolio_beta == 1.2

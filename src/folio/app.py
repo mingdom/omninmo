@@ -797,69 +797,80 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
                     + ["$0.00", "0.0%"]
                 )
 
-            # Use total_value_abs for percentage calculations as it represents the total size
-            total_abs = summary_data["total_value_abs"]
-            total_net = summary_data["total_value_net"]
+            # Get the market exposure metrics
+            net_market_exposure = summary_data.get("net_market_exposure", 0.0)
+            gross_market_exposure = summary_data.get("gross_market_exposure", 0.0)
+            total_portfolio_size = summary_data.get("total_portfolio_size", 0.0)
 
-            # Calculate percentages relative to total portfolio value
-            net_percent = (total_net / total_abs * 100) if total_abs != 0 else 0.0
+            # Get percentages directly from the summary data
+            net_percent = (
+                summary_data.get("net_market_exposure", 0.0)
+                / total_portfolio_size
+                * 100
+                if total_portfolio_size > 0
+                else 0.0
+            )
             long_percent = (
-                (summary_data["long_exposure"]["total_value"] / total_abs * 100)
-                if total_abs != 0
+                summary_data["long_exposure"]["total_exposure"]
+                / total_portfolio_size
+                * 100
+                if total_portfolio_size > 0
                 else 0.0
             )
             short_percent = (
-                (abs(summary_data["short_exposure"]["total_value"]) / total_abs * 100)
-                if total_abs != 0
+                abs(summary_data["short_exposure"]["total_exposure"])
+                / total_portfolio_size
+                * 100
+                if total_portfolio_size > 0
                 else 0.0
             )
             options_percent = (
-                (summary_data["options_exposure"]["total_value"] / total_abs * 100)
-                if total_abs != 0
+                summary_data["options_exposure"]["total_exposure"]
+                / total_portfolio_size
+                * 100
+                if total_portfolio_size > 0
                 else 0.0
             )
-            cash_like_percent = (
-                (summary_data["cash_like_value"] / total_abs * 100)
-                if total_abs != 0
-                else 0.0
-            )
+            cash_percent = summary_data.get("cash_percentage", 0.0)
 
             return [
                 # Net Exposure
-                utils.format_currency(total_net),
-                f"{net_percent:.1f}%",
+                utils.format_currency(summary_data["net_market_exposure"]),
+                "",  # Removed percentage
                 # Net Beta
                 utils.format_beta(summary_data["portfolio_beta"]),
                 # Long Exposure
-                utils.format_currency(summary_data["long_exposure"]["total_value"]),
-                f"{long_percent:.1f}%",
+                utils.format_currency(summary_data["long_exposure"]["total_exposure"]),
+                "",  # Removed percentage
                 utils.format_beta(
                     summary_data["long_exposure"]["total_beta_adjusted"]
-                    / summary_data["long_exposure"]["total_value"]
-                    if summary_data["long_exposure"]["total_value"] != 0
+                    / summary_data["long_exposure"]["total_exposure"]
+                    if summary_data["long_exposure"]["total_exposure"] != 0
                     else 0
                 ),
                 # Short Exposure
-                utils.format_currency(summary_data["short_exposure"]["total_value"]),
-                f"{short_percent:.1f}%",
+                utils.format_currency(summary_data["short_exposure"]["total_exposure"]),
+                "",  # Removed percentage
                 utils.format_beta(
                     summary_data["short_exposure"]["total_beta_adjusted"]
-                    / summary_data["short_exposure"]["total_value"]
-                    if summary_data["short_exposure"]["total_value"] != 0
+                    / summary_data["short_exposure"]["total_exposure"]
+                    if summary_data["short_exposure"]["total_exposure"] != 0
                     else 0
                 ),
                 # Options Exposure
-                utils.format_currency(summary_data["options_exposure"]["total_value"]),
-                f"{options_percent:.1f}%",
+                utils.format_currency(
+                    summary_data["options_exposure"]["total_exposure"]
+                ),
+                "",  # Removed percentage
                 utils.format_beta(
                     summary_data["options_exposure"]["total_beta_adjusted"]
-                    / summary_data["options_exposure"]["total_value"]
-                    if summary_data["options_exposure"]["total_value"] != 0
+                    / summary_data["options_exposure"]["total_exposure"]
+                    if summary_data["options_exposure"]["total_exposure"] != 0
                     else 0
                 ),
                 # Cash & Equivalents
                 utils.format_currency(summary_data["cash_like_value"]),
-                f"{cash_like_percent:.1f}%",
+                "",  # Removed percentage
             ]
 
         except Exception as e:
@@ -929,7 +940,6 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
                     ticker=g["ticker"],
                     stock_position=stock_position,
                     option_positions=option_positions,
-                    total_value=g["total_value"],
                     net_exposure=g["net_exposure"],
                     beta=g["beta"],
                     beta_adjusted_exposure=g["beta_adjusted_exposure"],
@@ -955,8 +965,10 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
                     stock_pos = StockPosition(
                         ticker=pos["ticker"],
                         quantity=pos["quantity"],
-                        market_value=pos["market_value"],
                         beta=pos["beta"],
+                        market_exposure=pos.get(
+                            "market_exposure", pos.get("market_value", 0.0)
+                        ),  # Use market_exposure or fall back to market_value
                         beta_adjusted_exposure=pos["beta_adjusted_exposure"],
                     )
 
@@ -965,8 +977,9 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
                         ticker=pos["ticker"],
                         stock_position=stock_pos,
                         option_positions=[],
-                        total_value=pos["market_value"],
-                        net_exposure=pos["market_value"],
+                        net_exposure=pos.get(
+                            "market_exposure", pos.get("market_value", 0.0)
+                        ),
                         beta=pos["beta"],
                         beta_adjusted_exposure=pos["beta_adjusted_exposure"],
                         total_delta_exposure=0.0,

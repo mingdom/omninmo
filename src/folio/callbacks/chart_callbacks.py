@@ -170,10 +170,10 @@ def register_chart_callbacks(app):
             # Determine which view to use based on button clicks
             ctx = dash.callback_context
             if not ctx.triggered:
-                # Default to net exposure view
-                use_beta_adjusted = False
-                net_active = True
-                beta_active = False
+                # Default to beta-adjusted view
+                use_beta_adjusted = True
+                net_active = False
+                beta_active = True
             else:
                 button_id = ctx.triggered[0]["prop_id"].split(".")[0]
                 if button_id == "exposure-net-btn":

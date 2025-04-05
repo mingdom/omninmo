@@ -116,6 +116,16 @@
    - Cash should be tracked separately from market exposure
    - Cash should be included in total portfolio size but not in exposure calculations
    - Positions should be combined regardless of account type (Margin vs Cash)
+   - **Analysis of Net Exposure Calculation**: Our current implementation calculates net_market_exposure as (long_exposure - short_exposure), which already includes both stocks and options but explicitly excludes cash. Specifically:
+     - long_exposure.total_exposure = long_stock_value + long_option_value
+     - short_exposure.total_exposure = short_stock_value + short_option_value
+     - net_market_exposure = long_exposure.total_exposure - short_exposure.total_exposure
+
+     This is the correct approach because:
+     - Cash and cash-like instruments have minimal market correlation (beta ≈ 0)
+     - Including cash would artificially inflate the market exposure metrics
+     - Cash is properly tracked separately via cash_percentage and cash_like_value
+     - Total portfolio size (gross_market_exposure + cash_like_value) provides the complete picture
 
 5. **Accurate Short Percentage Calculation**:
    - Should be calculated as: (Short Exposure / Gross Market Exposure) × 100

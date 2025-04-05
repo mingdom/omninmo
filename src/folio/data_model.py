@@ -8,12 +8,9 @@ class PositionDict(TypedDict):
     ticker: str
     position_type: Literal["stock", "option"]
     quantity: float
-    market_value: float
     beta: float
     beta_adjusted_exposure: float
-    clean_value: float
-    weight: float
-    position_beta: float
+    market_exposure: float  # Quantity * Current Price (fetched at runtime)
 
 
 class StockPositionDict(PositionDict):
@@ -33,23 +30,23 @@ class OptionPositionDict(PositionDict):
     expiry: str
     option_type: Literal["CALL", "PUT"]
     delta: float
-    delta_exposure: float
-    notional_value: float
+    delta_exposure: float  # Delta * Notional Value * sign(Quantity)
+    notional_value: float  # 100 * Underlying Price * |Quantity|
     underlying_beta: float
 
 
 class ExposureBreakdownDict(TypedDict):
     """Type definition for exposure breakdown dictionary"""
 
-    stock_value: float
-    stock_beta_adjusted: float
-    option_delta_value: float
-    option_beta_adjusted: float
-    total_value: float
-    total_beta_adjusted: float
-    description: str
-    formula: str
-    components: dict[str, float]
+    stock_exposure: float  # Represents the market exposure from stock positions
+    stock_beta_adjusted: float  # Risk-adjusted stock exposure
+    option_delta_exposure: float  # Represents the market exposure from option positions
+    option_beta_adjusted: float  # Risk-adjusted option exposure
+    total_exposure: float  # Combined market exposure from stocks and options
+    total_beta_adjusted: float  # Combined risk-adjusted exposure
+    description: str  # Human-readable explanation
+    formula: str  # Calculation formula used
+    components: dict[str, float]  # Detailed breakdown of components
 
 
 class PortfolioGroupDict(TypedDict):
@@ -58,32 +55,31 @@ class PortfolioGroupDict(TypedDict):
     ticker: str
     stock_position: StockPositionDict | None
     option_positions: list[OptionPositionDict]
-    total_value: float
-    net_exposure: float
-    beta: float
-    beta_adjusted_exposure: float
-    total_delta_exposure: float
-    options_delta_exposure: float
-    call_count: int
-    put_count: int
-    net_option_value: float
+    net_exposure: float  # Stock Exposure + Sum(Option Delta Exposures)
+    beta: float  # Underlying beta
+    beta_adjusted_exposure: float  # Sum of all beta-adjusted exposures
+    total_delta_exposure: float  # Sum of all option delta exposures
+    options_delta_exposure: float  # Same as total_delta_exposure
+    call_count: int  # Number of call option positions
+    put_count: int  # Number of put option positions
 
 
 class PortfolioSummaryDict(TypedDict):
     """Type definition for portfolio summary dictionary"""
 
-    total_value_net: float
-    total_value_abs: float
-    portfolio_beta: float
-    long_exposure: ExposureBreakdownDict
-    short_exposure: ExposureBreakdownDict
-    options_exposure: ExposureBreakdownDict
-    short_percentage: float
-    exposure_reduction_percentage: float
-    cash_like_positions: list[StockPositionDict]
-    cash_like_value: float
-    cash_like_count: int
-    help_text: dict[str, str]
+    net_market_exposure: float  # Long - Short (excluding cash)
+    gross_market_exposure: float  # Long + Short (excluding cash)
+    portfolio_beta: float  # Weighted average beta of all positions
+    long_exposure: ExposureBreakdownDict  # Detailed breakdown of long exposures
+    short_exposure: ExposureBreakdownDict  # Detailed breakdown of short exposures
+    options_exposure: ExposureBreakdownDict  # Detailed breakdown of option exposures
+    short_percentage: float  # Short / Gross Market Exposure
+    cash_like_positions: list[StockPositionDict]  # List of cash positions
+    cash_like_value: float  # Total value of cash positions
+    cash_like_count: int  # Number of cash positions
+    cash_percentage: float  # Cash / (Cash + Gross Market Exposure)
+    total_portfolio_size: float  # Gross Market Exposure + Cash
+    help_text: dict[str, str]  # Explanations of each metric
 
 
 @dataclass
@@ -93,12 +89,9 @@ class Position:
     ticker: str
     position_type: Literal["stock", "option"]
     quantity: float
-    market_value: float
     beta: float
     beta_adjusted_exposure: float
-    clean_value: float
-    weight: float
-    position_beta: float
+    market_exposure: float  # Quantity * Current Price (fetched at runtime)
 
     def to_dict(self) -> PositionDict:
         """Convert to a typed dictionary"""
@@ -106,12 +99,9 @@ class Position:
             "ticker": self.ticker,
             "position_type": self.position_type,
             "quantity": self.quantity,
-            "market_value": self.market_value,
             "beta": self.beta,
             "beta_adjusted_exposure": self.beta_adjusted_exposure,
-            "clean_value": self.clean_value,
-            "weight": self.weight,
-            "position_beta": self.position_beta,
+            "market_exposure": self.market_exposure,
         }
 
     @classmethod
@@ -128,12 +118,9 @@ class Position:
             ticker=data["ticker"],
             position_type=data["position_type"],
             quantity=data["quantity"],
-            market_value=data["market_value"],
             beta=data["beta"],
             beta_adjusted_exposure=data["beta_adjusted_exposure"],
-            clean_value=data.get("clean_value", data["market_value"]),
-            weight=data.get("weight", 1.0),
-            position_beta=data.get("position_beta", data["beta"]),
+            market_exposure=data["market_exposure"],
         )
 
 
@@ -152,15 +139,12 @@ class OptionPosition(Position):
     expiry: str
     option_type: Literal["CALL", "PUT"]
     delta: float
-    delta_exposure: float
-    notional_value: float
+    delta_exposure: float  # Delta * Notional Value * sign(Quantity)
+    notional_value: float  # 100 * Underlying Price * |Quantity|
     underlying_beta: float
 
     def __post_init__(self):
         self.position_type = "option"
-        self.clean_value = self.market_value
-        self.weight = 1.0
-        self.position_beta = self.beta
 
     def to_dict(self) -> OptionPositionDict:
         base_dict = super().to_dict()
@@ -189,12 +173,9 @@ class OptionPosition(Position):
             ticker=data["ticker"],
             position_type=data["position_type"],
             quantity=data["quantity"],
-            market_value=data["market_value"],
             beta=data["beta"],
             beta_adjusted_exposure=data["beta_adjusted_exposure"],
-            clean_value=data.get("clean_value", data["market_value"]),
-            weight=data.get("weight", 1.0),
-            position_beta=data.get("position_beta", data["beta"]),
+            market_exposure=data["market_exposure"],
             strike=data["strike"],
             expiry=data["expiry"],
             option_type=data["option_type"],
@@ -211,22 +192,19 @@ class StockPosition:
 
     ticker: str
     quantity: int
-    market_value: float
     beta: float
-    beta_adjusted_exposure: float
+    market_exposure: float  # Quantity * Current Price (fetched at runtime)
+    beta_adjusted_exposure: float  # Market Exposure * Beta
 
     def to_dict(self) -> StockPositionDict:
         """Convert to a Dash-compatible dictionary"""
         return {
             "ticker": self.ticker,
             "quantity": self.quantity,
-            "market_value": self.market_value,
             "beta": self.beta,
+            "market_exposure": self.market_exposure,
             "beta_adjusted_exposure": self.beta_adjusted_exposure,
             "position_type": "stock",
-            "clean_value": self.market_value,
-            "weight": 1.0,
-            "position_beta": self.beta,
         }
 
     @classmethod
@@ -242,8 +220,8 @@ class StockPosition:
         return cls(
             ticker=data["ticker"],
             quantity=data["quantity"],
-            market_value=data["market_value"],
             beta=data["beta"],
+            market_exposure=data["market_exposure"],
             beta_adjusted_exposure=data["beta_adjusted_exposure"],
         )
 
@@ -257,17 +235,15 @@ class PortfolioGroup:
     option_positions: list[OptionPosition]
 
     # Group metrics
-    total_value: float
-    net_exposure: float
-    beta: float
-    beta_adjusted_exposure: float
-    total_delta_exposure: float
-    options_delta_exposure: float
+    net_exposure: float  # Stock Exposure + Sum(Option Delta Exposures)
+    beta: float  # Underlying beta
+    beta_adjusted_exposure: float  # Sum of all beta-adjusted exposures
+    total_delta_exposure: float  # Sum of all option delta exposures
+    options_delta_exposure: float  # Same as total_delta_exposure
 
     # Option counts
     call_count: int = 0
     put_count: int = 0
-    net_option_value: float = 0.0
 
     def __post_init__(self) -> None:
         """Calculate option-specific metrics"""
@@ -277,7 +253,6 @@ class PortfolioGroup:
         self.put_count = sum(
             1 for opt in self.option_positions if opt.option_type == "PUT"
         )
-        self.net_option_value = sum(opt.market_value for opt in self.option_positions)
 
     def to_dict(self) -> PortfolioGroupDict:
         """Convert to a Dash-compatible dictionary"""
@@ -287,7 +262,6 @@ class PortfolioGroup:
             if self.stock_position
             else None,
             "option_positions": [opt.to_dict() for opt in self.option_positions],
-            "total_value": self.total_value,
             "net_exposure": self.net_exposure,
             "beta": self.beta,
             "beta_adjusted_exposure": self.beta_adjusted_exposure,
@@ -295,7 +269,6 @@ class PortfolioGroup:
             "options_delta_exposure": self.options_delta_exposure,
             "call_count": self.call_count,
             "put_count": self.put_count,
-            "net_option_value": self.net_option_value,
         }
 
     @classmethod
@@ -323,7 +296,6 @@ class PortfolioGroup:
             ticker=data["ticker"],
             stock_position=stock_position,
             option_positions=option_positions,
-            total_value=data["total_value"],
             net_exposure=data["net_exposure"],
             beta=data["beta"],
             beta_adjusted_exposure=data["beta_adjusted_exposure"],
@@ -331,7 +303,6 @@ class PortfolioGroup:
             options_delta_exposure=data["options_delta_exposure"],
             call_count=data.get("call_count", 0),
             put_count=data.get("put_count", 0),
-            net_option_value=data.get("net_option_value", 0.0),
         )
 
     def get_details(
@@ -340,7 +311,9 @@ class PortfolioGroup:
         """Get detailed breakdown of the group's exposures"""
         return {
             "Stock Position": {
-                "Value": self.stock_position.market_value if self.stock_position else 0,
+                "Market Exposure": self.stock_position.market_exposure
+                if self.stock_position
+                else 0,
                 "Beta-Adjusted": self.stock_position.beta_adjusted_exposure
                 if self.stock_position
                 else 0,
@@ -367,24 +340,24 @@ class PortfolioGroup:
 class ExposureBreakdown:
     """Detailed breakdown of exposure by type"""
 
-    stock_value: float
-    stock_beta_adjusted: float
-    option_delta_value: float
-    option_beta_adjusted: float
-    total_value: float
-    total_beta_adjusted: float
-    description: str
-    formula: str
-    components: dict[str, float]
+    stock_exposure: float  # Represents the market exposure from stock positions
+    stock_beta_adjusted: float  # Risk-adjusted stock exposure
+    option_delta_exposure: float  # Represents the market exposure from option positions
+    option_beta_adjusted: float  # Risk-adjusted option exposure
+    total_exposure: float  # Combined market exposure from stocks and options
+    total_beta_adjusted: float  # Combined risk-adjusted exposure
+    description: str  # Human-readable explanation
+    formula: str  # Calculation formula used
+    components: dict[str, float]  # Detailed breakdown of components
 
     def to_dict(self) -> ExposureBreakdownDict:
         """Convert to a Dash-compatible dictionary"""
         return {
-            "stock_value": self.stock_value,
+            "stock_exposure": self.stock_exposure,
             "stock_beta_adjusted": self.stock_beta_adjusted,
-            "option_delta_value": self.option_delta_value,
+            "option_delta_exposure": self.option_delta_exposure,
             "option_beta_adjusted": self.option_beta_adjusted,
-            "total_value": self.total_value,
+            "total_exposure": self.total_exposure,
             "total_beta_adjusted": self.total_beta_adjusted,
             "description": self.description,
             "formula": self.formula,
@@ -402,11 +375,11 @@ class ExposureBreakdown:
             A new ExposureBreakdown instance
         """
         return cls(
-            stock_value=data["stock_value"],
+            stock_exposure=data["stock_exposure"],
             stock_beta_adjusted=data["stock_beta_adjusted"],
-            option_delta_value=data["option_delta_value"],
+            option_delta_exposure=data["option_delta_exposure"],
             option_beta_adjusted=data["option_beta_adjusted"],
-            total_value=data["total_value"],
+            total_exposure=data["total_exposure"],
             total_beta_adjusted=data["total_beta_adjusted"],
             description=data["description"],
             formula=data["formula"],
@@ -418,28 +391,27 @@ class ExposureBreakdown:
 class PortfolioSummary:
     """Summary of portfolio metrics with detailed breakdowns"""
 
-    # Total portfolio values
-    total_value_net: float  # Long - Short (with short as positive)
-    total_value_abs: float  # Long + Short (with short as positive)
-    portfolio_beta: float
+    # Market exposure metrics (excluding cash)
+    net_market_exposure: float  # Long - Short (excluding cash)
+    gross_market_exposure: float  # Long + Short (excluding cash)
+    portfolio_beta: float  # Weighted average beta of all positions
 
-    # Long exposure details
-    long_exposure: ExposureBreakdown
-
-    # Short exposure details
-    short_exposure: ExposureBreakdown
-
-    # Options exposure (for reference)
-    options_exposure: ExposureBreakdown
+    # Exposure breakdowns
+    long_exposure: ExposureBreakdown  # Detailed breakdown of long exposures
+    short_exposure: ExposureBreakdown  # Detailed breakdown of short exposures
+    options_exposure: ExposureBreakdown  # Detailed breakdown of option exposures
 
     # Derived metrics
-    short_percentage: float
-    exposure_reduction_percentage: float
+    short_percentage: float  # Short / Gross Market Exposure
 
-    # Cash-like instruments
-    cash_like_positions: list[StockPosition] = None
-    cash_like_value: float = 0.0
-    cash_like_count: int = 0
+    # Cash metrics (separate from market exposure)
+    cash_like_positions: list[StockPosition] = None  # List of cash positions
+    cash_like_value: float = 0.0  # Total value of cash positions
+    cash_like_count: int = 0  # Number of cash positions
+    cash_percentage: float = 0.0  # Cash / (Cash + Gross Market Exposure)
+
+    # Total portfolio size (for reference only)
+    total_portfolio_size: float = 0.0  # Gross Market Exposure + Cash
 
     # Help text for each metric
     help_text: dict[str, str] | None = None
@@ -447,15 +419,15 @@ class PortfolioSummary:
     def __post_init__(self):
         """Initialize help text for metrics"""
         self.help_text = {
-            "total_value_net": """
-                Net portfolio value (Long - Short)
-                Formula: Sum of all position values
-                Includes: Stock positions and option market values
+            "net_market_exposure": """
+                Net market exposure (Long - Short, excluding cash)
+                Formula: Long exposure - Short exposure
+                Represents the directional risk in the portfolio
             """,
-            "total_value_abs": """
-                Gross portfolio value (|Long| + |Short|)
-                Formula: Sum of absolute values of all positions
-                Includes: Stock positions and option market values
+            "gross_market_exposure": """
+                Gross market exposure (Long + Short, excluding cash)
+                Formula: Long exposure + Short exposure
+                Represents the total market risk regardless of direction
             """,
             "portfolio_beta": """
                 Portfolio's overall market sensitivity
@@ -468,7 +440,7 @@ class PortfolioSummary:
                 - Long stock positions
                 - Long call options (delta-adjusted)
                 - Short put options (delta-adjusted)
-                Formula: Stock value + Option delta exposure
+                Formula: Stock exposure + Option delta exposure
             """,
             "short_exposure": """
                 Short market exposure
@@ -476,7 +448,7 @@ class PortfolioSummary:
                 - Short stock positions
                 - Short call options (delta-adjusted)
                 - Long put options (delta-adjusted)
-                Formula: |Stock value + Option delta exposure|
+                Formula: |Stock exposure + Option delta exposure|
             """,
             "options_exposure": """
                 Option positions' market exposure
@@ -487,13 +459,8 @@ class PortfolioSummary:
             """,
             "short_percentage": """
                 Percentage of portfolio in short positions
-                Formula: |Short exposure| / Gross exposure
-                Includes both stock and option positions
-            """,
-            "exposure_reduction_percentage": """
-                How much shorts reduce long exposure
-                Formula: |Short exposure| / Long exposure
-                Shows effectiveness of hedging
+                Formula: Short exposure / Gross market exposure
+                Represents the portion of market risk that is short
             """,
             "cash_like_positions": """
                 List of positions with very low beta (< 0.1)
@@ -509,6 +476,16 @@ class PortfolioSummary:
                 Number of cash-like positions in portfolio
                 Helps track diversification of low-risk assets
             """,
+            "cash_percentage": """
+                Percentage of portfolio in cash or cash equivalents
+                Formula: Cash value / Total portfolio size
+                Represents the defensive/liquid portion of the portfolio
+            """,
+            "total_portfolio_size": """
+                Total size of the portfolio including cash
+                Formula: Gross market exposure + Cash value
+                Represents the total capital deployed
+            """,
         }
 
     def to_dict(self) -> PortfolioSummaryDict:
@@ -521,17 +498,18 @@ class PortfolioSummary:
             self.cash_like_positions = []
 
         return {
-            "total_value_net": self.total_value_net,
-            "total_value_abs": self.total_value_abs,
+            "net_market_exposure": self.net_market_exposure,
+            "gross_market_exposure": self.gross_market_exposure,
             "portfolio_beta": self.portfolio_beta,
             "long_exposure": self.long_exposure.to_dict(),
             "short_exposure": self.short_exposure.to_dict(),
             "options_exposure": self.options_exposure.to_dict(),
             "short_percentage": self.short_percentage,
-            "exposure_reduction_percentage": self.exposure_reduction_percentage,
             "cash_like_positions": [pos.to_dict() for pos in self.cash_like_positions],
             "cash_like_value": self.cash_like_value,
             "cash_like_count": self.cash_like_count,
+            "cash_percentage": self.cash_percentage,
+            "total_portfolio_size": self.total_portfolio_size,
             "help_text": self.help_text if self.help_text is not None else {},
         }
 
@@ -555,18 +533,29 @@ class PortfolioSummary:
         for pos_data in data.get("cash_like_positions", []):
             cash_like_positions.append(StockPosition.from_dict(pos_data))
 
+        # Support both old and new field names for backward compatibility
+        net_market_exposure = data.get(
+            "net_market_exposure", data.get("total_value_net", 0.0)
+        )
+        gross_market_exposure = data.get(
+            "gross_market_exposure", data.get("total_value_abs", 0.0)
+        )
+        cash_percentage = data.get("cash_percentage", 0.0)
+        total_portfolio_size = data.get("total_portfolio_size", 0.0)
+
         return cls(
-            total_value_net=data["total_value_net"],
-            total_value_abs=data["total_value_abs"],
+            net_market_exposure=net_market_exposure,
+            gross_market_exposure=gross_market_exposure,
             portfolio_beta=data["portfolio_beta"],
             long_exposure=long_exposure,
             short_exposure=short_exposure,
             options_exposure=options_exposure,
             short_percentage=data["short_percentage"],
-            exposure_reduction_percentage=data["exposure_reduction_percentage"],
             cash_like_positions=cash_like_positions,
             cash_like_value=data["cash_like_value"],
             cash_like_count=data["cash_like_count"],
+            cash_percentage=cash_percentage,
+            total_portfolio_size=total_portfolio_size,
             help_text=data.get("help_text"),
         )
 
@@ -585,8 +574,8 @@ def create_portfolio_group(
         stock_position = StockPosition(
             ticker=stock_data["ticker"],
             quantity=stock_data["quantity"],
-            market_value=stock_data["market_value"],
             beta=stock_data["beta"],
+            market_exposure=stock_data["market_exposure"],
             beta_adjusted_exposure=stock_data["beta_adjusted_exposure"],
         )
 
@@ -600,12 +589,9 @@ def create_portfolio_group(
                     ticker=opt["ticker"],
                     position_type="option",
                     quantity=opt["quantity"],
-                    market_value=opt["market_value"],
                     beta=opt["beta"],
                     beta_adjusted_exposure=opt["beta_adjusted_exposure"],
-                    clean_value=opt["market_value"],  # Use market value as clean value
-                    weight=1.0,  # Default weight
-                    position_beta=opt["beta"],  # Use position beta
+                    market_exposure=opt["market_exposure"],
                     # OptionPosition specific fields
                     strike=opt["strike"],
                     expiry=opt["expiry"],
@@ -618,11 +604,7 @@ def create_portfolio_group(
             )
 
     # Calculate group metrics
-    total_value = (stock_position.market_value if stock_position else 0) + sum(
-        opt.market_value for opt in option_positions
-    )
-
-    net_exposure = (stock_position.market_value if stock_position else 0) + sum(
+    net_exposure = (stock_position.market_exposure if stock_position else 0) + sum(
         opt.delta_exposure for opt in option_positions
     )
 
@@ -640,7 +622,6 @@ def create_portfolio_group(
         ticker=stock_data["ticker"] if stock_data else option_data[0]["ticker"],
         stock_position=stock_position,
         option_positions=option_positions,
-        total_value=total_value,
         net_exposure=net_exposure,
         beta=beta,
         beta_adjusted_exposure=beta_adjusted_exposure,

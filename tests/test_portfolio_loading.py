@@ -68,11 +68,11 @@ def test_invalid_portfolio_data():
     df = pd.DataFrame()
     groups, summary, cash_like_positions = process_portfolio_data(df)
     assert len(groups) == 0
-    assert summary.total_value_net == 0
+    assert summary.total_exposure == 0
     assert len(cash_like_positions) == 0
 
     # Test None DataFrame - now returns empty results instead of raising an error
     groups, summary, cash_like_positions = process_portfolio_data(None)
     assert len(groups) == 0
-    assert summary.total_value_net == 0
+    assert summary.total_exposure == 0
     assert len(cash_like_positions) == 0

@@ -25,7 +25,7 @@ def create_asset_allocation_chart():
             dbc.ButtonGroup(
                 [
                     dbc.Button(
-                        "Value",
+                        "Exposure",
                         id="allocation-value-btn",
                         color="primary",
                         outline=True,
@@ -64,12 +64,11 @@ def create_exposure_chart():
             dbc.ButtonGroup(
                 [
                     dbc.Button(
-                        "Net Value",
+                        "Net Exposure",
                         id="exposure-net-btn",
                         color="primary",
                         outline=True,
                         size="sm",
-                        active=True,
                         n_clicks=0,
                     ),
                     dbc.Button(
@@ -78,6 +77,7 @@ def create_exposure_chart():
                         color="primary",
                         outline=True,
                         size="sm",
+                        active=True,
                         n_clicks=0,
                     ),
                 ],
