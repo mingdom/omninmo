@@ -91,7 +91,7 @@ def transform_for_asset_allocation(
             "showlegend": True,
             "legend": {"orientation": "h", "y": -0.1},
             "margin": {"l": 0, "r": 0, "t": 30, "b": 0},
-            "height": 400,
+            "autosize": True,  # Allow the chart to resize with its container
         },
     }
 
@@ -156,7 +156,7 @@ def transform_for_exposure_chart(
             "xaxis": {"title": "Exposure Type"},
             "yaxis": {"title": "Value ($)"},
             "margin": {"l": 50, "r": 20, "t": 30, "b": 50},
-            "height": 400,
+            "autosize": True,  # Allow the chart to resize with its container
         },
     }
 
@@ -164,18 +164,18 @@ def transform_for_exposure_chart(
 
 
 def transform_for_treemap(
-    portfolio_groups: list[PortfolioGroup], group_by: str = "type"
+    portfolio_groups: list[PortfolioGroup], _group_by: str = "ticker"
 ) -> dict[str, Any]:
     """Transform portfolio groups data for the treemap chart.
 
     Args:
         portfolio_groups: List of portfolio groups from the data model
-        group_by: How to group the positions ('type' or 'ticker')
+        _group_by: Unused parameter (kept for backward compatibility)
 
     Returns:
         Dict containing data and layout for the treemap chart
     """
-    logger.debug(f"Transforming data for treemap chart, grouping by: {group_by}")
+    logger.debug("Transforming data for treemap chart (grouped by ticker)")
 
     # Initialize lists for treemap data
     labels = []
@@ -191,153 +191,49 @@ def transform_for_treemap(
     texts.append("Portfolio")
     colors.append("#FFFFFF")  # White for root
 
-    # Process groups based on grouping type
-    if group_by == "type":
-        # Add type nodes
-        type_nodes = ["Stocks", "Options", "Cash"]
-        type_colors = ["#4CAF50", "#2196F3", "#9E9E9E"]  # Green, Blue, Grey
+    # Group by ticker
+    # First, collect all unique tickers and calculate their total exposure
+    ticker_exposures = {}
+    for group in portfolio_groups:
+        ticker = group.ticker
+        exposure = 0
 
-        for node, color in zip(type_nodes, type_colors, strict=False):
-            labels.append(node)
-            parents.append("Portfolio")
-            values.append(0)  # Will be sum of children
-            texts.append(node)
-            colors.append(color)
+        # Add stock position exposure
+        if group.stock_position:
+            # Use market value for stocks
+            exposure += group.stock_position.market_value
 
-        # Add individual positions
-        for group in portfolio_groups:
-            # Add stock position (if exists)
-            if group.stock_position:
-                position = group.stock_position
-                parent = "Stocks"
-                value = abs(position.market_value)
-                text = (
-                    f"{position.ticker}: {format_currency(position.market_value)}<br>"
-                    f"Quantity: {position.quantity:,.0f}"
-                )
-                # Determine color based on long/short
-                color = (
-                    "#4CAF50" if position.quantity > 0 else "#F44336"
-                )  # Green or Red
+        # Add option positions exposure (market value)
+        for option in group.option_positions:
+            exposure += option.market_value
 
-                labels.append(position.ticker)
-                parents.append(parent)
-                values.append(value)
-                texts.append(text)
-                colors.append(color)
+        # Store the net exposure value for sizing (not absolute)
+        ticker_exposures[ticker] = exposure
 
-            # Add option positions
-            for position in group.option_positions:
-                parent = "Options"
-                value = abs(position.market_value)
-                # Create a description from the available attributes
-                option_desc = f"{position.ticker} {position.option_type} {position.strike} {position.expiry}"
-                text = (
-                    f"{option_desc}: {format_currency(position.market_value)}<br>"
-                    f"Quantity: {position.quantity:,.0f}<br>"
-                    f"Delta: {position.delta:.2f}"
-                )
-                # Determine color based on call/put and long/short
-                if position.option_type == "CALL":
-                    color = (
-                        "#2196F3" if position.quantity > 0 else "#FF9800"
-                    )  # Blue or Orange
-                else:
-                    color = (
-                        "#673AB7" if position.quantity > 0 else "#E91E63"
-                    )  # Purple or Pink
+    # Sort tickers by absolute exposure (largest first)
+    sorted_tickers = sorted(
+        ticker_exposures.keys(), key=lambda t: abs(ticker_exposures[t]), reverse=True
+    )
 
-                labels.append(f"{position.ticker} {position.option_type}")
-                parents.append(parent)
-                values.append(value)
-                texts.append(text)
-                colors.append(color)
+    # Add ticker nodes
+    for ticker in sorted_tickers:
+        # Skip tickers with zero exposure
+        if ticker_exposures[ticker] == 0:
+            continue
 
-        # Add cash positions
-        for group in portfolio_groups:
-            if (
-                group.stock_position
-                and hasattr(group.stock_position, "is_cash_like")
-                and group.stock_position.is_cash_like
-            ):
-                position = group.stock_position
-                parent = "Cash"
-                value = abs(position.market_value)
-                text = f"{position.ticker}: {format_currency(position.market_value)}"
-                color = "#9E9E9E"  # Grey for cash
+        exposure = ticker_exposures[ticker]
+        labels.append(ticker)
+        parents.append("Portfolio")
+        values.append(abs(exposure))  # Use absolute exposure for sizing
+        texts.append(f"{ticker}: {format_currency(exposure)}")
 
-                labels.append(f"Cash: {position.ticker}")
-                parents.append(parent)
-                values.append(value)
-                texts.append(text)
-                colors.append(color)
+        # Color based on long/short
+        color = (
+            "#4CAF50" if exposure > 0 else "#F44336"
+        )  # Green for long, Red for short
+        colors.append(color)
 
-    else:  # group_by == "ticker"
-        # Add ticker nodes (one for each group)
-        for group in portfolio_groups:
-            ticker = group.ticker
-            # Calculate total value
-            total_value = 0
-            if group.stock_position:
-                total_value += abs(group.stock_position.market_value)
-            for p in group.option_positions:
-                total_value += abs(p.market_value)
-
-            # Skip empty groups
-            if total_value == 0:
-                continue
-
-            labels.append(ticker)
-            parents.append("Portfolio")
-            values.append(total_value)
-            texts.append(f"{ticker}: {format_currency(total_value)}")
-            colors.append("#2196F3")  # Blue for all tickers
-
-            # Add stock position under ticker (if exists)
-            if group.stock_position:
-                position = group.stock_position
-                value = abs(position.market_value)
-                text = (
-                    f"{position.ticker}: {format_currency(position.market_value)}<br>"
-                    f"Quantity: {position.quantity:,.0f}"
-                )
-                # Determine color based on long/short
-                color = (
-                    "#4CAF50" if position.quantity > 0 else "#F44336"
-                )  # Green or Red
-
-                labels.append(f"{ticker} Stock")
-                parents.append(ticker)
-                values.append(value)
-                texts.append(text)
-                colors.append(color)
-
-            # Add option positions
-            for position in group.option_positions:
-                value = abs(position.market_value)
-                # Create a description from the available attributes
-                option_desc = f"{position.ticker} {position.option_type} {position.strike} {position.expiry}"
-                text = (
-                    f"{option_desc}: {format_currency(position.market_value)}<br>"
-                    f"Quantity: {position.quantity:,.0f}<br>"
-                    f"Delta: {position.delta:.2f}"
-                )
-                # Determine color based on call/put and long/short
-                if position.option_type == "CALL":
-                    color = (
-                        "#2196F3" if position.quantity > 0 else "#FF9800"
-                    )  # Blue or Orange
-                else:
-                    color = (
-                        "#673AB7" if position.quantity > 0 else "#E91E63"
-                    )  # Purple or Pink
-
-                option_type = position.option_type
-                labels.append(f"{ticker} {option_type}")
-                parents.append(ticker)
-                values.append(value)
-                texts.append(text)
-                colors.append(color)
+    # We don't need to add individual positions anymore - just show the ticker level
 
     # Create the chart data
     chart_data = {
@@ -353,9 +249,9 @@ def transform_for_treemap(
             }
         ],
         "layout": {
-            "title": f"Position Size Treemap (Grouped by {group_by.capitalize()})",
+            "title": "Position Size by Exposure",
             "margin": {"l": 0, "r": 0, "t": 30, "b": 0},
-            "height": 500,
+            "autosize": True,  # Allow the chart to resize with its container
         },
     }
 
@@ -374,41 +270,92 @@ def transform_for_sector_allocation(
     Returns:
         Dict containing data and layout for the pie chart
     """
-    logger.debug("Transforming data for sector allocation chart")
+    logger.debug(
+        f"Transforming data for sector allocation chart with {len(portfolio_groups)} groups"
+    )
+    logger.debug(f"Use percentage: {use_percentage}")
 
     # Collect sector data
     sector_values = {}
-    for group in portfolio_groups:
+    for i, group in enumerate(portfolio_groups):
+        logger.debug(f"Processing group {i}: {group.ticker}")
         if group.stock_position:
             position = group.stock_position
-            if hasattr(position, "is_cash_like") and position.is_cash_like:
+            logger.debug(f"  Found stock position: {position.ticker}")
+
+            # Check for sector attribute
+            has_sector = hasattr(position, "sector")
+            logger.debug(f"  Has sector attribute: {has_sector}")
+
+            # Check for cash-like attribute
+            has_cash_like = hasattr(position, "is_cash_like")
+            logger.debug(f"  Has is_cash_like attribute: {has_cash_like}")
+
+            if has_cash_like and position.is_cash_like:
                 sector = "Cash"
+                logger.debug("  Identified as cash-like position")
             else:
                 # Use sector from position if available, otherwise "Unknown"
                 sector = getattr(position, "sector", "Unknown")
+                logger.debug(f"  Sector assigned: {sector}")
 
             # Add value to sector total
             if sector in sector_values:
                 sector_values[sector] += position.market_value
+                logger.debug(
+                    f"  Added {position.market_value} to existing sector {sector}"
+                )
             else:
                 sector_values[sector] = position.market_value
+                logger.debug(
+                    f"  Created new sector {sector} with value {position.market_value}"
+                )
+        else:
+            logger.debug("  No stock position in this group")
 
     # Convert to lists for chart
     sectors = list(sector_values.keys())
     values = list(sector_values.values())
+    logger.debug(f"Sectors found: {sectors}")
+    logger.debug(f"Values: {values}")
+
+    # Check if we have any sectors
+    if not sectors:
+        logger.warning("No sectors found in portfolio data")
+        return {
+            "data": [],
+            "layout": {
+                "title": "No sector data available",
+                "height": 400,
+                "annotations": [
+                    {
+                        "text": "No sector data available in portfolio",
+                        "showarrow": False,
+                        "font": {"size": 16},
+                        "xref": "paper",
+                        "yref": "paper",
+                        "x": 0.5,
+                        "y": 0.5,
+                    }
+                ],
+            },
+        }
 
     # Calculate total for percentage calculation
     total_value = sum(abs(v) for v in values)
+    logger.debug(f"Total value: {total_value}")
 
     # Convert to percentages if requested
     if use_percentage:
         chart_values = [(abs(v) / total_value) * 100 for v in values]
         text_values = [f"{v:.1f}%" for v in chart_values]
         title_text = "Sector Allocation (% of Portfolio)"
+        logger.debug(f"Using percentage values: {chart_values}")
     else:
         chart_values = [abs(v) for v in values]
         text_values = [format_currency(value) for value in chart_values]
         title_text = "Sector Allocation (Value)"
+        logger.debug(f"Using absolute values: {chart_values}")
 
     # Create the chart data
     chart_data = {
@@ -430,6 +377,8 @@ def transform_for_sector_allocation(
             "height": 400,
         },
     }
+
+    logger.debug(f"Created sector chart with {len(sectors)} sectors")
 
     return chart_data
 

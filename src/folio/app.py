@@ -445,8 +445,7 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
                             [
                                 # Add visualization dashboard section near the top
                                 create_dashboard_section(),
-                                # Move header and filters below visualizations
-                                create_header(),
+                                # Add filters below visualizations
                                 create_filters(),
                                 # Move table to the end
                                 dbc.Card(
@@ -768,12 +767,16 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
     @app.callback(
         [
             Output("total-value", "children"),
+            Output("total-value-percent", "children"),
             Output("total-beta", "children"),
             Output("long-exposure", "children"),
+            Output("long-exposure-percent", "children"),
             Output("long-beta", "children"),
             Output("short-exposure", "children"),
+            Output("short-exposure-percent", "children"),
             Output("short-beta", "children"),
             Output("options-exposure", "children"),
+            Output("options-exposure-percent", "children"),
             Output("options-beta", "children"),
             Output("cash-like-value", "children"),
             Output("cash-like-percent", "children"),
@@ -785,46 +788,91 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
         logger.debug("Updating summary cards")
         try:
             if not summary_data:
-                return ["$0.00"] * 4 + ["0.00β"] * 4 + ["$0.00", "0.0%"]
+                # Return default values for all outputs
+                return (
+                    ["$0.00"]
+                    + ["0.0%"]
+                    + ["0.00β"]
+                    + ["$0.00", "0.0%", "0.00β"] * 3
+                    + ["$0.00", "0.0%"]
+                )
 
-            # Calculate cash-like percentage
+            # Use total_value_abs for percentage calculations as it represents the total size
+            total_abs = summary_data["total_value_abs"]
+            total_net = summary_data["total_value_net"]
+
+            # Calculate percentages relative to total portfolio value
+            net_percent = (total_net / total_abs * 100) if total_abs != 0 else 0.0
+            long_percent = (
+                (summary_data["long_exposure"]["total_value"] / total_abs * 100)
+                if total_abs != 0
+                else 0.0
+            )
+            short_percent = (
+                (abs(summary_data["short_exposure"]["total_value"]) / total_abs * 100)
+                if total_abs != 0
+                else 0.0
+            )
+            options_percent = (
+                (summary_data["options_exposure"]["total_value"] / total_abs * 100)
+                if total_abs != 0
+                else 0.0
+            )
             cash_like_percent = (
-                summary_data["cash_like_value"] / summary_data["total_value_abs"] * 100
-                if summary_data["total_value_abs"] != 0
+                (summary_data["cash_like_value"] / total_abs * 100)
+                if total_abs != 0
                 else 0.0
             )
 
             return [
-                utils.format_currency(summary_data["total_value_net"]),
+                # Net Exposure
+                utils.format_currency(total_net),
+                f"{net_percent:.1f}%",
+                # Net Beta
                 utils.format_beta(summary_data["portfolio_beta"]),
+                # Long Exposure
                 utils.format_currency(summary_data["long_exposure"]["total_value"]),
+                f"{long_percent:.1f}%",
                 utils.format_beta(
                     summary_data["long_exposure"]["total_beta_adjusted"]
                     / summary_data["long_exposure"]["total_value"]
                     if summary_data["long_exposure"]["total_value"] != 0
                     else 0
                 ),
+                # Short Exposure
                 utils.format_currency(summary_data["short_exposure"]["total_value"]),
+                f"{short_percent:.1f}%",
                 utils.format_beta(
                     summary_data["short_exposure"]["total_beta_adjusted"]
                     / summary_data["short_exposure"]["total_value"]
                     if summary_data["short_exposure"]["total_value"] != 0
                     else 0
                 ),
+                # Options Exposure
                 utils.format_currency(summary_data["options_exposure"]["total_value"]),
+                f"{options_percent:.1f}%",
                 utils.format_beta(
                     summary_data["options_exposure"]["total_beta_adjusted"]
                     / summary_data["options_exposure"]["total_value"]
                     if summary_data["options_exposure"]["total_value"] != 0
                     else 0
                 ),
+                # Cash & Equivalents
                 utils.format_currency(summary_data["cash_like_value"]),
                 f"{cash_like_percent:.1f}%",
             ]
 
         except Exception as e:
             logger.error(f"Error updating summary cards: {e}", exc_info=True)
-            return ["$0.00"] * 4 + ["0.00β"] * 4 + ["$0.00", "0.0%"]
+            # Return default values for all outputs
+            return (
+                ["$0.00"]
+                + ["$0.00"]
+                + ["0.0%"]
+                + ["0.00β"]
+                + ["$0.00", "0.0%", "0.00β"] * 3
+                + ["$0.00", "0.0%"]
+            )
 
     @app.callback(
         Output("portfolio-table", "children"),
@@ -864,9 +912,16 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
             # Convert data back to PortfolioGroup objects
             groups = []
             for g in groups_data:
-                stock_position = (
-                    Position(**g["stock_position"]) if g["stock_position"] else None
-                )
+                # Filter out attributes that don't exist in Position class
+                stock_position = None
+                if g["stock_position"]:
+                    stock_position_data = g["stock_position"].copy()
+                    # Remove attributes that don't exist in Position class
+                    if "sector" in stock_position_data:
+                        stock_position_data.pop("sector")
+                    if "is_cash_like" in stock_position_data:
+                        stock_position_data.pop("is_cash_like")
+                    stock_position = Position(**stock_position_data)
                 option_positions = [
                     OptionPosition(**opt) for opt in g["option_positions"]
                 ]
@@ -1128,11 +1183,16 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
 
     def _create_portfolio_group_from_data(position_data):
         """Helper function to create a PortfolioGroup from position data"""
-        stock_position = (
-            Position(**position_data["stock_position"])
-            if position_data["stock_position"]
-            else None
-        )
+        stock_position = None
+        if position_data["stock_position"]:
+            stock_position_data = position_data["stock_position"].copy()
+            # Remove attributes that don't exist in Position class
+            if "sector" in stock_position_data:
+                stock_position_data.pop("sector")
+            if "is_cash_like" in stock_position_data:
+                stock_position_data.pop("is_cash_like")
+            stock_position = Position(**stock_position_data)
+
         option_positions = [
             OptionPosition(**opt) for opt in position_data["option_positions"]
         ]
@@ -1216,8 +1276,8 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
             return new_state, icon_class
         return is_open, "fas fa-chevron-down ms-2"
 
-    # Add callbacks for individual chart collapses
-    for section in ["allocation", "exposure", "sector", "treemap", "positions"]:
+    # Add callbacks for main section collapses
+    for section in ["summary", "charts"]:
 
         @app.callback(
             [
@@ -1241,6 +1301,28 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
                 )
                 return new_state, icon_class
             return is_open, "fas fa-chevron-down ms-2"
+
+    # Add callback for positions collapse
+    @app.callback(
+        [
+            Output("positions-collapse", "is_open"),
+            Output("positions-collapse-icon", "className"),
+        ],
+        [Input("positions-collapse-button", "n_clicks")],
+        [State("positions-collapse", "is_open")],
+        prevent_initial_call=True,
+    )
+    def toggle_positions_collapse(n_clicks, is_open):
+        """Toggle the positions section collapse state"""
+        if n_clicks:
+            # Toggle the collapse state
+            new_state = not is_open
+            # Update the icon based on the new state
+            icon_class = (
+                "fas fa-chevron-up ms-2" if new_state else "fas fa-chevron-down ms-2"
+            )
+            return new_state, icon_class
+        return is_open, "fas fa-chevron-down ms-2"
 
     # Register chart callbacks
     register_chart_callbacks(app)

@@ -12,244 +12,350 @@ from ..logger import logger
 
 
 def create_asset_allocation_chart():
-    """Create an asset allocation pie chart component.
-
-    Returns:
-        dbc.Card: A collapsible card containing the chart and controls
-    """
+    """Create an asset allocation pie chart component."""
     logger.debug("Creating asset allocation chart component")
-    return dbc.Card(
+    return html.Div(
         [
-            dbc.CardHeader(
-                dbc.Button(
-                    [
-                        html.I(className="fas fa-chart-pie me-2"),
-                        "Asset Allocation",
-                        html.I(
-                            className="fas fa-chevron-down ms-2",
-                            id="allocation-collapse-icon",
-                        ),
-                    ],
-                    id="allocation-collapse-button",
-                    color="link",
-                    className="text-decoration-none text-dark p-0 d-flex align-items-center w-100 justify-content-between",
-                ),
+            dcc.Graph(
+                id="asset-allocation-chart",
+                config={"displayModeBar": False},
+                className="dash-chart",
             ),
-            dbc.Collapse(
-                dbc.CardBody(
-                    [
-                        dcc.Graph(
-                            id="asset-allocation-chart",
-                            config={"displayModeBar": False},
-                            className="dash-chart",
-                        ),
-                        # Add controls for toggling between absolute value and percentage
-                        dbc.ButtonGroup(
-                            [
-                                dbc.Button(
-                                    "Value",
-                                    id="allocation-value-btn",
-                                    color="primary",
-                                    outline=True,
-                                    n_clicks=0,
-                                ),
-                                dbc.Button(
-                                    "Percent",
-                                    id="allocation-percent-btn",
-                                    color="primary",
-                                    outline=True,
-                                    active=True,
-                                    n_clicks=0,
-                                ),
-                            ],
-                            size="sm",
-                            className="mt-2",
-                        ),
-                    ]
-                ),
-                id="allocation-collapse",
-                is_open=True,  # Initially open
+            # Add controls for toggling between absolute value and percentage
+            dbc.ButtonGroup(
+                [
+                    dbc.Button(
+                        "Value",
+                        id="allocation-value-btn",
+                        color="primary",
+                        outline=True,
+                        size="sm",
+                        n_clicks=0,
+                    ),
+                    dbc.Button(
+                        "Percentage",
+                        id="allocation-percent-btn",
+                        color="primary",
+                        outline=True,
+                        size="sm",
+                        active=True,
+                        n_clicks=0,
+                    ),
+                ],
+                size="sm",
+                className="mt-2",
             ),
         ],
-        className="mb-3 chart-card",
+        className="mb-4",
     )
 
 
 def create_exposure_chart():
-    """Create an exposure visualization chart component.
-
-    Returns:
-        dbc.Card: A collapsible card containing the chart and controls
-    """
+    """Create an exposure bar chart component."""
     logger.debug("Creating exposure chart component")
-    return dbc.Card(
+    return html.Div(
         [
-            dbc.CardHeader(
-                dbc.Button(
-                    [
-                        html.I(className="fas fa-balance-scale me-2"),
-                        "Exposure Breakdown",
-                        html.I(
-                            className="fas fa-chevron-down ms-2",
-                            id="exposure-collapse-icon",
-                        ),
-                    ],
-                    id="exposure-collapse-button",
-                    color="link",
-                    className="text-decoration-none text-dark p-0 d-flex align-items-center w-100 justify-content-between",
-                ),
+            dcc.Graph(
+                id="exposure-chart",
+                config={"displayModeBar": False},
+                className="dash-chart",
             ),
-            dbc.Collapse(
-                dbc.CardBody(
-                    [
-                        dcc.Graph(
-                            id="exposure-chart",
-                            config={"displayModeBar": False},
-                            className="dash-chart",
-                        ),
-                        # Add controls for toggling between different exposure views
-                        dbc.ButtonGroup(
-                            [
-                                dbc.Button(
-                                    "Net",
-                                    id="exposure-net-btn",
-                                    color="primary",
-                                    outline=True,
-                                    active=True,
-                                    n_clicks=0,
-                                ),
-                                dbc.Button(
-                                    "Beta-Adjusted",
-                                    id="exposure-beta-btn",
-                                    color="primary",
-                                    outline=True,
-                                    n_clicks=0,
-                                ),
-                            ],
-                            size="sm",
-                            className="mt-2",
-                        ),
-                    ]
-                ),
-                id="exposure-collapse",
-                is_open=True,  # Initially open
+            # Add controls for toggling between net and beta-adjusted
+            dbc.ButtonGroup(
+                [
+                    dbc.Button(
+                        "Net Value",
+                        id="exposure-net-btn",
+                        color="primary",
+                        outline=True,
+                        size="sm",
+                        active=True,
+                        n_clicks=0,
+                    ),
+                    dbc.Button(
+                        "Beta-Adjusted",
+                        id="exposure-beta-btn",
+                        color="primary",
+                        outline=True,
+                        size="sm",
+                        n_clicks=0,
+                    ),
+                ],
+                size="sm",
+                className="mt-2",
             ),
         ],
-        className="mb-3 chart-card",
+        className="mb-4",
     )
 
 
 def create_position_treemap():
-    """Create a position size treemap visualization component.
-
-    Returns:
-        dbc.Card: A collapsible card containing the chart and controls
-    """
+    """Create a position treemap component."""
     logger.debug("Creating position treemap component")
-    return dbc.Card(
+    return html.Div(
         [
-            dbc.CardHeader(
-                dbc.Button(
-                    [
-                        html.I(className="fas fa-th-large me-2"),
-                        "Position Sizes",
-                        html.I(
-                            className="fas fa-chevron-down ms-2",
-                            id="treemap-collapse-icon",
-                        ),
-                    ],
-                    id="treemap-collapse-button",
-                    color="link",
-                    className="text-decoration-none text-dark p-0 d-flex align-items-center w-100 justify-content-between",
-                ),
+            dcc.Graph(
+                id="position-treemap",
+                config={"displayModeBar": False},
+                className="dash-chart",
             ),
-            dbc.Collapse(
-                dbc.CardBody(
-                    [
-                        dcc.Graph(
-                            id="position-treemap",
-                            config={"displayModeBar": False},
-                            className="dash-chart",
-                        ),
-                        # Add controls for different grouping options
-                        dbc.RadioItems(
-                            id="treemap-group-by",
-                            options=[
-                                {"label": "Position Type", "value": "type"},
-                                {"label": "Ticker", "value": "ticker"},
-                            ],
-                            value="type",
-                            inline=True,
-                            className="mt-2",
-                        ),
-                    ]
+            # Hidden input to maintain the 'ticker' grouping without a visible toggle
+            html.Div(
+                dbc.Input(
+                    id="treemap-group-by",
+                    type="hidden",
+                    value="ticker",  # Always group by ticker
                 ),
-                id="treemap-collapse",
-                is_open=True,  # Initially open
+                style={"display": "none"},
             ),
         ],
-        className="mb-3 chart-card",
+        className="mb-4",
     )
 
 
-def create_sector_chart():
-    """Create a sector allocation chart component.
-
-    Returns:
-        dbc.Card: A collapsible card containing the chart and controls
-    """
-    logger.debug("Creating sector chart component")
-    return dbc.Card(
-        [
-            dbc.CardHeader(
-                dbc.Button(
-                    [
-                        html.I(className="fas fa-industry me-2"),
-                        "Sector Allocation",
-                        html.I(
-                            className="fas fa-chevron-down ms-2",
-                            id="sector-collapse-icon",
-                        ),
-                    ],
-                    id="sector-collapse-button",
-                    color="link",
-                    className="text-decoration-none text-dark p-0 d-flex align-items-center w-100 justify-content-between",
-                ),
-            ),
-            dbc.Collapse(
-                dbc.CardBody(
-                    [
-                        dcc.Graph(
-                            id="sector-chart",
-                            config={"displayModeBar": False},
-                            className="dash-chart",
-                        ),
-                        # Add controls for comparing to benchmark
-                        dbc.Checklist(
-                            id="sector-benchmark-toggle",
-                            options=[{"label": "Compare to S&P 500", "value": True}],
-                            value=[],
-                            switch=True,
-                            className="mt-2",
-                        ),
-                    ]
-                ),
-                id="sector-collapse",
-                is_open=True,  # Initially open
-            ),
-        ],
-        className="mb-3 chart-card",
-    )
+# Sector chart removed for now - will be implemented in a separate task
 
 
 def create_dashboard_section():
-    """Create the main dashboard section with all charts.
+    """Create the dashboard section with all charts.
 
     Returns:
-        dbc.Card: A collapsible card containing all visualization charts
+        html.Div: A div containing all dashboard components
     """
     logger.info("Creating dashboard section with charts")
-    return dbc.Card(
+
+    # Create the summary section - using the original dashboard metrics
+    summary_section = dbc.Card(
+        [
+            dbc.CardHeader(
+                dbc.Button(
+                    [
+                        html.I(className="fas fa-info-circle me-2"),
+                        "Portfolio Summary",
+                        html.I(
+                            className="fas fa-chevron-down ms-2",
+                            id="summary-collapse-icon",
+                        ),
+                    ],
+                    id="summary-collapse-button",
+                    color="link",
+                    className="text-decoration-none text-dark p-0 d-flex align-items-center w-100 justify-content-between",
+                ),
+            ),
+            dbc.Collapse(
+                dbc.CardBody(
+                    [
+                        # First row: Net Exposure and Net Beta
+                        dbc.Row(
+                            [
+                                dbc.Col(
+                                    [
+                                        dbc.Card(
+                                            dbc.CardBody(
+                                                [
+                                                    html.H6(
+                                                        "Net Exposure",
+                                                        className="card-subtitle",
+                                                    ),
+                                                    html.H5(
+                                                        id="total-value",
+                                                        className="card-title text-primary",
+                                                    ),
+                                                    html.P(
+                                                        id="total-value-percent",
+                                                        className="card-text text-muted",
+                                                    ),
+                                                ]
+                                            ),
+                                            className="mb-3",
+                                            id="total-value-card",
+                                        ),
+                                        dbc.Tooltip(
+                                            "Net portfolio exposure (Long - Short). Includes stock positions and option delta exposures.",
+                                            target="total-value-card",
+                                            placement="top",
+                                        ),
+                                    ],
+                                    width=6,
+                                ),
+                                dbc.Col(
+                                    [
+                                        dbc.Card(
+                                            dbc.CardBody(
+                                                [
+                                                    html.H6(
+                                                        "Net Beta",
+                                                        className="card-subtitle",
+                                                    ),
+                                                    html.H5(
+                                                        id="total-beta",
+                                                        className="card-title text-primary",
+                                                    ),
+                                                ]
+                                            ),
+                                            className="mb-3",
+                                            id="total-beta-card",
+                                        ),
+                                        dbc.Tooltip(
+                                            "Portfolio beta measures correlation with the overall market. Beta > 1 means higher volatility than the market.",
+                                            target="total-beta-card",
+                                            placement="top",
+                                        ),
+                                    ],
+                                    width=6,
+                                ),
+                            ],
+                        ),
+                        # Third row: Long and Short Exposure
+                        dbc.Row(
+                            [
+                                dbc.Col(
+                                    [
+                                        dbc.Card(
+                                            dbc.CardBody(
+                                                [
+                                                    html.H6(
+                                                        "Long Exposure",
+                                                        className="card-subtitle",
+                                                    ),
+                                                    html.H5(
+                                                        id="long-exposure",
+                                                        className="card-title text-success",
+                                                    ),
+                                                    html.P(
+                                                        id="long-exposure-percent",
+                                                        className="card-text text-muted",
+                                                    ),
+                                                ]
+                                            ),
+                                            className="mb-3",
+                                            id="long-exposure-card",
+                                        ),
+                                        dbc.Tooltip(
+                                            "Total long exposure (stocks + options delta). Positive market correlation.",
+                                            target="long-exposure-card",
+                                            placement="top",
+                                        ),
+                                    ],
+                                    width=6,
+                                ),
+                                dbc.Col(
+                                    [
+                                        dbc.Card(
+                                            dbc.CardBody(
+                                                [
+                                                    html.H6(
+                                                        "Short Exposure",
+                                                        className="card-subtitle",
+                                                    ),
+                                                    html.H5(
+                                                        id="short-exposure",
+                                                        className="card-title text-danger",
+                                                    ),
+                                                    html.P(
+                                                        id="short-exposure-percent",
+                                                        className="card-text text-muted",
+                                                    ),
+                                                ]
+                                            ),
+                                            className="mb-3",
+                                            id="short-exposure-card",
+                                        ),
+                                        dbc.Tooltip(
+                                            "Total short exposure (stocks + options delta). Negative market correlation.",
+                                            target="short-exposure-card",
+                                            placement="top",
+                                        ),
+                                    ],
+                                    width=6,
+                                ),
+                            ],
+                        ),
+                        # Fourth row: Options Exposure and Cash
+                        dbc.Row(
+                            [
+                                dbc.Col(
+                                    [
+                                        dbc.Card(
+                                            dbc.CardBody(
+                                                [
+                                                    html.H6(
+                                                        "Options Exposure",
+                                                        className="card-subtitle",
+                                                    ),
+                                                    html.H5(
+                                                        id="options-exposure",
+                                                        className="card-title text-info",
+                                                    ),
+                                                    html.P(
+                                                        id="options-exposure-percent",
+                                                        className="card-text text-muted",
+                                                    ),
+                                                ]
+                                            ),
+                                            className="mb-3",
+                                            id="options-exposure-card",
+                                        ),
+                                        dbc.Tooltip(
+                                            "Options exposure (delta-adjusted). Includes long and short options.",
+                                            target="options-exposure-card",
+                                            placement="top",
+                                        ),
+                                    ],
+                                    width=6,
+                                ),
+                                dbc.Col(
+                                    [
+                                        dbc.Card(
+                                            dbc.CardBody(
+                                                [
+                                                    html.H6(
+                                                        "Cash & Equivalents",
+                                                        className="card-subtitle",
+                                                    ),
+                                                    html.H5(
+                                                        id="cash-like-value",
+                                                        className="card-title text-info",
+                                                    ),
+                                                    html.P(
+                                                        id="cash-like-percent",
+                                                        className="card-text text-muted",
+                                                    ),
+                                                ]
+                                            ),
+                                            className="mb-3",
+                                            id="cash-like-card",
+                                        ),
+                                        dbc.Tooltip(
+                                            "Cash and cash equivalents (money market, T-bills, etc). Low market correlation.",
+                                            target="cash-like-card",
+                                            placement="top",
+                                        ),
+                                    ],
+                                    width=6,
+                                ),
+                            ],
+                        ),
+                        # Hidden elements to maintain compatibility with callbacks
+                        html.Div(
+                            [
+                                html.P(id="long-beta", style={"display": "none"}),
+                                html.P(id="short-beta", style={"display": "none"}),
+                                html.P(id="options-beta", style={"display": "none"}),
+                            ],
+                            style={"display": "none"},
+                        ),
+                    ]
+                ),
+                id="summary-collapse",
+                is_open=True,  # Initially open
+            ),
+        ],
+        className="mb-3",
+    )
+
+    # Create the charts section
+    charts_section = dbc.Card(
         [
             dbc.CardHeader(
                 dbc.Button(
@@ -258,10 +364,10 @@ def create_dashboard_section():
                         "Portfolio Visualizations",
                         html.I(
                             className="fas fa-chevron-down ms-2",
-                            id="dashboard-collapse-icon",
+                            id="charts-collapse-icon",
                         ),
                     ],
-                    id="dashboard-collapse-button",
+                    id="charts-collapse-button",
                     color="link",
                     className="text-decoration-none text-dark p-0 d-flex align-items-center w-100 justify-content-between",
                 ),
@@ -269,51 +375,66 @@ def create_dashboard_section():
             dbc.Collapse(
                 dbc.CardBody(
                     [
-                        # Summary metrics will be populated by callbacks
-                        html.Div(id="dashboard-metrics", className="mb-4"),
-                        # First row - Asset Allocation and Exposure
-                        dbc.Row(
+                        # Asset Allocation Chart (in its own card)
+                        dbc.Card(
                             [
-                                dbc.Col(
+                                dbc.CardHeader(
+                                    html.H5("Asset Allocation", className="m-0"),
+                                ),
+                                dbc.CardBody(
                                     [
                                         create_asset_allocation_chart(),
-                                    ],
-                                    lg=6,
-                                    md=12,
+                                    ]
                                 ),
-                                dbc.Col(
+                            ],
+                            className="mb-4 chart-card",
+                        ),
+                        # Market Exposure Chart (in its own card)
+                        dbc.Card(
+                            [
+                                dbc.CardHeader(
+                                    html.H5("Market Exposure", className="m-0"),
+                                ),
+                                dbc.CardBody(
                                     [
                                         create_exposure_chart(),
-                                    ],
-                                    lg=6,
-                                    md=12,
+                                    ]
                                 ),
                             ],
+                            className="mb-4 chart-card",
                         ),
-                        # Second row - Sector Allocation and Position Treemap
-                        dbc.Row(
+                        # Position Treemap (in its own card)
+                        dbc.Card(
                             [
-                                dbc.Col(
-                                    [
-                                        create_sector_chart(),
-                                    ],
-                                    lg=6,
-                                    md=12,
+                                dbc.CardHeader(
+                                    html.H5(
+                                        "Position Size by Exposure", className="m-0"
+                                    ),
                                 ),
-                                dbc.Col(
+                                dbc.CardBody(
                                     [
                                         create_position_treemap(),
-                                    ],
-                                    lg=6,
-                                    md=12,
+                                    ]
                                 ),
                             ],
+                            className="mb-4 chart-card",
                         ),
                     ]
                 ),
-                id="dashboard-collapse",
+                id="charts-collapse",
                 is_open=True,  # Initially open
             ),
         ],
         className="mb-3",
+    )
+
+    # We don't need to create the positions section here as it's already in app.py
+
+    # Combine all sections
+    return html.Div(
+        [
+            summary_section,
+            charts_section,
+            # positions_section is handled in app.py
+        ]
     )

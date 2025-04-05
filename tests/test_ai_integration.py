@@ -21,7 +21,7 @@ class TestAIIntegration:
             quantity=100,
             market_value=15000.0,
             beta=1.2,
-            beta_adjusted_exposure=18000.0
+            beta_adjusted_exposure=18000.0,
         )
 
         option_position = OptionPosition(
@@ -40,7 +40,7 @@ class TestAIIntegration:
             delta=0.7,
             delta_exposure=1050.0,
             notional_value=15000.0,
-            underlying_beta=1.2
+            underlying_beta=1.2,
         )
 
         # Create portfolio group
@@ -53,7 +53,7 @@ class TestAIIntegration:
             beta=1.2,
             beta_adjusted_exposure=19800.0,
             total_delta_exposure=1050.0,
-            options_delta_exposure=1050.0
+            options_delta_exposure=1050.0,
         )
 
         # Create test exposure breakdowns
@@ -66,7 +66,7 @@ class TestAIIntegration:
             total_beta_adjusted=19260.0,
             description="Test Exposure",
             formula="Stock + Options",
-            components={"stock": 15000.0, "options": 1050.0}
+            components={"stock": 15000.0, "options": 1050.0},
         )
 
         # Create portfolio summary
@@ -81,7 +81,7 @@ class TestAIIntegration:
             exposure_reduction_percentage=0.0,
             cash_like_positions=[],
             cash_like_value=0.0,
-            cash_like_count=0
+            cash_like_count=0,
         )
 
         # Test prepare_portfolio_data_for_analysis
@@ -93,14 +93,18 @@ class TestAIIntegration:
         assert len(ai_data["positions"]) == 2  # Stock and option position
 
         # Verify stock position data
-        stock_data = next((p for p in ai_data["positions"] if p["position_type"] == "stock"), None)
+        stock_data = next(
+            (p for p in ai_data["positions"] if p["position_type"] == "stock"), None
+        )
         assert stock_data is not None
         assert stock_data["ticker"] == "AAPL"
         assert stock_data["market_value"] == 15000.0
         assert stock_data["beta"] == 1.2
 
         # Verify option position data
-        option_data = next((p for p in ai_data["positions"] if p["position_type"] == "option"), None)
+        option_data = next(
+            (p for p in ai_data["positions"] if p["position_type"] == "option"), None
+        )
         assert option_data is not None
         assert option_data["ticker"] == "AAPL"
         assert option_data["market_value"] == 1500.0
@@ -121,7 +125,7 @@ class TestAIIntegration:
             quantity=100,
             market_value=15000.0,
             beta=1.2,
-            beta_adjusted_exposure=18000.0
+            beta_adjusted_exposure=18000.0,
         )
 
         option_position = OptionPosition(
@@ -140,7 +144,7 @@ class TestAIIntegration:
             delta=0.7,
             delta_exposure=1050.0,
             notional_value=15000.0,
-            underlying_beta=1.2
+            underlying_beta=1.2,
         )
 
         # Create portfolio group
@@ -153,7 +157,7 @@ class TestAIIntegration:
             beta=1.2,
             beta_adjusted_exposure=19800.0,
             total_delta_exposure=1050.0,
-            options_delta_exposure=1050.0
+            options_delta_exposure=1050.0,
         )
 
         # Create test exposure breakdowns
@@ -166,7 +170,7 @@ class TestAIIntegration:
             total_beta_adjusted=19260.0,
             description="Test Exposure",
             formula="Stock + Options",
-            components={"stock": 15000.0, "options": 1050.0}
+            components={"stock": 15000.0, "options": 1050.0},
         )
 
         # Create portfolio summary
@@ -181,7 +185,7 @@ class TestAIIntegration:
             exposure_reduction_percentage=0.0,
             cash_like_positions=[],
             cash_like_value=0.0,
-            cash_like_count=0
+            cash_like_count=0,
         )
 
         # Convert to dictionary format as would be stored in Dash

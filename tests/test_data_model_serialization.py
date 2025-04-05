@@ -20,7 +20,7 @@ class TestDataModelSerialization:
             quantity=100,
             market_value=15000.0,
             beta=1.2,
-            beta_adjusted_exposure=18000.0
+            beta_adjusted_exposure=18000.0,
         )
 
         # Serialize to dict
@@ -34,7 +34,10 @@ class TestDataModelSerialization:
         assert stock_restored.quantity == stock_position.quantity
         assert stock_restored.market_value == stock_position.market_value
         assert stock_restored.beta == stock_position.beta
-        assert stock_restored.beta_adjusted_exposure == stock_position.beta_adjusted_exposure
+        assert (
+            stock_restored.beta_adjusted_exposure
+            == stock_position.beta_adjusted_exposure
+        )
 
     def test_option_position_serialization(self):
         """Test OptionPosition serialization and deserialization."""
@@ -55,7 +58,7 @@ class TestDataModelSerialization:
             delta=0.7,
             delta_exposure=1050.0,
             notional_value=15000.0,
-            underlying_beta=1.2
+            underlying_beta=1.2,
         )
 
         # Serialize to dict
@@ -85,7 +88,7 @@ class TestDataModelSerialization:
             quantity=100,
             market_value=15000.0,
             beta=1.2,
-            beta_adjusted_exposure=18000.0
+            beta_adjusted_exposure=18000.0,
         )
 
         option_position = OptionPosition(
@@ -104,7 +107,7 @@ class TestDataModelSerialization:
             delta=0.7,
             delta_exposure=1050.0,
             notional_value=15000.0,
-            underlying_beta=1.2
+            underlying_beta=1.2,
         )
 
         # Create portfolio group
@@ -117,7 +120,7 @@ class TestDataModelSerialization:
             beta=1.2,
             beta_adjusted_exposure=19800.0,
             total_delta_exposure=1050.0,
-            options_delta_exposure=1050.0
+            options_delta_exposure=1050.0,
         )
 
         # Serialize to dict
@@ -131,19 +134,41 @@ class TestDataModelSerialization:
         assert group_restored.total_value == portfolio_group.total_value
         assert group_restored.net_exposure == portfolio_group.net_exposure
         assert group_restored.beta == portfolio_group.beta
-        assert group_restored.beta_adjusted_exposure == portfolio_group.beta_adjusted_exposure
-        assert group_restored.total_delta_exposure == portfolio_group.total_delta_exposure
-        assert group_restored.options_delta_exposure == portfolio_group.options_delta_exposure
+        assert (
+            group_restored.beta_adjusted_exposure
+            == portfolio_group.beta_adjusted_exposure
+        )
+        assert (
+            group_restored.total_delta_exposure == portfolio_group.total_delta_exposure
+        )
+        assert (
+            group_restored.options_delta_exposure
+            == portfolio_group.options_delta_exposure
+        )
 
         # Verify stock position
         assert group_restored.stock_position is not None
-        assert group_restored.stock_position.ticker == portfolio_group.stock_position.ticker
-        assert group_restored.stock_position.quantity == portfolio_group.stock_position.quantity
+        assert (
+            group_restored.stock_position.ticker
+            == portfolio_group.stock_position.ticker
+        )
+        assert (
+            group_restored.stock_position.quantity
+            == portfolio_group.stock_position.quantity
+        )
 
         # Verify option positions
-        assert len(group_restored.option_positions) == len(portfolio_group.option_positions)
-        assert group_restored.option_positions[0].ticker == portfolio_group.option_positions[0].ticker
-        assert group_restored.option_positions[0].strike == portfolio_group.option_positions[0].strike
+        assert len(group_restored.option_positions) == len(
+            portfolio_group.option_positions
+        )
+        assert (
+            group_restored.option_positions[0].ticker
+            == portfolio_group.option_positions[0].ticker
+        )
+        assert (
+            group_restored.option_positions[0].strike
+            == portfolio_group.option_positions[0].strike
+        )
 
     def test_exposure_breakdown_serialization(self):
         """Test ExposureBreakdown serialization and deserialization."""
@@ -157,7 +182,7 @@ class TestDataModelSerialization:
             total_beta_adjusted=19260.0,
             description="Test Exposure",
             formula="Stock + Options",
-            components={"stock": 15000.0, "options": 1050.0}
+            components={"stock": 15000.0, "options": 1050.0},
         )
 
         # Serialize to dict
@@ -189,7 +214,7 @@ class TestDataModelSerialization:
             total_beta_adjusted=19260.0,
             description="Test Exposure",
             formula="Stock + Options",
-            components={"stock": 15000.0, "options": 1050.0}
+            components={"stock": 15000.0, "options": 1050.0},
         )
 
         # Create test cash-like position
@@ -198,7 +223,7 @@ class TestDataModelSerialization:
             quantity=1,
             market_value=5000.0,
             beta=0.0,
-            beta_adjusted_exposure=0.0
+            beta_adjusted_exposure=0.0,
         )
 
         # Create portfolio summary
@@ -213,7 +238,7 @@ class TestDataModelSerialization:
             exposure_reduction_percentage=0.0,
             cash_like_positions=[cash_position],
             cash_like_value=5000.0,
-            cash_like_count=1
+            cash_like_count=1,
         )
 
         # Serialize to dict
@@ -227,19 +252,39 @@ class TestDataModelSerialization:
         assert summary_restored.total_value_abs == summary.total_value_abs
         assert summary_restored.portfolio_beta == summary.portfolio_beta
         assert summary_restored.short_percentage == summary.short_percentage
-        assert summary_restored.exposure_reduction_percentage == summary.exposure_reduction_percentage
+        assert (
+            summary_restored.exposure_reduction_percentage
+            == summary.exposure_reduction_percentage
+        )
         assert summary_restored.cash_like_value == summary.cash_like_value
         assert summary_restored.cash_like_count == summary.cash_like_count
 
         # Verify exposure breakdowns
-        assert summary_restored.long_exposure.total_value == summary.long_exposure.total_value
-        assert summary_restored.short_exposure.total_value == summary.short_exposure.total_value
-        assert summary_restored.options_exposure.total_value == summary.options_exposure.total_value
+        assert (
+            summary_restored.long_exposure.total_value
+            == summary.long_exposure.total_value
+        )
+        assert (
+            summary_restored.short_exposure.total_value
+            == summary.short_exposure.total_value
+        )
+        assert (
+            summary_restored.options_exposure.total_value
+            == summary.options_exposure.total_value
+        )
 
         # Verify cash-like positions
-        assert len(summary_restored.cash_like_positions) == len(summary.cash_like_positions)
-        assert summary_restored.cash_like_positions[0].ticker == summary.cash_like_positions[0].ticker
-        assert summary_restored.cash_like_positions[0].market_value == summary.cash_like_positions[0].market_value
+        assert len(summary_restored.cash_like_positions) == len(
+            summary.cash_like_positions
+        )
+        assert (
+            summary_restored.cash_like_positions[0].ticker
+            == summary.cash_like_positions[0].ticker
+        )
+        assert (
+            summary_restored.cash_like_positions[0].market_value
+            == summary.cash_like_positions[0].market_value
+        )
 
     def test_complete_serialization_cycle(self):
         """Test a complete serialization cycle with nested objects."""
@@ -249,7 +294,7 @@ class TestDataModelSerialization:
             quantity=100,
             market_value=15000.0,
             beta=1.2,
-            beta_adjusted_exposure=18000.0
+            beta_adjusted_exposure=18000.0,
         )
 
         option_position = OptionPosition(
@@ -268,7 +313,7 @@ class TestDataModelSerialization:
             delta=0.7,
             delta_exposure=1050.0,
             notional_value=15000.0,
-            underlying_beta=1.2
+            underlying_beta=1.2,
         )
 
         # Create portfolio group
@@ -281,7 +326,7 @@ class TestDataModelSerialization:
             beta=1.2,
             beta_adjusted_exposure=19800.0,
             total_delta_exposure=1050.0,
-            options_delta_exposure=1050.0
+            options_delta_exposure=1050.0,
         )
 
         # Create test exposure breakdowns
@@ -294,7 +339,7 @@ class TestDataModelSerialization:
             total_beta_adjusted=19260.0,
             description="Test Exposure",
             formula="Stock + Options",
-            components={"stock": 15000.0, "options": 1050.0}
+            components={"stock": 15000.0, "options": 1050.0},
         )
 
         # Create portfolio summary
@@ -309,7 +354,7 @@ class TestDataModelSerialization:
             exposure_reduction_percentage=0.0,
             cash_like_positions=[],
             cash_like_value=0.0,
-            cash_like_count=0
+            cash_like_count=0,
         )
 
         # Convert to dictionary format as would be stored in Dash

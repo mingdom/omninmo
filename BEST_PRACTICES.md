@@ -58,6 +58,7 @@ Follow consistent development practices to maintain code quality and developer p
   - **Never Commit Directly**: Let the user handle all git operations
   - **⚠️ NEVER USE GIT IN SCRIPTS**: Do not write scripts that use git commands - this can lead to catastrophic data loss and irreversible history modification
   - **Manual Git Operations**: All git operations must be performed manually by the user, never automated
+  - **NEVER CREATE PRs WITHOUT BEING ASKED**: Do not create pull requests unless explicitly requested by the user
   - **Preserve Git History**: Never modify Git history without explicit user consent and understanding of the consequences
   - **Transparent Operations**: All version control suggestions must be explicit, visible, and explained clearly
 
@@ -155,8 +156,14 @@ Thorough testing prevents bugs and ensures code behaves as expected in all scena
   - **Fix Linting Issues**: Address linting errors before committing code to maintain code quality
   - **Automated vs. Manual Testing**:
     - For AI assistants: Only run `make test` and `make lint` to verify changes
-    - Leave UI testing with `make folio` or `make portfolio` to human users
+    - NEVER launch the application with `make folio` or `make portfolio` - leave UI testing to human users
+    - Instead, provide detailed instructions on what UI changes to test and how to verify them
     - Add unit tests for new functionality instead of manual testing when possible
+  - **Testing Instructions**:
+    - Provide clear, step-by-step instructions for the user to test changes
+    - Include specific UI elements to check and expected behavior
+    - Describe what success looks like and potential issues to watch for
+    - Format as a checklist that the user can follow easily
   - **Review App Logs**: Check `logs/test_latest.log` after running tests to catch errors
   - **Test Real Data**: Use `src/lab/portfolio.csv` for testing with real portfolio data
 

@@ -12,7 +12,6 @@ from ..chart_data import (
     create_dashboard_metrics,
     transform_for_asset_allocation,
     transform_for_exposure_chart,
-    transform_for_sector_allocation,
     transform_for_treemap,
 )
 from ..data_model import PortfolioGroup, PortfolioSummary
@@ -70,21 +69,28 @@ def register_chart_callbacks(app):
 
     # Asset Allocation Chart callback
     @app.callback(
-        Output("asset-allocation-chart", "figure"),
+        [
+            Output("asset-allocation-chart", "figure"),
+            Output("allocation-value-btn", "active"),
+            Output("allocation-percent-btn", "active"),
+        ],
         [
             Input("portfolio-summary", "data"),
             Input("allocation-value-btn", "n_clicks"),
             Input("allocation-percent-btn", "n_clicks"),
         ],
-        [State("allocation-percent-btn", "active")],
+        [
+            State("allocation-value-btn", "active"),
+            State("allocation-percent-btn", "active"),
+        ],
     )
     def update_asset_allocation_chart(
-        summary_data, value_clicks, percent_clicks, percent_active
+        summary_data, value_clicks, percent_clicks, value_active, percent_active
     ):
         """Update the asset allocation chart based on user selection."""
         if not summary_data:
             # Return empty figure if no data
-            return {"data": [], "layout": {"height": 300}}
+            return {"data": [], "layout": {"height": 300}}, False, True
 
         try:
             # Determine which view to use based on button clicks
@@ -92,24 +98,34 @@ def register_chart_callbacks(app):
             if not ctx.triggered:
                 # Default to percentage view
                 use_percentage = True
+                value_active = False
+                percent_active = True
             else:
                 button_id = ctx.triggered[0]["prop_id"].split(".")[0]
                 if button_id == "allocation-value-btn":
                     use_percentage = False
+                    value_active = True
+                    percent_active = False
                 elif button_id == "allocation-percent-btn":
                     use_percentage = True
+                    value_active = False
+                    percent_active = True
                 else:
                     # If triggered by data update, maintain current state
                     use_percentage = percent_active
+                    # Keep button states as they are
 
             # Convert the JSON data back to a PortfolioSummary object
             portfolio_summary = PortfolioSummary.from_dict(summary_data)
 
             # Transform the data for the chart
-            return transform_for_asset_allocation(portfolio_summary, use_percentage)
+            chart_data = transform_for_asset_allocation(
+                portfolio_summary, use_percentage
+            )
+            return chart_data, value_active, percent_active
         except Exception as e:
             logger.error(f"Error updating asset allocation chart: {e}", exc_info=True)
-            return {
+            error_figure = {
                 "data": [],
                 "layout": {
                     "height": 300,
@@ -122,22 +138,33 @@ def register_chart_callbacks(app):
                     ],
                 },
             }
+            # Return error figure and maintain button states
+            return error_figure, value_active, percent_active
 
     # Exposure Chart callback
     @app.callback(
-        Output("exposure-chart", "figure"),
+        [
+            Output("exposure-chart", "figure"),
+            Output("exposure-net-btn", "active"),
+            Output("exposure-beta-btn", "active"),
+        ],
         [
             Input("portfolio-summary", "data"),
             Input("exposure-net-btn", "n_clicks"),
             Input("exposure-beta-btn", "n_clicks"),
         ],
-        [State("exposure-beta-btn", "active")],
+        [
+            State("exposure-net-btn", "active"),
+            State("exposure-beta-btn", "active"),
+        ],
     )
-    def update_exposure_chart(summary_data, net_clicks, beta_clicks, beta_active):
+    def update_exposure_chart(
+        summary_data, net_clicks, beta_clicks, net_active, beta_active
+    ):
         """Update the exposure chart based on user selection."""
         if not summary_data:
             # Return empty figure if no data
-            return {"data": [], "layout": {"height": 300}}
+            return {"data": [], "layout": {"height": 300}}, True, False
 
         try:
             # Determine which view to use based on button clicks
@@ -145,24 +172,34 @@ def register_chart_callbacks(app):
             if not ctx.triggered:
                 # Default to net exposure view
                 use_beta_adjusted = False
+                net_active = True
+                beta_active = False
             else:
                 button_id = ctx.triggered[0]["prop_id"].split(".")[0]
                 if button_id == "exposure-net-btn":
                     use_beta_adjusted = False
+                    net_active = True
+                    beta_active = False
                 elif button_id == "exposure-beta-btn":
                     use_beta_adjusted = True
+                    net_active = False
+                    beta_active = True
                 else:
                     # If triggered by data update, maintain current state
                     use_beta_adjusted = beta_active
+                    # Keep button states as they are
 
             # Convert the JSON data back to a PortfolioSummary object
             portfolio_summary = PortfolioSummary.from_dict(summary_data)
 
             # Transform the data for the chart
-            return transform_for_exposure_chart(portfolio_summary, use_beta_adjusted)
+            chart_data = transform_for_exposure_chart(
+                portfolio_summary, use_beta_adjusted
+            )
+            return chart_data, net_active, beta_active
         except Exception as e:
             logger.error(f"Error updating exposure chart: {e}", exc_info=True)
-            return {
+            error_figure = {
                 "data": [],
                 "layout": {
                     "height": 300,
@@ -175,6 +212,8 @@ def register_chart_callbacks(app):
                     ],
                 },
             }
+            # Return error figure and maintain button states
+            return error_figure, net_active, beta_active
 
     # Position Treemap callback
     @app.callback(
@@ -215,44 +254,4 @@ def register_chart_callbacks(app):
             }
 
     # Sector Chart callback
-    @app.callback(
-        Output("sector-chart", "figure"),
-        [
-            Input("portfolio-groups", "data"),
-            Input("sector-benchmark-toggle", "value"),
-        ],
-    )
-    def update_sector_chart(groups_data, benchmark_toggle):
-        """Update the sector chart based on user selection."""
-        if not groups_data:
-            # Return empty figure if no data
-            return {"data": [], "layout": {"height": 300}}
-
-        try:
-            # Convert the JSON data back to a list of PortfolioGroup objects
-            portfolio_groups = [
-                PortfolioGroup.from_dict(group) for group in groups_data
-            ]
-
-            # Determine whether to compare to benchmark
-            compare_to_benchmark = len(benchmark_toggle) > 0
-
-            # Transform the data for the chart
-            return transform_for_sector_allocation(
-                portfolio_groups, compare_to_benchmark
-            )
-        except Exception as e:
-            logger.error(f"Error updating sector chart: {e}", exc_info=True)
-            return {
-                "data": [],
-                "layout": {
-                    "height": 300,
-                    "annotations": [
-                        {
-                            "text": f"Error: {e!s}",
-                            "showarrow": False,
-                            "font": {"color": "red"},
-                        }
-                    ],
-                },
-            }
+    # Sector chart callback removed - will be implemented in a separate task

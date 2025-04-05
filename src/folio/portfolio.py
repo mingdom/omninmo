@@ -14,8 +14,6 @@ import yaml
 
 from src.stockdata import create_data_fetcher
 
-# Import utility functions directly
-# Import utility functions directly
 from .cash_detection import is_cash_or_short_term
 from .data_model import (
     ExposureBreakdown,
@@ -26,8 +24,6 @@ from .data_model import (
 )
 from .logger import logger
 from .option_utils import calculate_option_delta, parse_option_description
-
-# Import utility functions directly
 from .utils import clean_currency_value, format_beta, format_currency, get_beta
 
 # Initialize data fetcher
@@ -37,15 +33,9 @@ try:
 
     # Try to load from config file if it exists
     config_path = os.path.join(os.path.dirname(__file__), "folio.yaml")
-    if os.path.exists(config_path):
-        try:
-            with open(config_path) as f:
-                config = yaml.safe_load(f)
-                data_source = config.get("app", {}).get("data_source", "yfinance")
-        except Exception as e:
-            logger.warning(
-                f"Failed to load folio.yaml: {e}. Using default data source: {data_source}"
-            )
+    with open(config_path) as f:
+        config = yaml.safe_load(f)
+        data_source = config.get("app", {}).get("data_source", "yfinance")
 
     logger.info(f"Using data source: {data_source}")
 
@@ -207,15 +197,7 @@ def process_portfolio_data(
 
     # Basic portfolio statistics
     total_positions = len(df)
-    # Calculate total value *after* cleaning currency values
-    try:
-        total_value = df["Current Value"].apply(clean_currency_value).sum()
-    except ValueError as e:
-        logger.error(
-            f"Error calculating total portfolio value during initial cleaning: {e}"
-        )
-        # Depending on severity, you might want to raise here or continue with 0
-        total_value = 0  # Or re-raise
+    # Note: We no longer calculate portfolio_value from the CSV as it may be out of date
 
     # Filter for non-options and options using the description parser
     is_opt_mask = df["Description"].apply(is_option_desc)
@@ -232,9 +214,7 @@ def process_portfolio_data(
     logger.info(f"Total Input Rows: {total_positions}")
     logger.info(f"Identified Stocks Rows: {len(stock_df)}")
     logger.info(f"Identified Option Rows: {len(option_df)}")
-    logger.info(
-        f"Total Portfolio Value (sum of 'Current Value' column): {format_currency(total_value)}"
-    )
+    # We no longer calculate or display the total portfolio value from the CSV
     logger.info(f"Unique Stock Symbols: {unique_stocks}")
     logger.info(
         f"Unique Option Descriptions: {unique_options}"
@@ -372,6 +352,8 @@ def process_portfolio_data(
                         float(str(row["Percent Of Account"]).replace("%", "")) / 100.0
                     )
 
+                # Sector determination removed - will be implemented in a separate task
+
                 stock_positions[symbol] = {
                     "price": price,
                     "quantity": quantity,
@@ -429,6 +411,7 @@ def process_portfolio_data(
                 "beta_adjusted_exposure": value * beta,
                 "weight": percent_of_account,
                 "position_beta": beta,  # Used for compatibility with existing code
+                "description": stock_info.get("description", ""),
                 # TODO: Add other relevant stock fields if needed (e.g., cost basis)
             }
 
@@ -665,6 +648,7 @@ def process_portfolio_data(
                 total_value_net=0,
                 total_value_abs=0,
                 portfolio_beta=0,
+                portfolio_value=0,
                 long_exposure=empty_exposure,
                 short_exposure=empty_exposure,
                 options_exposure=empty_exposure,
@@ -695,7 +679,8 @@ def process_portfolio_data(
 
 
 def calculate_portfolio_summary(
-    groups: list[PortfolioGroup], cash_like_positions: list[dict] | None = None
+    groups: list[PortfolioGroup],
+    cash_like_positions: list[dict] | None = None,
 ) -> PortfolioSummary:
     """Calculate comprehensive summary metrics for the entire portfolio.
 
@@ -910,6 +895,7 @@ def calculate_portfolio_summary(
                 f"Adding {cash_like_count} cash positions worth {format_currency(cash_like_value)}"
             )
             total_value_abs += cash_like_value
+            # Add cash to total_value_net
             total_value_net += cash_like_value
 
         # Create and return the portfolio summary

@@ -115,7 +115,7 @@ class Position:
         }
 
     @classmethod
-    def from_dict(cls, data: PositionDict) -> 'Position':
+    def from_dict(cls, data: PositionDict) -> "Position":
         """Create a Position from a dictionary
 
         Args:
@@ -133,7 +133,7 @@ class Position:
             beta_adjusted_exposure=data["beta_adjusted_exposure"],
             clean_value=data.get("clean_value", data["market_value"]),
             weight=data.get("weight", 1.0),
-            position_beta=data.get("position_beta", data["beta"])
+            position_beta=data.get("position_beta", data["beta"]),
         )
 
 
@@ -176,7 +176,7 @@ class OptionPosition(Position):
         }
 
     @classmethod
-    def from_dict(cls, data: OptionPositionDict) -> 'OptionPosition':
+    def from_dict(cls, data: OptionPositionDict) -> "OptionPosition":
         """Create an OptionPosition from a dictionary
 
         Args:
@@ -201,7 +201,7 @@ class OptionPosition(Position):
             delta=data["delta"],
             delta_exposure=data["delta_exposure"],
             notional_value=data["notional_value"],
-            underlying_beta=data["underlying_beta"]
+            underlying_beta=data["underlying_beta"],
         )
 
 
@@ -230,7 +230,7 @@ class StockPosition:
         }
 
     @classmethod
-    def from_dict(cls, data: StockPositionDict) -> 'StockPosition':
+    def from_dict(cls, data: StockPositionDict) -> "StockPosition":
         """Create a StockPosition from a dictionary
 
         Args:
@@ -244,7 +244,7 @@ class StockPosition:
             quantity=data["quantity"],
             market_value=data["market_value"],
             beta=data["beta"],
-            beta_adjusted_exposure=data["beta_adjusted_exposure"]
+            beta_adjusted_exposure=data["beta_adjusted_exposure"],
         )
 
 
@@ -299,7 +299,7 @@ class PortfolioGroup:
         }
 
     @classmethod
-    def from_dict(cls, data: PortfolioGroupDict) -> 'PortfolioGroup':
+    def from_dict(cls, data: PortfolioGroupDict) -> "PortfolioGroup":
         """Create a PortfolioGroup from a dictionary
 
         Args:
@@ -331,7 +331,7 @@ class PortfolioGroup:
             options_delta_exposure=data["options_delta_exposure"],
             call_count=data.get("call_count", 0),
             put_count=data.get("put_count", 0),
-            net_option_value=data.get("net_option_value", 0.0)
+            net_option_value=data.get("net_option_value", 0.0),
         )
 
     def get_details(
@@ -392,7 +392,7 @@ class ExposureBreakdown:
         }
 
     @classmethod
-    def from_dict(cls, data: ExposureBreakdownDict) -> 'ExposureBreakdown':
+    def from_dict(cls, data: ExposureBreakdownDict) -> "ExposureBreakdown":
         """Create an ExposureBreakdown from a dictionary
 
         Args:
@@ -410,7 +410,7 @@ class ExposureBreakdown:
             total_beta_adjusted=data["total_beta_adjusted"],
             description=data["description"],
             formula=data["formula"],
-            components=data["components"]
+            components=data["components"],
         )
 
 
@@ -419,8 +419,8 @@ class PortfolioSummary:
     """Summary of portfolio metrics with detailed breakdowns"""
 
     # Total portfolio values
-    total_value_net: float
-    total_value_abs: float
+    total_value_net: float  # Long - Short (with short as positive)
+    total_value_abs: float  # Long + Short (with short as positive)
     portfolio_beta: float
 
     # Long exposure details
@@ -536,7 +536,7 @@ class PortfolioSummary:
         }
 
     @classmethod
-    def from_dict(cls, data: PortfolioSummaryDict) -> 'PortfolioSummary':
+    def from_dict(cls, data: PortfolioSummaryDict) -> "PortfolioSummary":
         """Create a PortfolioSummary from a dictionary
 
         Args:
@@ -567,7 +567,7 @@ class PortfolioSummary:
             cash_like_positions=cash_like_positions,
             cash_like_value=data["cash_like_value"],
             cash_like_count=data["cash_like_count"],
-            help_text=data.get("help_text")
+            help_text=data.get("help_text"),
         )
 
 
