@@ -23,8 +23,8 @@
 - [x] Responsive design for all visualizations
 
 ### Sprint 2: Sector Analysis & Market Simulation
-- [x] Sector allocation analysis
-  - [x] Sector breakdown visualization
+- [ ] Sector allocation analysis
+  - [ ] Sector breakdown visualization
   - [ ] Benchmark comparison (e.g., vs S&P 500 sectors)
   - [ ] Sector concentration risk indicators
 - [ ] Market scenario simulation
