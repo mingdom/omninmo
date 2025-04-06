@@ -21,7 +21,10 @@ from .summary_cards import create_summary_cards
 
 
 def create_asset_allocation_chart():
-    """Create an asset allocation pie chart component."""
+    """Create an asset allocation chart component.
+
+    Note: This component now always displays exposure values without toggle buttons.
+    """
     logger.debug("Creating asset allocation chart component")
     return html.Div(
         [
@@ -30,34 +33,10 @@ def create_asset_allocation_chart():
                 config={"displayModeBar": False, "responsive": True},
                 className="dash-chart",
             ),
-            # Add controls for toggling between absolute value and percentage
+            # Hidden input to maintain the exposure view without visible toggle
             html.Div(
-                dbc.ButtonGroup(
-                    [
-                        dbc.Button(
-                            "Exposure",
-                            id="allocation-value-btn",
-                            color="primary",
-                            outline=True,
-                            size="sm",
-                            n_clicks=0,
-                            className="px-3",
-                        ),
-                        dbc.Button(
-                            "Percentage",
-                            id="allocation-percent-btn",
-                            color="primary",
-                            outline=True,
-                            size="sm",
-                            active=True,
-                            n_clicks=0,
-                            className="px-3",
-                        ),
-                    ],
-                    size="sm",
-                    className="chart-toggle-buttons",
-                ),
-                className="d-flex justify-content-center mt-3",
+                id="allocation-view-container",
+                style={"display": "none"},
             ),
         ],
         className="mb-4",
@@ -286,60 +265,24 @@ def register_callbacks(app):
 
     # Asset Allocation Chart callback
     @app.callback(
-        [
-            Output("asset-allocation-chart", "figure"),
-            Output("allocation-value-btn", "active"),
-            Output("allocation-percent-btn", "active"),
-        ],
-        [
-            Input("portfolio-summary", "data"),
-            Input("allocation-value-btn", "n_clicks"),
-            Input("allocation-percent-btn", "n_clicks"),
-        ],
-        [
-            State("allocation-value-btn", "active"),
-            State("allocation-percent-btn", "active"),
-        ],
+        Output("asset-allocation-chart", "figure"),
+        Input("portfolio-summary", "data"),
     )
-    def update_asset_allocation_chart(
-        summary_data, _value_clicks, _percent_clicks, value_active, percent_active
-    ):
-        """Update the asset allocation chart based on user selection."""
+    def update_asset_allocation_chart(summary_data):
+        """Update the asset allocation chart with exposure values."""
         if not summary_data:
             # Return empty figure if no data
-            return {"data": [], "layout": {"height": 300}}, False, True
+            return {"data": [], "layout": {"height": 300}}
 
         try:
-            # Determine which view to use based on button clicks
-            ctx = dash.callback_context
-            if not ctx.triggered:
-                # Default to percentage view
-                use_percentage = True
-                value_active = False
-                percent_active = True
-            else:
-                button_id = ctx.triggered[0]["prop_id"].split(".")[0]
-                if button_id == "allocation-value-btn":
-                    use_percentage = False
-                    value_active = True
-                    percent_active = False
-                elif button_id == "allocation-percent-btn":
-                    use_percentage = True
-                    value_active = False
-                    percent_active = True
-                else:
-                    # If triggered by data update, maintain current state
-                    use_percentage = percent_active
-                    # Keep button states as they are
-
             # Convert the JSON data back to a PortfolioSummary object
             portfolio_summary = PortfolioSummary.from_dict(summary_data)
 
-            # Transform the data for the chart
+            # Always use exposure values (use_percentage=False)
             chart_data = transform_for_asset_allocation(
-                portfolio_summary, use_percentage
+                portfolio_summary, use_percentage=False
             )
-            return chart_data, value_active, percent_active
+            return chart_data
         except Exception as e:
             logger.error(f"Error updating asset allocation chart: {e}", exc_info=True)
             error_figure = {

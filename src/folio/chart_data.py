@@ -20,6 +20,8 @@ def transform_for_asset_allocation(
     Args:
         portfolio_summary: Portfolio summary data from the data model
         use_percentage: Whether to use percentage values (True) or absolute values (False)
+                       Note: This parameter is kept for backward compatibility but
+                       the chart now always shows exposure values.
 
     Returns:
         Dict containing data and layout for the stacked bar chart
@@ -33,72 +35,86 @@ def transform_for_asset_allocation(
     short_option_value = abs(portfolio_summary.short_exposure.option_delta_exposure)
     cash_like_value = portfolio_summary.cash_like_value
 
-    # Create data for the three bars: long exposure, short exposure, and cash
-    long_exposure = long_stock_value + long_option_value
-    short_exposure = short_stock_value + short_option_value
+    # Categories for the chart
+    categories = ["Long", "Short", "Cash"]
 
-    # Create the stacked bar chart data
-    categories = ["Long Exposure", "Short Exposure", "Cash & Bonds"]
+    # Format values for display
+    title_text = "Asset Allocation (Exposure)"
 
-    # Values for each category
-    values = [long_exposure, short_exposure, cash_like_value]
-
-    # Note: In the future, we could implement stacked bars for each category
-    # to show the breakdown of stocks vs options within each exposure type
-
-    # Format text for display
-    if use_percentage:
-        total_value = sum(values)
-        title_text = "Asset Allocation (% of Portfolio)"
-
-        def text_format(v):
-            return f"{(v / total_value * 100):.1f}%" if total_value > 0 else "0.0%"
-    else:
-        title_text = "Asset Allocation (Exposure)"
-        text_format = format_currency
-
-    # Create the chart data with three separate traces
+    # Create the chart data with stacked bars for long and short exposure
     chart_data = {
         "data": [
-            # Long Exposure Bar
+            # Long Stock Exposure (base of long stack)
             {
                 "type": "bar",
-                "name": "Long Exposure",
-                "x": [categories[0]],
-                "y": [values[0]],
-                "text": [text_format(values[0])],
+                "name": "Long Stock",
+                "x": categories,
+                "y": [long_stock_value, 0, 0],  # Only for Long category
+                "text": [format_currency(long_stock_value), "", ""],
                 "textposition": "auto",
                 "marker": {
-                    "color": "#27AE60",  # Modern green for long
+                    "color": "#27AE60",  # Modern green for long stock
                     "line": {"width": 0},
                     "opacity": 0.9,
                 },
                 "hoverinfo": "text",
-                "hovertemplate": "<b>Long Exposure</b><br>%{text}<extra></extra>",
+                "hovertemplate": "<b>Long Stock</b><br>%{text}<extra></extra>",
             },
-            # Short Exposure Bar
+            # Long Option Exposure (top of long stack)
             {
                 "type": "bar",
-                "name": "Short Exposure",
-                "x": [categories[1]],
-                "y": [values[1]],
-                "text": [text_format(values[1])],
+                "name": "Long Options",
+                "x": categories,
+                "y": [long_option_value, 0, 0],  # Only for Long category
+                "text": [format_currency(long_option_value), "", ""],
                 "textposition": "auto",
                 "marker": {
-                    "color": "#E74C3C",  # Modern red for short
+                    "color": "#2ECC71",  # Lighter green for long options
                     "line": {"width": 0},
                     "opacity": 0.9,
                 },
                 "hoverinfo": "text",
-                "hovertemplate": "<b>Short Exposure</b><br>%{text}<extra></extra>",
+                "hovertemplate": "<b>Long Options</b><br>%{text}<extra></extra>",
             },
-            # Cash Bar
+            # Short Stock Exposure (base of short stack)
+            {
+                "type": "bar",
+                "name": "Short Stock",
+                "x": categories,
+                "y": [0, short_stock_value, 0],  # Only for Short category
+                "text": ["", format_currency(short_stock_value), ""],
+                "textposition": "auto",
+                "marker": {
+                    "color": "#E74C3C",  # Modern red for short stock
+                    "line": {"width": 0},
+                    "opacity": 0.9,
+                },
+                "hoverinfo": "text",
+                "hovertemplate": "<b>Short Stock</b><br>%{text}<extra></extra>",
+            },
+            # Short Option Exposure (top of short stack)
+            {
+                "type": "bar",
+                "name": "Short Options",
+                "x": categories,
+                "y": [0, short_option_value, 0],  # Only for Short category
+                "text": ["", format_currency(short_option_value), ""],
+                "textposition": "auto",
+                "marker": {
+                    "color": "#F1948A",  # Lighter red for short options
+                    "line": {"width": 0},
+                    "opacity": 0.9,
+                },
+                "hoverinfo": "text",
+                "hovertemplate": "<b>Short Options</b><br>%{text}<extra></extra>",
+            },
+            # Cash Bar (single bar, not stacked)
             {
                 "type": "bar",
                 "name": "Cash & Bonds",
-                "x": [categories[2]],
-                "y": [values[2]],
-                "text": [text_format(values[2])],
+                "x": categories,
+                "y": [0, 0, cash_like_value],  # Only for Cash category
+                "text": ["", "", format_currency(cash_like_value)],
                 "textposition": "auto",
                 "marker": {
                     "color": "#95A5A6",  # Modern grey for cash
@@ -107,6 +123,36 @@ def transform_for_asset_allocation(
                 },
                 "hoverinfo": "text",
                 "hovertemplate": "<b>Cash & Bonds</b><br>%{text}<extra></extra>",
+            },
+            # Total Long Exposure (invisible trace for total label)
+            {
+                "type": "bar",
+                "name": "Total Long",
+                "x": categories,
+                "y": [0, 0, 0],  # Zero height to make it invisible
+                "text": [format_currency(long_stock_value + long_option_value), "", ""],
+                "textposition": "outside",
+                "textfont": {"color": "#2C3E50", "size": 12},
+                "marker": {"color": "rgba(0,0,0,0)"},  # Transparent
+                "hoverinfo": "none",
+                "showlegend": False,
+            },
+            # Total Short Exposure (invisible trace for total label)
+            {
+                "type": "bar",
+                "name": "Total Short",
+                "x": categories,
+                "y": [0, 0, 0],  # Zero height to make it invisible
+                "text": [
+                    "",
+                    format_currency(short_stock_value + short_option_value),
+                    "",
+                ],
+                "textposition": "outside",
+                "textfont": {"color": "#2C3E50", "size": 12},
+                "marker": {"color": "rgba(0,0,0,0)"},  # Transparent
+                "hoverinfo": "none",
+                "showlegend": False,
             },
         ],
         "layout": {
@@ -119,9 +165,9 @@ def transform_for_asset_allocation(
             },
             "margin": {"l": 50, "r": 20, "t": 50, "b": 50, "pad": 4},
             "autosize": True,
-            "barmode": "group",
+            "barmode": "stack",  # Stack the bars instead of grouping them
             "yaxis": {
-                "title": "Exposure" if not use_percentage else "Percentage",
+                "title": "Exposure",
                 "gridcolor": "#ECF0F1",
                 "zerolinecolor": "#BDC3C7",
             },

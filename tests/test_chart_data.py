@@ -215,35 +215,63 @@ class TestChartDataTransformations:
 
     def test_asset_allocation_chart_values(self, mock_portfolio_summary):
         """Test that asset allocation chart values are correctly calculated."""
-        # Test with percentage values (default)
+        # Test with exposure values
         chart_data = transform_for_asset_allocation(mock_portfolio_summary)
 
         # Verify that the chart has the expected structure
         assert "data" in chart_data
-        assert len(chart_data["data"]) == 3  # Three traces for Long, Short, Cash
 
-        # Test with absolute values
+        # We now have 7 traces for the stacked bar chart:
+        # 1. Long Stock, 2. Long Options, 3. Short Stock, 4. Short Options,
+        # 5. Cash & Bonds, 6. Total Long (invisible), 7. Total Short (invisible)
+        assert len(chart_data["data"]) == 7
+
+        # Verify we have the expected trace names
+        trace_names = [trace["name"] for trace in chart_data["data"]]
+        assert "Long Stock" in trace_names
+        assert "Long Options" in trace_names
+        assert "Short Stock" in trace_names
+        assert "Short Options" in trace_names
+        assert "Cash & Bonds" in trace_names
+
+        # Test with absolute values (note: parameter is kept for backward compatibility)
         chart_data = transform_for_asset_allocation(
             mock_portfolio_summary, use_percentage=False
         )
 
-        # Extract the values from the chart data
-        long_trace = next(
-            trace for trace in chart_data["data"] if trace["name"] == "Long Exposure"
+        # Extract the values from the chart data for each component
+        long_stock_trace = next(
+            trace for trace in chart_data["data"] if trace["name"] == "Long Stock"
         )
-        short_trace = next(
-            trace for trace in chart_data["data"] if trace["name"] == "Short Exposure"
+        long_options_trace = next(
+            trace for trace in chart_data["data"] if trace["name"] == "Long Options"
+        )
+        short_stock_trace = next(
+            trace for trace in chart_data["data"] if trace["name"] == "Short Stock"
+        )
+        short_options_trace = next(
+            trace for trace in chart_data["data"] if trace["name"] == "Short Options"
         )
         cash_trace = next(
             trace for trace in chart_data["data"] if trace["name"] == "Cash & Bonds"
         )
 
-        # Verify that the values match the portfolio summary
-        assert long_trace["y"][0] == mock_portfolio_summary.long_exposure.total_exposure
+        # Verify the values match the expected values
         assert (
-            short_trace["y"][0] == mock_portfolio_summary.short_exposure.total_exposure
+            long_stock_trace["y"][0]
+            == mock_portfolio_summary.long_exposure.stock_exposure
         )
-        assert cash_trace["y"][0] == mock_portfolio_summary.cash_like_value
+        assert (
+            long_options_trace["y"][0]
+            == mock_portfolio_summary.long_exposure.option_delta_exposure
+        )
+        assert short_stock_trace["y"][1] == abs(
+            mock_portfolio_summary.short_exposure.stock_exposure
+        )
+        assert short_options_trace["y"][1] == abs(
+            mock_portfolio_summary.short_exposure.option_delta_exposure
+        )
+        assert cash_trace["y"][2] == mock_portfolio_summary.cash_like_value
 
     def test_treemap_chart_values(self, mock_portfolio_groups):
         """Test that treemap chart values are correctly calculated."""

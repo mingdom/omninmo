@@ -38,19 +38,16 @@ class TestChartComponents:
 
         # Verify that the chart contains a Graph component with the correct ID
         graph_component = None
-        button_value_component = None
-        button_percent_component = None
+        view_container = None
 
         # Find the essential components without assuming specific structure
         def find_components(component):
-            nonlocal graph_component, button_value_component, button_percent_component
+            nonlocal graph_component, view_container
             if hasattr(component, "id"):
                 if component.id == "asset-allocation-chart":
                     graph_component = component
-                elif component.id == "allocation-value-btn":
-                    button_value_component = component
-                elif component.id == "allocation-percent-btn":
-                    button_percent_component = component
+                elif component.id == "allocation-view-container":
+                    view_container = component
 
             # Recursively check children
             if hasattr(component, "children") and component.children:
@@ -64,12 +61,10 @@ class TestChartComponents:
 
         # Verify essential components exist
         assert graph_component is not None, "Graph component not found"
-        assert button_value_component is not None, "Value button not found"
-        assert button_percent_component is not None, "Percentage button not found"
+        assert view_container is not None, "View container not found"
 
-        # Verify button properties
-        assert button_value_component.children == "Exposure"
-        assert button_percent_component.children == "Percentage"
+        # Verify view container is hidden
+        assert view_container.style.get("display") == "none"
 
     def test_create_exposure_chart(self):
         """Test that exposure chart can be created correctly."""
@@ -308,22 +303,29 @@ class TestChartDataTransformation:
 
         # Verify data contains the expected traces
         data = chart_data["data"]
-        assert len(data) == 3  # Three traces for the pie chart (Long, Short, Cash)
+
+        # We now have 7 traces for the stacked bar chart:
+        # 1. Long Stock, 2. Long Options, 3. Short Stock, 4. Short Options,
+        # 5. Cash & Bonds, 6. Total Long (invisible), 7. Total Short (invisible)
+        assert len(data) == 7
 
         # Verify the traces have the expected structure
         for trace in data:
             assert "name" in trace
-            assert "text" in trace
+            assert "type" in trace
+            assert "x" in trace
+            assert "y" in trace
             assert "marker" in trace
-            assert "color" in trace["marker"]
 
         # Verify the trace names
         trace_names = [trace["name"] for trace in data]
-        assert "Long Exposure" in trace_names
-        assert "Short Exposure" in trace_names
+        assert "Long Stock" in trace_names
+        assert "Long Options" in trace_names
+        assert "Short Stock" in trace_names
+        assert "Short Options" in trace_names
         assert "Cash & Bonds" in trace_names
 
-        # Test with absolute values
+        # Test with absolute values (note: parameter is kept for backward compatibility)
         chart_data = transform_for_asset_allocation(
             mock_portfolio_summary, use_percentage=False
         )
@@ -331,12 +333,14 @@ class TestChartDataTransformation:
         # Verify data contains the expected traces
         data = chart_data["data"]
 
-        # Find the long exposure trace
-        long_trace = next(trace for trace in data if trace["name"] == "Long Exposure")
+        # Extract the values from the chart data for each component
+        long_stock_trace = next(
+            trace for trace in data if trace["name"] == "Long Stock"
+        )
 
         # Verify the values are absolute (not percentages)
         assert (
-            float(long_trace["text"][0].replace("$", "").replace(",", "")) > 1000
+            float(long_stock_trace["text"][0].replace("$", "").replace(",", "")) > 1000
         )  # Long exposure should be a large number, not a percentage
 
     def test_transform_for_exposure_chart(self, mock_portfolio_summary):
@@ -551,8 +555,7 @@ class TestChartIntegration:
             "charts-collapse",
             "charts-collapse-button",
             "charts-collapse-icon",
-            "allocation-value-btn",
-            "allocation-percent-btn",
+            "allocation-view-container",  # Hidden container instead of toggle buttons
             "exposure-net-btn",
             "exposure-beta-btn",
             "treemap-group-by",
