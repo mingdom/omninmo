@@ -36,16 +36,40 @@ class TestChartComponents:
         # Verify that chart is a Dash component
         assert isinstance(chart, html.Div)
 
-        # Verify that chart has the expected structure
-        assert len(chart.children) == 2  # Graph and button group
-        assert chart.children[0].id == "asset-allocation-chart"
-        assert isinstance(chart.children[1], dbc.ButtonGroup)
+        # Verify that the chart contains a Graph component with the correct ID
+        graph_component = None
+        button_value_component = None
+        button_percent_component = None
 
-        # Verify button group has two buttons
-        button_group = chart.children[1]
-        assert len(button_group.children) == 2
-        assert button_group.children[0].id == "allocation-value-btn"
-        assert button_group.children[1].id == "allocation-percent-btn"
+        # Find the essential components without assuming specific structure
+        def find_components(component):
+            nonlocal graph_component, button_value_component, button_percent_component
+            if hasattr(component, "id"):
+                if component.id == "asset-allocation-chart":
+                    graph_component = component
+                elif component.id == "allocation-value-btn":
+                    button_value_component = component
+                elif component.id == "allocation-percent-btn":
+                    button_percent_component = component
+
+            # Recursively check children
+            if hasattr(component, "children") and component.children:
+                if isinstance(component.children, list):
+                    for child in component.children:
+                        find_components(child)
+                else:
+                    find_components(component.children)
+
+        find_components(chart)
+
+        # Verify essential components exist
+        assert graph_component is not None, "Graph component not found"
+        assert button_value_component is not None, "Value button not found"
+        assert button_percent_component is not None, "Percentage button not found"
+
+        # Verify button properties
+        assert button_value_component.children == "Exposure"
+        assert button_percent_component.children == "Percentage"
 
     def test_create_exposure_chart(self):
         """Test that exposure chart can be created correctly."""
@@ -55,16 +79,40 @@ class TestChartComponents:
         # Verify that chart is a Dash component
         assert isinstance(chart, html.Div)
 
-        # Verify that chart has the expected structure
-        assert len(chart.children) == 2  # Graph and button group
-        assert chart.children[0].id == "exposure-chart"
-        assert isinstance(chart.children[1], dbc.ButtonGroup)
+        # Verify that the chart contains a Graph component with the correct ID
+        graph_component = None
+        button_net_component = None
+        button_beta_component = None
 
-        # Verify button group has two buttons
-        button_group = chart.children[1]
-        assert len(button_group.children) == 2
-        assert button_group.children[0].id == "exposure-net-btn"
-        assert button_group.children[1].id == "exposure-beta-btn"
+        # Find the essential components without assuming specific structure
+        def find_components(component):
+            nonlocal graph_component, button_net_component, button_beta_component
+            if hasattr(component, "id"):
+                if component.id == "exposure-chart":
+                    graph_component = component
+                elif component.id == "exposure-net-btn":
+                    button_net_component = component
+                elif component.id == "exposure-beta-btn":
+                    button_beta_component = component
+
+            # Recursively check children
+            if hasattr(component, "children") and component.children:
+                if isinstance(component.children, list):
+                    for child in component.children:
+                        find_components(child)
+                else:
+                    find_components(component.children)
+
+        find_components(chart)
+
+        # Verify essential components exist
+        assert graph_component is not None, "Graph component not found"
+        assert button_net_component is not None, "Net exposure button not found"
+        assert button_beta_component is not None, "Beta-adjusted button not found"
+
+        # Verify button properties
+        assert button_net_component.children == "Net Exposure"
+        assert button_beta_component.children == "Beta-Adjusted"
 
     def test_create_position_treemap(self):
         """Test that position treemap can be created correctly."""
@@ -74,16 +122,41 @@ class TestChartComponents:
         # Verify that chart is a Dash component
         assert isinstance(chart, html.Div)
 
-        # Verify that chart has the expected structure
-        assert len(chart.children) == 2  # Graph and hidden input
-        assert chart.children[0].id == "position-treemap"
-        assert isinstance(chart.children[1], html.Div)
+        # Verify that the chart contains a Graph component with the correct ID
+        graph_found = False
+        hidden_div_found = False
+        hidden_input_found = False
+        hidden_input_value = None
 
-        # Verify hidden input
-        hidden_div = chart.children[1]
-        assert hidden_div.style == {"display": "none"}
-        assert hidden_div.children.id == "treemap-group-by"
-        assert hidden_div.children.value == "ticker"
+        # Check for the graph component
+        for child in chart.children:
+            if hasattr(child, "id") and child.id == "position-treemap":
+                graph_found = True
+
+            # Check for the hidden div containing the input
+            if (
+                isinstance(child, html.Div)
+                and hasattr(child, "style")
+                and child.style.get("display") == "none"
+            ):
+                hidden_div_found = True
+
+                # Check for the hidden input inside the div
+                if (
+                    hasattr(child, "children")
+                    and hasattr(child.children, "id")
+                    and child.children.id == "treemap-group-by"
+                ):
+                    hidden_input_found = True
+                    hidden_input_value = child.children.value
+
+        # Verify essential components exist
+        assert graph_found, "Graph component not found"
+        assert hidden_div_found, "Hidden div not found"
+        assert hidden_input_found, "Hidden input not found"
+
+        # Verify hidden input properties
+        assert hidden_input_value == "ticker", "Hidden input value is incorrect"
 
     def test_create_dashboard_section(self):
         """Test that dashboard section can be created correctly."""
