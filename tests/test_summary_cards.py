@@ -83,16 +83,14 @@ def test_format_summary_card_values(test_summary):
         "$10,000.00",  # Portfolio Value
         "$8,000.00",  # Net Exposure
         "",  # Net Exposure Percent
-        "1.20β",  # Net Beta
+        "1.20β",  # Portfolio Beta
+        "$10,800.00",  # Beta-Adjusted Net Exposure (14400 - 4800 + 1200)
         "$12,000.00",  # Long Exposure
         "",  # Long Exposure Percent
-        "1.20β",  # Long Beta
         "$4,000.00",  # Short Exposure
         "",  # Short Exposure Percent
-        "1.20β",  # Short Beta
         "$1,000.00",  # Options Exposure
         "",  # Options Exposure Percent
-        "1.20β",  # Options Beta
         "$2,000.00",  # Cash Value
         "",  # Cash Percent
     ]
@@ -120,16 +118,14 @@ def test_format_summary_card_values_with_missing_keys(test_summary):
         "$10,000.00",  # Portfolio Value (8000 + 2000)
         "$8,000.00",  # Net Exposure
         "",  # Net Exposure Percent
-        "1.20β",  # Net Beta
+        "1.20β",  # Portfolio Beta
+        "$10,800.00",  # Beta-Adjusted Net Exposure (14400 - 4800 + 1200)
         "$12,000.00",  # Long Exposure
         "",  # Long Exposure Percent
-        "1.20β",  # Long Beta
         "$4,000.00",  # Short Exposure
         "",  # Short Exposure Percent
-        "1.20β",  # Short Beta
         "$1,000.00",  # Options Exposure
         "",  # Options Exposure Percent
-        "1.20β",  # Options Beta
         "$2,000.00",  # Cash Value
         "",  # Cash Percent
     ]
@@ -149,7 +145,8 @@ def test_format_summary_card_values_with_invalid_data():
     # Check that the result has error values
     assert result[0] == "Error"  # Portfolio Value
     assert result[1] == "Error"  # Net Exposure
-    assert result[3] == "Error"  # Net Beta
+    assert result[3] == "Error"  # Portfolio Beta
+    assert result[4] == "Error"  # Beta-Adjusted Net Exposure
 
     # Call the format_summary_card_values function with an empty dictionary
     result = format_summary_card_values({})
@@ -157,7 +154,8 @@ def test_format_summary_card_values_with_invalid_data():
     # Check that the result has error values
     assert result[0] == "Error"  # Portfolio Value
     assert result[1] == "Error"  # Net Exposure
-    assert result[3] == "Error"  # Net Beta
+    assert result[3] == "Error"  # Portfolio Beta
+    assert result[4] == "Error"  # Beta-Adjusted Net Exposure
 
 
 def test_error_values():
@@ -168,7 +166,8 @@ def test_error_values():
     assert result[0] == "Error"  # Portfolio Value
     assert result[1] == "Error"  # Net Exposure
     assert result[2] == "Data missing"  # Net Exposure Percent
-    assert result[3] == "Error"  # Net Beta
+    assert result[3] == "Error"  # Portfolio Beta
+    assert result[4] == "Error"  # Beta-Adjusted Net Exposure
 
 
 # Integration Tests
@@ -194,6 +193,65 @@ def test_callback_registration():
 # It was too complex and fragile, focusing on implementation details rather than behavior
 
 
+def test_summary_cards_user_expectations():
+    """Test that summary cards meet user expectations.
+
+    This test focuses on what users expect to see, not implementation details.
+    It verifies that the summary cards display the expected information in a user-friendly way.
+    """
+    # Create a test app
+    app = create_app()
+
+    # Get the layout
+    layout = app.layout
+
+    # Find the summary card component
+    summary_card = None
+
+    def find_summary_card(component):
+        """Recursively find the summary card component."""
+        nonlocal summary_card
+        if hasattr(component, "id") and component.id == "summary-card":
+            summary_card = component
+            return True
+
+        if hasattr(component, "children"):
+            if isinstance(component.children, list):
+                for child in component.children:
+                    if find_summary_card(child):
+                        return True
+            elif component.children is not None:
+                return find_summary_card(component.children)
+
+        return False
+
+    # Search the layout
+    find_summary_card(layout)
+
+    # Check that the summary card was found
+    assert summary_card is not None, "Summary card not found in layout"
+
+    # Check that the summary card has the expected structure
+    # This is a high-level check that doesn't depend on implementation details
+    layout_str = str(summary_card)
+
+    # Check for the presence of key metrics that users expect to see
+    assert "Portfolio Value" in layout_str, "Portfolio Value not found in summary cards"
+    assert "Net Exposure" in layout_str, "Net Exposure not found in summary cards"
+    assert "Portfolio Beta" in layout_str, "Portfolio Beta not found in summary cards"
+    assert "Beta-Adjusted Net Exposure" in layout_str, (
+        "Beta-Adjusted Net Exposure not found in summary cards"
+    )
+    assert "Long Exposure" in layout_str, "Long Exposure not found in summary cards"
+    assert "Short Exposure" in layout_str, "Short Exposure not found in summary cards"
+    assert "Options Exposure" in layout_str, (
+        "Options Exposure not found in summary cards"
+    )
+    assert "Cash & Equivalents" in layout_str, (
+        "Cash & Equivalents not found in summary cards"
+    )
+
+
 def test_summary_cards_rendered_and_callback_registered():
     """Test that summary cards are rendered in the layout and their callback is registered.
 
@@ -212,6 +270,8 @@ def test_summary_cards_rendered_and_callback_registered():
         "summary-card",
         "portfolio-value",
         "total-value",
+        "portfolio-beta",
+        "beta-adjusted-exposure",
         "long-exposure",
         "short-exposure",
         "options-exposure",

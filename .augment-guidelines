@@ -133,8 +133,8 @@ Handle errors gracefully and log information that helps diagnose issues quickly.
 Thorough testing prevents bugs and ensures code behaves as expected in all scenarios.
 
 - **Testing Workflow**:
-  - **Run Linter Regularly**: Run `make lint` to check for code quality issues, unused imports/functions, and other potential problems
-  - **Always Test Changes**: Run `make test` after ANY change - no exceptions!
+  - **Run Linter Frequently**: Run `make lint` very frequently - it's cheap, fast, and effective at catching issues early
+  - **Always Test Before Completion**: Run `make test` before considering any work complete - this is essential
   - **Check Test Logs**: Always review `logs/test_latest.log` after running tests to identify failures
   - **Fix Linting Issues**: Address linting errors before committing code to maintain code quality
   - **Automated vs. Manual Testing**:
@@ -149,6 +149,15 @@ Thorough testing prevents bugs and ensures code behaves as expected in all scena
     - Format as a checklist that the user can follow easily
   - **Review App Logs**: Check `logs/test_latest.log` after running tests to catch errors
   - **Test Real Data**: Use `src/lab/portfolio.csv` for testing with real portfolio data
+
+- **Test Organization**:
+  - **1:1 Test File Mapping**: Tests should be 1:1 with the code file they are testing
+    - For each source file (e.g., `util.py`), create a corresponding test file (e.g., `test_util.py`)
+    - Maintain the same directory structure in tests as in the source code
+    - This makes it easy to find tests for specific functionality
+  - **New Functionality, New Tests**: Always write tests for new functionality added to the codebase
+    - Tests should be written alongside the implementation, not as an afterthought
+    - No new feature is complete without corresponding tests
 
 - **Testing Strategy**:
   - **Test Behavior**: Focus on functionality, not implementation details
