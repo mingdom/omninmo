@@ -68,8 +68,13 @@ def transform_for_asset_allocation(
                 "y": [values[0]],
                 "text": [text_format(values[0])],
                 "textposition": "auto",
-                "marker": {"color": "#4CAF50"},  # Green for long
+                "marker": {
+                    "color": "#27AE60",  # Modern green for long
+                    "line": {"width": 0},
+                    "opacity": 0.9,
+                },
                 "hoverinfo": "text",
+                "hovertemplate": "<b>Long Exposure</b><br>%{text}<extra></extra>",
             },
             # Short Exposure Bar
             {
@@ -79,8 +84,13 @@ def transform_for_asset_allocation(
                 "y": [values[1]],
                 "text": [text_format(values[1])],
                 "textposition": "auto",
-                "marker": {"color": "#F44336"},  # Red for short
+                "marker": {
+                    "color": "#E74C3C",  # Modern red for short
+                    "line": {"width": 0},
+                    "opacity": 0.9,
+                },
                 "hoverinfo": "text",
+                "hovertemplate": "<b>Short Exposure</b><br>%{text}<extra></extra>",
             },
             # Cash Bar
             {
@@ -90,18 +100,36 @@ def transform_for_asset_allocation(
                 "y": [values[2]],
                 "text": [text_format(values[2])],
                 "textposition": "auto",
-                "marker": {"color": "#9E9E9E"},  # Grey for cash
+                "marker": {
+                    "color": "#95A5A6",  # Modern grey for cash
+                    "line": {"width": 0},
+                    "opacity": 0.9,
+                },
                 "hoverinfo": "text",
+                "hovertemplate": "<b>Cash & Bonds</b><br>%{text}<extra></extra>",
             },
         ],
         "layout": {
-            "title": title_text,
+            "title": {"text": title_text, "font": {"size": 16, "color": "#2C3E50"}},
             "showlegend": True,
-            "legend": {"orientation": "h", "y": -0.1},
-            "margin": {"l": 50, "r": 20, "t": 50, "b": 50},
+            "legend": {
+                "orientation": "h",
+                "y": -0.1,
+                "bgcolor": "rgba(255,255,255,0.9)",
+            },
+            "margin": {"l": 50, "r": 20, "t": 50, "b": 50, "pad": 4},
             "autosize": True,
             "barmode": "group",
-            "yaxis": {"title": "Exposure" if not use_percentage else "Percentage"},
+            "yaxis": {
+                "title": "Exposure" if not use_percentage else "Percentage",
+                "gridcolor": "#ECF0F1",
+                "zerolinecolor": "#BDC3C7",
+            },
+            "plot_bgcolor": "white",
+            "paper_bgcolor": "white",
+            "font": {
+                "family": "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
+            },
         },
     }
 
@@ -130,7 +158,7 @@ def transform_for_exposure_chart(
         # Use the utility function for beta-adjusted net exposure
         net_value = calculate_beta_adjusted_net_exposure(
             portfolio_summary.long_exposure.total_beta_adjusted,
-            portfolio_summary.short_exposure.total_beta_adjusted
+            portfolio_summary.short_exposure.total_beta_adjusted,
         )
     else:
         long_value = portfolio_summary.long_exposure.total_exposure
@@ -146,8 +174,8 @@ def transform_for_exposure_chart(
     # Format values for display
     text_values = [format_currency(value) for value in values]
 
-    # Colors for the bars
-    colors = ["#4CAF50", "#F44336", "#673AB7", "#2196F3"]  # Green, Red, Purple, Blue
+    # Colors for the bars - modern financial palette
+    colors = ["#27AE60", "#E74C3C", "#9B59B6", "#3498DB"]  # Green, Red, Purple, Blue
 
     # Create the chart data
     chart_data = {
@@ -159,16 +187,35 @@ def transform_for_exposure_chart(
                 "text": text_values,
                 "textposition": "auto",
                 "hoverinfo": "text",
-                "marker": {"color": colors},
+                "hovertemplate": "<b>%{x}</b><br>%{text}<extra></extra>",
+                "marker": {"color": colors, "line": {"width": 0}, "opacity": 0.9},
             }
         ],
         "layout": {
-            "title": "Market Exposure"
-            + (" (Beta-Adjusted)" if use_beta_adjusted else ""),
-            "xaxis": {"title": "Exposure Type"},
-            "yaxis": {"title": "Exposure ($)"},
-            "margin": {"l": 50, "r": 20, "t": 30, "b": 50},
+            "title": {
+                "text": "Market Exposure"
+                + (" (Beta-Adjusted)" if use_beta_adjusted else ""),
+                "font": {"size": 16, "color": "#2C3E50"},
+            },
+            "xaxis": {
+                "title": "Exposure Type",
+                "titlefont": {"size": 12, "color": "#7F8C8D"},
+                "tickfont": {"size": 11},
+            },
+            "yaxis": {
+                "title": "Exposure ($)",
+                "titlefont": {"size": 12, "color": "#7F8C8D"},
+                "tickfont": {"size": 11},
+                "gridcolor": "#ECF0F1",
+                "zerolinecolor": "#BDC3C7",
+            },
+            "margin": {"l": 50, "r": 20, "t": 50, "b": 50, "pad": 4},
             "autosize": True,  # Allow the chart to resize with its container
+            "plot_bgcolor": "white",
+            "paper_bgcolor": "white",
+            "font": {
+                "family": "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
+            },
         },
     }
 
@@ -239,10 +286,10 @@ def transform_for_treemap(
         values.append(abs(exposure))  # Use absolute exposure for sizing
         texts.append(f"{ticker}: {format_currency(exposure)}")
 
-        # Color based on long/short
+        # Color based on long/short - using modern financial colors
         color = (
-            "#4CAF50" if exposure > 0 else "#F44336"
-        )  # Green for long, Red for short
+            "#27AE60" if exposure > 0 else "#E74C3C"
+        )  # Modern green for long, modern red for short
         colors.append(color)
 
     # We don't need to add individual positions anymore - just show the ticker level
@@ -257,13 +304,30 @@ def transform_for_treemap(
                 "values": values,
                 "text": texts,
                 "hoverinfo": "text",
-                "marker": {"colors": colors},
+                "marker": {
+                    "colors": colors,
+                    "line": {"width": 1, "color": "#FFFFFF"},
+                    "pad": 3,
+                },
+                "textfont": {
+                    "family": "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
+                    "size": 12,
+                    "color": "#FFFFFF",
+                },
+                "hovertemplate": "%{text}<extra></extra>",
             }
         ],
         "layout": {
-            "title": "Position Size by Exposure",
-            "margin": {"l": 0, "r": 0, "t": 30, "b": 0},
+            "title": {
+                "text": "Position Size by Exposure",
+                "font": {"size": 16, "color": "#2C3E50"},
+            },
+            "margin": {"l": 0, "r": 0, "t": 50, "b": 0, "pad": 4},
             "autosize": True,  # Allow the chart to resize with its container
+            "paper_bgcolor": "white",
+            "font": {
+                "family": "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
+            },
         },
     }
 
@@ -379,14 +443,45 @@ def transform_for_sector_allocation(
                 "text": text_values,
                 "textinfo": "label+text",
                 "hoverinfo": "label+text+percent",
+                "marker": {
+                    "line": {"width": 1, "color": "#FFFFFF"},
+                    "colors": [
+                        "#3498DB",
+                        "#2ECC71",
+                        "#9B59B6",
+                        "#F1C40F",
+                        "#E74C3C",
+                        "#1ABC9C",
+                        "#34495E",
+                        "#D35400",
+                        "#7F8C8D",
+                        "#27AE60",
+                        "#2980B9",
+                        "#8E44AD",
+                    ],
+                },
+                "textfont": {
+                    "family": "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
+                    "size": 11,
+                    "color": "#FFFFFF",
+                },
+                "hole": 0.4,  # Creates a donut chart for a more modern look
             }
         ],
         "layout": {
-            "title": title_text,
+            "title": {"text": title_text, "font": {"size": 16, "color": "#2C3E50"}},
             "showlegend": True,
-            "legend": {"orientation": "h", "y": -0.1},
-            "margin": {"l": 0, "r": 0, "t": 30, "b": 0},
+            "legend": {
+                "orientation": "h",
+                "y": -0.1,
+                "bgcolor": "rgba(255,255,255,0.9)",
+            },
+            "margin": {"l": 0, "r": 0, "t": 50, "b": 0, "pad": 4},
             "height": 400,
+            "paper_bgcolor": "white",
+            "font": {
+                "family": "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
+            },
         },
     }
 

@@ -27,32 +27,37 @@ def create_asset_allocation_chart():
         [
             dcc.Graph(
                 id="asset-allocation-chart",
-                config={"displayModeBar": False},
+                config={"displayModeBar": False, "responsive": True},
                 className="dash-chart",
             ),
             # Add controls for toggling between absolute value and percentage
-            dbc.ButtonGroup(
-                [
-                    dbc.Button(
-                        "Exposure",
-                        id="allocation-value-btn",
-                        color="primary",
-                        outline=True,
-                        size="sm",
-                        n_clicks=0,
-                    ),
-                    dbc.Button(
-                        "Percentage",
-                        id="allocation-percent-btn",
-                        color="primary",
-                        outline=True,
-                        size="sm",
-                        active=True,
-                        n_clicks=0,
-                    ),
-                ],
-                size="sm",
-                className="mt-2",
+            html.Div(
+                dbc.ButtonGroup(
+                    [
+                        dbc.Button(
+                            "Exposure",
+                            id="allocation-value-btn",
+                            color="primary",
+                            outline=True,
+                            size="sm",
+                            n_clicks=0,
+                            className="px-3",
+                        ),
+                        dbc.Button(
+                            "Percentage",
+                            id="allocation-percent-btn",
+                            color="primary",
+                            outline=True,
+                            size="sm",
+                            active=True,
+                            n_clicks=0,
+                            className="px-3",
+                        ),
+                    ],
+                    size="sm",
+                    className="chart-toggle-buttons",
+                ),
+                className="d-flex justify-content-center mt-3",
             ),
         ],
         className="mb-4",
@@ -66,32 +71,37 @@ def create_exposure_chart():
         [
             dcc.Graph(
                 id="exposure-chart",
-                config={"displayModeBar": False},
+                config={"displayModeBar": False, "responsive": True},
                 className="dash-chart",
             ),
             # Add controls for toggling between net and beta-adjusted
-            dbc.ButtonGroup(
-                [
-                    dbc.Button(
-                        "Net Exposure",
-                        id="exposure-net-btn",
-                        color="primary",
-                        outline=True,
-                        size="sm",
-                        n_clicks=0,
-                    ),
-                    dbc.Button(
-                        "Beta-Adjusted",
-                        id="exposure-beta-btn",
-                        color="primary",
-                        outline=True,
-                        size="sm",
-                        active=True,
-                        n_clicks=0,
-                    ),
-                ],
-                size="sm",
-                className="mt-2",
+            html.Div(
+                dbc.ButtonGroup(
+                    [
+                        dbc.Button(
+                            "Net Exposure",
+                            id="exposure-net-btn",
+                            color="primary",
+                            outline=True,
+                            size="sm",
+                            n_clicks=0,
+                            className="px-3",
+                        ),
+                        dbc.Button(
+                            "Beta-Adjusted",
+                            id="exposure-beta-btn",
+                            color="primary",
+                            outline=True,
+                            size="sm",
+                            active=True,
+                            n_clicks=0,
+                            className="px-3",
+                        ),
+                    ],
+                    size="sm",
+                    className="chart-toggle-buttons",
+                ),
+                className="d-flex justify-content-center mt-3",
             ),
         ],
         className="mb-4",
@@ -105,7 +115,7 @@ def create_position_treemap():
         [
             dcc.Graph(
                 id="position-treemap",
-                config={"displayModeBar": False},
+                config={"displayModeBar": False, "responsive": True},
                 className="dash-chart",
             ),
             # Hidden input to maintain the 'ticker' grouping without a visible toggle

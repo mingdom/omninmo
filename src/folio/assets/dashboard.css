@@ -3,24 +3,36 @@
 /* Chart cards */
 .chart-card {
     border: none;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    transition: box-shadow 0.3s ease;
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    transition: all 0.3s ease;
     overflow: hidden;
+    background-color: #ffffff;
 }
 
 .chart-card:hover {
-    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
 }
 
 .chart-card .card-header {
-    background-color: #f8f9fa;
-    border-bottom: none;
-    padding: 0.75rem 1rem;
+    background: linear-gradient(to right, #f8f9fa, #ffffff);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    padding: 1rem 1.25rem;
+    border-radius: 10px 10px 0 0 !important;
+}
+
+.chart-card .card-header h5 {
+    font-weight: 600;
+    font-size: 1.1rem;
+    color: #2C3E50;
+    margin: 0;
 }
 
 .chart-card .card-header button {
     font-weight: 600;
     font-size: 1rem;
+    color: #2C3E50;
 }
 
 .chart-card .card-body {
@@ -39,9 +51,11 @@
     width: 100% !important;
     max-width: 100% !important;
     height: auto !important;
-    min-height: 300px;
-    max-height: 400px;
+    min-height: 350px;
+    max-height: 450px;
     overflow: hidden !important;
+    border-radius: 0 0 10px 10px;
+    padding: 0.5rem;
 }
 
 /* Metric cards */
@@ -81,9 +95,43 @@
 
 /* Chart controls */
 .chart-controls {
-    margin-top: 10px;
+    margin-top: 12px;
     display: flex;
     justify-content: center;
+}
+
+/* Chart toggle buttons */
+.chart-toggle-buttons {
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.btn-group .btn-outline-primary {
+    border-color: #3498DB;
+    color: #3498DB;
+    transition: all 0.2s ease;
+    border-width: 1px;
+}
+
+.btn-group .btn-outline-primary:hover,
+.btn-group .btn-outline-primary:active,
+.btn-group .btn-outline-primary.active {
+    background-color: #3498DB;
+    border-color: #3498DB;
+    color: white;
+    box-shadow: 0 2px 5px rgba(52, 152, 219, 0.3);
+}
+
+/* Chart tooltips */
+.plotly-tooltip {
+    background-color: rgba(255, 255, 255, 0.95) !important;
+    border: 1px solid rgba(0, 0, 0, 0.1) !important;
+    border-radius: 6px !important;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1) !important;
+    padding: 8px 12px !important;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+    font-size: 12px !important;
 }
 
 /* Collapsible sections */
