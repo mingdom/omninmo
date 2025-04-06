@@ -308,6 +308,7 @@ class StockPosition:
     beta: float
     market_exposure: float  # Quantity * Current Price (fetched at runtime)
     beta_adjusted_exposure: float  # Market Exposure * Beta
+    position_type: str = "stock"  # Always "stock" for StockPosition
 
     def __init__(
         self,
@@ -317,6 +318,7 @@ class StockPosition:
         beta_adjusted_exposure: float,
         market_exposure: float | None = None,
         market_value: float | None = None,
+        position_type: str = "stock",  # Added position_type parameter
     ):
         """Initialize a StockPosition with backward compatibility for market_value.
 
@@ -327,6 +329,7 @@ class StockPosition:
             beta_adjusted_exposure: Beta-adjusted market exposure
             market_exposure: Market exposure (quantity * price)
             market_value: DEPRECATED - Use market_exposure instead
+            position_type: Type of position, always "stock" for StockPosition
         """
         from .logger import logger
 
@@ -334,6 +337,7 @@ class StockPosition:
         self.quantity = quantity
         self.beta = beta
         self.beta_adjusted_exposure = beta_adjusted_exposure
+        self.position_type = position_type  # Store the position_type
 
         # Handle market_value for backward compatibility
         if market_value is not None and market_exposure is None:
@@ -392,6 +396,7 @@ class StockPosition:
             beta=data["beta"],
             market_exposure=data["market_exposure"],
             beta_adjusted_exposure=data["beta_adjusted_exposure"],
+            position_type=data.get("position_type", "stock"),  # Pass position_type
         )
 
 

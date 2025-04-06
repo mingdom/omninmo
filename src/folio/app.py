@@ -664,11 +664,13 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
                 stock_position = None
                 if g["stock_position"]:
                     stock_position_data = g["stock_position"].copy()
-                    # Remove attributes that don't exist in Position class
+                    # Remove attributes that don't exist in StockPosition class
                     if "sector" in stock_position_data:
                         stock_position_data.pop("sector")
                     if "is_cash_like" in stock_position_data:
                         stock_position_data.pop("is_cash_like")
+                    if "position_type" in stock_position_data:
+                        stock_position_data.pop("position_type")
                     stock_position = StockPosition(**stock_position_data)
                 option_positions = [
                     OptionPosition(**opt) for opt in g["option_positions"]
