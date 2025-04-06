@@ -51,7 +51,9 @@ class TestGeminiClient(unittest.TestCase):
             del os.environ["GEMINI_API_KEY"]
 
         # Check that initializing the client raises an error
-        with pytest.raises(ValueError, match="GEMINI_API_KEY environment variable not set"):
+        with pytest.raises(
+            ValueError, match="GEMINI_API_KEY environment variable not set"
+        ):
             GeminiClient()
 
         # Check that configure was not called
@@ -61,7 +63,7 @@ class TestGeminiClient(unittest.TestCase):
 
     @patch("google.generativeai.configure")
     @patch("google.generativeai.GenerativeModel")
-    def test_chat_sync_basic(self, mock_model, mock_configure):
+    def test_chat_sync_basic(self, mock_model, _mock_configure):
         """Test that the chat_sync method works correctly."""
         # Set up mocks
         mock_model_instance = MagicMock()
@@ -94,7 +96,7 @@ class TestGeminiClient(unittest.TestCase):
 
     @patch("google.generativeai.configure")
     @patch("google.generativeai.GenerativeModel")
-    def test_chat_sync_with_error(self, mock_model, mock_configure):
+    def test_chat_sync_with_error(self, mock_model, _mock_configure):
         """Test that the chat_sync method handles errors correctly."""
         # Set up mocks
         mock_model_instance = MagicMock()

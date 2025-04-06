@@ -9,7 +9,7 @@ from src.folio.portfolio import process_portfolio_data
 def mock_get_beta(monkeypatch):
     """Mock get_beta to return 1.25 for TSM"""
 
-    def mock_beta(ticker: str, description: str = "") -> float:
+    def mock_beta(ticker: str, _description: str = "") -> float:
         if ticker == "TSM":
             return 1.25
         return 1.0

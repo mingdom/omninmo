@@ -21,7 +21,7 @@ import pytest
 import requests
 
 # Add the project root to the Python path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from src.fmp import DataFetcher
 
@@ -122,7 +122,12 @@ class TestDataFetcherInitialization:
     def test_init_with_custom_ttl(self):
         """Test initialization with custom cache TTL from config."""
         with patch.dict(os.environ, {"FMP_API_KEY": "test_key"}):
-            with patch("src.v2.config.config.get", side_effect=lambda key, default=None: 3600 if key == "app.cache.ttl" else default):
+            with patch(
+                "src.v2.config.config.get",
+                side_effect=lambda key, default=None: 3600
+                if key == "app.cache.ttl"
+                else default,
+            ):
                 fetcher = DataFetcher()
                 assert fetcher.cache_ttl == 3600
 
@@ -167,7 +172,9 @@ class TestDataFetching:
                 cache_file = os.path.join(temp_cache_dir, "AAPL_1y_1d.csv")
                 assert os.path.exists(cache_file)
 
-    def test_fetch_data_from_cache(self, mock_response, temp_cache_dir, sample_dataframe):
+    def test_fetch_data_from_cache(
+        self, mock_response, temp_cache_dir, sample_dataframe
+    ):
         """Test fetching data from cache."""
         with patch.dict(os.environ, {"FMP_API_KEY": "test_key"}):
             # Create cache file
@@ -187,7 +194,9 @@ class TestDataFetching:
                 # Data should match sample
                 pd.testing.assert_frame_equal(df, sample_dataframe)
 
-    def test_fetch_data_expired_cache(self, mock_response, temp_cache_dir, sample_dataframe):
+    def test_fetch_data_expired_cache(
+        self, mock_response, temp_cache_dir, sample_dataframe
+    ):
         """Test fetching data with expired cache."""
         with patch.dict(os.environ, {"FMP_API_KEY": "test_key"}):
             # Create cache file
@@ -260,7 +269,10 @@ class TestErrorHandling:
             os.utime(cache_file, (old_time, old_time))
 
             # Simulate network error
-            with patch("requests.get", side_effect=requests.exceptions.ConnectionError("Network error")):
+            with patch(
+                "requests.get",
+                side_effect=requests.exceptions.ConnectionError("Network error"),
+            ):
                 fetcher = DataFetcher(cache_dir=temp_cache_dir)
                 df = fetcher.fetch_data("AAPL", period="1y")
 
@@ -271,7 +283,10 @@ class TestErrorHandling:
         """Test network error without cache fallback raises exception."""
         with patch.dict(os.environ, {"FMP_API_KEY": "test_key"}):
             # Simulate network error with no cache
-            with patch("requests.get", side_effect=requests.exceptions.ConnectionError("Network error")):
+            with patch(
+                "requests.get",
+                side_effect=requests.exceptions.ConnectionError("Network error"),
+            ):
                 fetcher = DataFetcher(cache_dir=temp_cache_dir)
                 with pytest.raises(requests.exceptions.ConnectionError):
                     fetcher.fetch_data("AAPL", period="1y")
@@ -304,7 +319,7 @@ class TestDataFormat:
                 for col in required_columns:
                     assert col in df.columns, f"Column {col} not found in DataFrame"
 
-    def test_data_sorting(self, mock_response, temp_cache_dir):
+    def test_data_sorting(self, temp_cache_dir):
         """Test that data is sorted by date in ascending order."""
         # Modify mock response to have unsorted dates
         unsorted_response = MagicMock()
@@ -312,10 +327,31 @@ class TestDataFormat:
         unsorted_response.json.return_value = {
             "symbol": "AAPL",
             "historical": [
-                {"date": "2023-01-05", "open": 127.13, "high": 127.77, "low": 124.76, "close": 125.02, "volume": 80829500},
-                {"date": "2023-01-03", "open": 130.28, "high": 130.9, "low": 124.17, "close": 125.07, "volume": 112117500},
-                {"date": "2023-01-04", "open": 126.89, "high": 128.66, "low": 125.08, "close": 126.36, "volume": 88883500}
-            ]
+                {
+                    "date": "2023-01-05",
+                    "open": 127.13,
+                    "high": 127.77,
+                    "low": 124.76,
+                    "close": 125.02,
+                    "volume": 80829500,
+                },
+                {
+                    "date": "2023-01-03",
+                    "open": 130.28,
+                    "high": 130.9,
+                    "low": 124.17,
+                    "close": 125.07,
+                    "volume": 112117500,
+                },
+                {
+                    "date": "2023-01-04",
+                    "open": 126.89,
+                    "high": 128.66,
+                    "low": 125.08,
+                    "close": 126.36,
+                    "volume": 88883500,
+                },
+            ],
         }
 
         with patch.dict(os.environ, {"FMP_API_KEY": "test_key"}):
@@ -345,7 +381,9 @@ class TestPeriodHandling:
 
                 # Check that date range is approximately 2 years
                 today = datetime.now().strftime("%Y-%m-%d")
-                two_years_ago = (datetime.now() - timedelta(days=365*2)).strftime("%Y-%m")
+                two_years_ago = (datetime.now() - timedelta(days=365 * 2)).strftime(
+                    "%Y-%m"
+                )
 
                 assert today in url
                 assert two_years_ago in url
@@ -362,7 +400,9 @@ class TestPeriodHandling:
 
                 # Check that date range is approximately 6 months
                 today = datetime.now().strftime("%Y-%m-%d")
-                six_months_ago = (datetime.now() - timedelta(days=30*6)).strftime("%Y-%m")
+                six_months_ago = (datetime.now() - timedelta(days=30 * 6)).strftime(
+                    "%Y-%m"
+                )
 
                 assert today in url
                 assert six_months_ago in url
@@ -391,9 +431,12 @@ class TestBetaCalculation:
     def test_beta_calculation(self, mock_response, mock_spy_response, temp_cache_dir):
         """Test beta calculation with mock data."""
         with patch.dict(os.environ, {"FMP_API_KEY": "test_key"}):
-            with patch("requests.get", side_effect=lambda url, params=None:
-                      mock_spy_response if "SPY" in url else mock_response):
-
+            with patch(
+                "requests.get",
+                side_effect=lambda url, params=None: mock_spy_response
+                if "SPY" in url
+                else mock_response,
+            ):
                 fetcher = DataFetcher(cache_dir=temp_cache_dir)
 
                 # Get stock and market data
