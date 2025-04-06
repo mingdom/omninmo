@@ -126,15 +126,17 @@ def transform_for_exposure_chart(
         long_value = portfolio_summary.long_exposure.total_beta_adjusted
         short_value = portfolio_summary.short_exposure.total_beta_adjusted
         options_value = portfolio_summary.options_exposure.total_beta_adjusted
+        # Use the pre-calculated beta-adjusted net exposure
+        net_value = (
+            portfolio_summary.long_exposure.total_beta_adjusted
+            - portfolio_summary.short_exposure.total_beta_adjusted
+        )
     else:
         long_value = portfolio_summary.long_exposure.total_exposure
         short_value = portfolio_summary.short_exposure.total_exposure
         options_value = portfolio_summary.options_exposure.total_exposure
-
-    # Calculate net value
-    net_value = (
-        long_value + short_value
-    )  # Note: options_value is already included in long/short
+        # Use the pre-calculated net market exposure
+        net_value = portfolio_summary.net_market_exposure
 
     # Categories and values for the chart
     categories = ["Long", "Short", "Options", "Net"]

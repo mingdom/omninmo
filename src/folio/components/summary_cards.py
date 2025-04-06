@@ -132,11 +132,8 @@ def format_summary_card_values(summary_data):
         return error_values()
 
     # Calculate beta-adjusted net exposure
-    beta_adjusted_net_exposure = (
-        long_total_beta_adjusted
-        - short_total_beta_adjusted
-        + options_total_beta_adjusted
-    )
+    # Note: options_total_beta_adjusted is already included in long/short, so we don't add it separately
+    beta_adjusted_net_exposure = long_total_beta_adjusted - short_total_beta_adjusted
 
     # Format the values for display
     try:
