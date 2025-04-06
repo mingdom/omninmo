@@ -3,7 +3,6 @@
 This module tests the core functionality of the data model classes in src/folio/data_model.py.
 """
 
-import pytest
 
 from src.folio.data_model import (
     ExposureBreakdown,

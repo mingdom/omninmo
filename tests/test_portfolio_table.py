@@ -1,7 +1,5 @@
 """Tests for portfolio table component."""
 
-import pytest
-
 from src.folio.components.portfolio_table import create_position_row
 from src.folio.data_model import OptionPosition, PortfolioGroup, StockPosition
 
@@ -117,14 +115,23 @@ class TestPortfolioTable:
             "position_type": "stock",  # This should be ignored by StockPosition constructor
         }
 
-        # Verify that creating a StockPosition with position_type raises an error
-        with pytest.raises(TypeError):
-            StockPosition(**stock_position_data)
+        # Create a StockPosition with position_type included (now accepted)
+        stock_position = StockPosition(**stock_position_data)
 
-        # Create a copy of the data without position_type
-        stock_position_data_clean = stock_position_data.copy()
-        stock_position_data_clean.pop("position_type")
-
-        # Verify that creating a StockPosition without position_type works
-        stock_position = StockPosition(**stock_position_data_clean)
+        # Verify the position was created correctly
         assert stock_position.ticker == "AAPL"
+        assert stock_position.quantity == 100
+        assert stock_position.beta == 1.2
+        assert stock_position.market_exposure == 15000.0
+        assert stock_position.beta_adjusted_exposure == 18000.0
+        assert stock_position.position_type == "stock"  # Should be set correctly
+
+        # Test with a different position_type to ensure it's handled correctly
+        stock_position_data_wrong_type = stock_position_data.copy()
+        stock_position_data_wrong_type["position_type"] = "option"  # Wrong type
+
+        # Create a StockPosition with wrong position_type
+        stock_position_wrong_type = StockPosition(**stock_position_data_wrong_type)
+
+        # The position_type is now accepted as provided
+        assert stock_position_wrong_type.position_type == "option"

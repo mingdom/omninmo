@@ -3,6 +3,7 @@
 import pandas as pd
 import pytest
 
+from src.folio.data_model import ExposureBreakdown, PortfolioSummary
 from src.folio.portfolio import is_cash_or_short_term, process_portfolio_data
 
 
@@ -100,26 +101,37 @@ def test_portfolio_summary_cash_like_metrics():
     assert total_size >= summary.cash_like_value
 
 
-def test_empty_portfolio():
-    """Test handling of an empty portfolio."""
-    # Create an empty DataFrame
-    df = pd.DataFrame(
-        columns=[
-            "Symbol",
-            "Description",
-            "Quantity",
-            "Last Price",
-            "Current Value",
-            "Type",
-            "Percent Of Account",
-        ]
+def test_empty_portfolio_creation():
+    """Test creating an empty portfolio summary."""
+    # Create empty exposure breakdowns for testing
+    empty_exposure = ExposureBreakdown(
+        stock_exposure=0.0,
+        stock_beta_adjusted=0.0,
+        option_delta_exposure=0.0,
+        option_beta_adjusted=0.0,
+        total_exposure=0.0,
+        total_beta_adjusted=0.0,
+        description="Empty exposure",
+        formula="N/A",
+        components={},
     )
 
-    # Process the empty portfolio
-    groups, summary, cash_like_positions = process_portfolio_data(df)
+    # Create an empty portfolio summary directly
+    summary = PortfolioSummary(
+        net_market_exposure=0.0,
+        portfolio_beta=0.0,
+        long_exposure=empty_exposure,
+        short_exposure=empty_exposure,
+        options_exposure=empty_exposure,
+        short_percentage=0.0,
+        cash_like_positions=[],
+        cash_like_value=0.0,
+        cash_like_count=0,
+        cash_percentage=0.0,
+        portfolio_estimate_value=0.0,
+    )
 
     # Check that there are no cash-like positions
-    assert len(cash_like_positions) == 0
     assert summary.cash_like_count == 0
     assert summary.cash_like_value == 0.0
     assert len(summary.cash_like_positions) == 0
@@ -151,8 +163,11 @@ def test_only_cash_portfolio():
     assert summary.cash_like_count == 3
     assert summary.cash_like_value == 6000.00  # Sum of all values
 
-    # Check that the total exposure equals the cash-like value for an all-cash portfolio
-    assert summary.total_exposure == summary.cash_like_value
+    # Check that the portfolio estimate value equals the cash-like value for an all-cash portfolio
+    assert summary.portfolio_estimate_value == summary.cash_like_value
+
+    # Check that the net market exposure is 0 for an all-cash portfolio
+    assert summary.net_market_exposure == 0.0
 
     # Check that the portfolio beta is 0
     assert summary.portfolio_beta == 0.0

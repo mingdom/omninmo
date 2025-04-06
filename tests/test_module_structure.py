@@ -93,12 +93,11 @@ class TestModuleStructure:
             # Verify that key components exist
             assert hasattr(app, "create_app")
 
-            # Verify utils import in app
-            assert hasattr(app, "utils")
-
-            # Verify that the app can access utils functions
-            assert app.utils.format_beta(1.2) == "1.20β"
-            assert app.utils.format_currency(1500.0) == "$1,500.00"
+            # Verify key components are imported in app
+            assert hasattr(app, "create_dashboard_section")
+            assert hasattr(app, "create_portfolio_table")
+            assert hasattr(app, "create_position_details")
+            assert hasattr(app, "create_summary_cards")
 
         except ImportError as e:
             pytest.fail(f"Failed to import app module: {e!s}")
