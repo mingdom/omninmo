@@ -48,6 +48,8 @@ select = [
     "PLE0604",  # Invalid object in __all__, or invalid __all__ format
     "PLE0605",  # Invalid format for __all__
     "A",        # Unused functions... etc.
+    "ARG001",   # Unused function argument
+    "ARG002",   # Unused function argument
     "B",        # flake8-bugbear rules (includes B007 for unused loop variables)
     "ERA",      # eradicate (commented out code)
     "F",        # pyflakes (includes F401 for unused imports, F841 for unused variables)
@@ -63,7 +65,6 @@ ignore = [
     "PLR0912",  # too many branches - common in ML data processing and training loops
     "PLR0915",  # too many statements - common in ML training and evaluation functions
     "PLR2004",  # magic value used in comparison - common in data processing code
-    "ARG002",  # Unused method argument - we use underscore prefix for intentionally unused arguments
 ]
 
 # Allow autofix for all enabled rules (when `--fix`) is provided

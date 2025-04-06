@@ -120,7 +120,7 @@ def create_premium_chat_component():
     )
 
 
-def register_premium_chat_callbacks(app):
+def register_callbacks(app):
     """Register callbacks for the premium chat component."""
 
     # Toggle chat panel
@@ -436,3 +436,6 @@ def register_premium_chat_callbacks(app):
         final_messages = [*current_messages, ai_message]
         logger.info(f"PROCESS_AI_RESPONSE: Final message count: {len(final_messages)}")
         return final_messages, "premium-chat-loading d-none", chat_history
+
+
+# The register_callbacks function is now the main function above

@@ -47,14 +47,38 @@ The easiest way to try Folio is through our Hugging Face Spaces deployment:
    cd omninmo
    ```
 
-2. Run with sample portfolio:
+2. Set up the environment and install dependencies:
+   ```bash
+   make env
+   make install
+   ```
+
+3. Run with sample portfolio:
    ```bash
    make portfolio
    ```
 
-3. Or start with a blank slate:
+4. Or start with a blank slate:
    ```bash
    make folio
+   ```
+
+### Development Setup
+
+1. Install development dependencies:
+   ```bash
+   pip install -r requirements-dev.txt
+   ```
+
+2. Set up pre-commit hooks:
+   ```bash
+   pre-commit install
+   ```
+
+3. Run linting and tests:
+   ```bash
+   make lint
+   make test
    ```
 
 ### Docker Deployment

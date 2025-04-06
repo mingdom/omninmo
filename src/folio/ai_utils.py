@@ -4,6 +4,7 @@ import logging
 from typing import Any
 
 from .data_model import PortfolioGroup, PortfolioSummary
+from .portfolio import calculate_position_weight
 
 logger = logging.getLogger(__name__)
 
@@ -27,9 +28,9 @@ Important guidelines:
 Your goal is to help clients understand their investments and make informed decisions about their portfolio.
 """
 
+
 def prepare_portfolio_data_for_analysis(
-    groups: list[PortfolioGroup],
-    summary: PortfolioSummary
+    groups: list[PortfolioGroup], summary: PortfolioSummary
 ) -> dict[str, Any]:
     """
     Prepare portfolio data for AI analysis.
@@ -48,45 +49,49 @@ def prepare_portfolio_data_for_analysis(
         # Add stock position if present
         if group.stock_position:
             stock = group.stock_position
-            positions.append({
-                "ticker": stock.ticker,
-                "position_type": "stock",
-                "market_value": stock.market_value,
-                "beta": stock.beta,
-                "weight": stock.market_value / summary.total_value_net if summary.total_value_net else 0,
-                "quantity": stock.quantity
-            })
+            positions.append(
+                {
+                    "ticker": stock.ticker,
+                    "position_type": "stock",
+                    "market_value": stock.market_value,
+                    "beta": stock.beta,
+                    "weight": calculate_position_weight(
+                        stock.market_value, summary.net_market_exposure
+                    ),
+                    "quantity": stock.quantity,
+                }
+            )
 
         # Add option positions if present
         for option in group.option_positions:
-            positions.append({
-                "ticker": option.ticker,
-                "position_type": "option",
-                "market_value": option.market_value,
-                "beta": option.beta,
-                "weight": option.market_value / summary.total_value_net if summary.total_value_net else 0,
-                "option_type": option.option_type,
-                "strike": option.strike,
-                "expiry": option.expiry,
-                "delta": option.delta
-            })
+            positions.append(
+                {
+                    "ticker": option.ticker,
+                    "position_type": "option",
+                    "market_value": option.market_value,
+                    "beta": option.beta,
+                    "weight": calculate_position_weight(
+                        option.market_value, summary.net_market_exposure
+                    ),
+                    "option_type": option.option_type,
+                    "strike": option.strike,
+                    "expiry": option.expiry,
+                    "delta": option.delta,
+                }
+            )
 
     # Create summary data
     summary_data = {
-        "total_value_net": summary.total_value_net,
-        "total_value_abs": summary.total_value_abs,
+        "net_market_exposure": summary.net_market_exposure,
         "portfolio_beta": summary.portfolio_beta,
         "long_exposure": {
             "total": summary.long_exposure.total_value,
-            "beta_adjusted": summary.long_exposure.total_beta_adjusted
+            "beta_adjusted": summary.long_exposure.total_beta_adjusted,
         },
         "short_exposure": {
             "total": summary.short_exposure.total_value,
-            "beta_adjusted": summary.short_exposure.total_beta_adjusted
-        }
+            "beta_adjusted": summary.short_exposure.total_beta_adjusted,
+        },
     }
 
-    return {
-        "positions": positions,
-        "summary": summary_data
-    }
+    return {"positions": positions, "summary": summary_data}

@@ -1,0 +1,22 @@
+# Additional dependencies for development (not included in requirements-docker.txt)
+
+# Machine Learning
+scikit-learn>=1.5.0
+xgboost==2.0.3
+
+# Additional Utilities
+tabulate==0.9.0
+typing_extensions>=4.7.1  # For development scripts
+
+# Technical Analysis
+ta==0.11.0
+
+# Model tracking and visualization
+mlflow==2.21.2
+shap==0.47.0
+matplotlib==3.10.1
+
+# Development tools are now in requirements-dev.txt
+
+# Additional visualization
+plotly==5.19.0  # Dash already includes plotly, but we pin the version for development

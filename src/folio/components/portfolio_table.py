@@ -160,9 +160,11 @@ def create_portfolio_table(
         [
             dbc.Col(create_sortable_header("Ticker", "ticker", sort_by), width=2),
             dbc.Col(create_sortable_header("Type", "type", sort_by), width=2),
-            dbc.Col(create_sortable_header("Value", "value", sort_by), width=2),
+            dbc.Col(create_sortable_header("Exposure", "value", sort_by), width=2),
             dbc.Col(create_sortable_header("Beta", "beta", sort_by), width=2),
-            dbc.Col(create_sortable_header("Exposure", "exposure", sort_by), width=2),
+            dbc.Col(
+                create_sortable_header("Beta-Adj Exp", "exposure", sort_by), width=2
+            ),
             dbc.Col("", width=2),
         ],
         className="g-0 border-bottom py-2 bg-light",

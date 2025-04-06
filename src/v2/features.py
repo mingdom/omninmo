@@ -517,14 +517,17 @@ class Features:
             risk_free_rate (float): Annual risk-free rate
         """
         # Check if future return column exists (it should be added during training)
-        if "future_return_90d" in df.columns and "volatility_90d" in df.columns:
+        if (
+            f"future_return_{window}d" in df.columns
+            and f"volatility_{window}d" in df.columns
+        ):
             # Calculate quarterly risk-free rate
             quarterly_rfr = risk_free_rate / 4
 
             # Calculate Sharpe ratio
-            df["target_sharpe_ratio"] = (df["future_return_90d"] - quarterly_rfr) / df[
-                "volatility_90d"
-            ]
+            df["target_sharpe_ratio"] = (
+                df[f"future_return_{window}d"] - quarterly_rfr
+            ) / df[f"volatility_{window}d"]
 
 
 def calculate_rsi(data, period=14):

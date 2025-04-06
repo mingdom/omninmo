@@ -307,13 +307,12 @@ def get_mock_raw_data(ticker, period="1y"):
     return {"symbol": ticker, "historical": historical}
 
 
-def get_real_beta(ticker, market_index="SPY"):
+def get_real_beta(ticker):
     """
-    Get the beta value for a ticker against a market index from real data.
+    Get the beta value for a ticker from real data.
 
     Args:
         ticker: Stock ticker symbol
-        market_index: Market index ticker symbol
 
     Returns:
         Beta value (float)

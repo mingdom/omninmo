@@ -2,7 +2,8 @@ import dash_bootstrap_components as dbc
 from dash import html
 
 from ..data_model import PortfolioGroup
-from ..utils import format_beta, format_currency, format_percentage
+from ..portfolio import calculate_position_weight
+from ..utils import format_beta, format_currency, format_delta, format_percentage
 from .portfolio_table import get_group_ticker
 
 
@@ -62,8 +63,15 @@ def create_stock_section(group: PortfolioGroup) -> dbc.Card:
                                         [
                                             html.Strong("Portfolio Weight: "),
                                             html.Span(
-                                                format_percentage(stock.weight * 100)
-                                                if stock.weight is not None
+                                                # Calculate weight on the fly
+                                                format_percentage(
+                                                    calculate_position_weight(
+                                                        stock.market_exposure,
+                                                        group.net_exposure,
+                                                    )
+                                                )
+                                                if stock.market_exposure is not None
+                                                and group.net_exposure
                                                 else "N/A"
                                             ),
                                         ]
@@ -149,7 +157,8 @@ def create_options_section(group: PortfolioGroup) -> dbc.Card:
                                     else "N/A"
                                 ),
                                 html.Td(
-                                    format_percentage(opt.delta * 100)
+                                    # Display delta as a decimal with 2 decimal places
+                                    format_delta(opt.delta)
                                     if opt.delta is not None
                                     else "N/A"
                                 ),
@@ -191,16 +200,7 @@ def create_options_section(group: PortfolioGroup) -> dbc.Card:
                             ),
                         ]
                     ),
-                    html.P(
-                        [
-                            html.Strong("Net Option Value: "),
-                            html.Span(
-                                format_currency(group.net_option_value)
-                                if group.net_option_value is not None
-                                else "N/A"
-                            ),
-                        ]
-                    ),
+                    # Net Option Value removed - based on unreliable market values
                     html.P(
                         [
                             html.Strong("Total Delta Exposure: "),
@@ -221,6 +221,19 @@ def create_options_section(group: PortfolioGroup) -> dbc.Card:
 
 def create_combined_metrics(group: PortfolioGroup) -> dbc.Card:
     """Create the combined metrics section"""
+    # Calculate the net delta percentage
+    net_delta_pct = (
+        group.total_delta_exposure / group.net_exposure
+        if group.net_exposure != 0 and group.total_delta_exposure is not None
+        else 0
+    )
+
+    # Calculate the position beta
+    position_beta = (
+        group.beta_adjusted_exposure / group.net_exposure
+        if group.net_exposure != 0 and group.beta_adjusted_exposure is not None
+        else 0
+    )
     return dbc.Card(
         [
             dbc.CardHeader("Combined Position Metrics"),
@@ -245,15 +258,7 @@ def create_combined_metrics(group: PortfolioGroup) -> dbc.Card:
                                         [
                                             html.Strong("Net Delta: "),
                                             html.Span(
-                                                format_percentage(
-                                                    group.total_delta_exposure
-                                                    / group.net_exposure
-                                                    * 100
-                                                    if group.net_exposure != 0
-                                                    and group.total_delta_exposure
-                                                    is not None
-                                                    else 0
-                                                )
+                                                format_percentage(net_delta_pct)
                                                 if group.net_exposure is not None
                                                 else "N/A"
                                             ),
@@ -282,14 +287,7 @@ def create_combined_metrics(group: PortfolioGroup) -> dbc.Card:
                                         [
                                             html.Strong("Position Beta: "),
                                             html.Span(
-                                                format_beta(
-                                                    group.beta_adjusted_exposure
-                                                    / group.net_exposure
-                                                    if group.net_exposure != 0
-                                                    and group.beta_adjusted_exposure
-                                                    is not None
-                                                    else 0
-                                                )
+                                                format_beta(position_beta)
                                                 if group.net_exposure is not None
                                                 else "N/A"
                                             ),

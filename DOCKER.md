@@ -103,7 +103,7 @@ If you prefer to use Docker directly without Make:
 
 - **Volume mounting**: If you're making changes to the code and want to see them reflected immediately, ensure the volumes in `docker-compose.yml` are correctly mapping your local directories.
 
-- **Dependencies**: The Docker image uses `requirements-folio.txt` for its dependencies. If you need to add or update dependencies, modify this file instead of editing the Dockerfile directly.
+- **Dependencies**: The Docker image uses `requirements.txt` for its dependencies. If you need to add or update dependencies, modify this file instead of editing the Dockerfile directly.
 
 - **Development dependencies**: For development and testing, the Docker image can also install dependencies from `requirements-dev.txt`. These are installed automatically when running `make docker-test`.
 

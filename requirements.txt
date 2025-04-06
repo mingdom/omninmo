@@ -1,25 +1,23 @@
-# Additional dependencies for development (not included in requirements-docker.txt)
+# Core dependencies - only what's needed for the Folio app
+# Note: Developer Dependencies in requirements-dev.txt
+pandas==2.2.1
+numpy==1.26.4
+scipy==1.11.3  # For option calculations
 
-# Machine Learning
-scikit-learn>=1.5.0
-xgboost==2.0.3
+# Utilities
+requests>=2.32.0
+PyYAML==6.0.1
 
-# Additional Utilities
-tabulate==0.9.0
-typing_extensions>=4.7.1  # For development scripts
+# Data source
+yfinance>=0.2.37  # For portfolio beta calculation
 
-# Technical Analysis
-ta==0.11.0
+# Web application - using latest versions for security updates
+dash>=2.14.2
+dash-bootstrap-components>=1.5.0
 
-# Model tracking and visualization
-mlflow==2.21.2
-shap==0.47.0
-matplotlib==3.10.1
+# WSGI server for production - always use latest for security
+gunicorn>=21.2.0
 
-# Development tools
-tqdm>=4.66.3
-ruff>=0.3.3
-pytest>=8.1.1
+# AI/ML dependencies
+google-generativeai>=0.3.0  # For Gemini AI integration
 
-# Additional visualization
-plotly==5.19.0  # Dash already includes plotly, but we pin the version for development

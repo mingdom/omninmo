@@ -193,6 +193,21 @@ def format_beta(value: float) -> str:
     return f"{value:.2f}β"
 
 
+def format_delta(value: float) -> str:
+    """Formats an option delta value as a decimal with 2 decimal places.
+
+    Option delta is conventionally displayed as a decimal value between -1.00 and 1.00,
+    not as a percentage.
+
+    Args:
+        value: The numerical delta value.
+
+    Returns:
+        A string representing the delta value with 2 decimal places (e.g., "0.75", "-0.45").
+    """
+    return f"{value:.2f}"
+
+
 def clean_currency_value(value_str: str) -> float:
     """Converts a formatted currency string into a float.
 

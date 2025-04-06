@@ -12,14 +12,17 @@ from dash import ALL, Input, Output, State, dcc, html
 
 # Import portfolio processing functions
 # Import utility functions
-from . import portfolio, utils
+from . import portfolio
+from .callbacks.chart_callbacks import register_chart_callbacks
 
 # Import AI utilities directly
 # Import components
 from .components import create_premium_chat_component, register_premium_chat_callbacks
+from .components.charts import create_dashboard_section
 from .components.portfolio_table import create_portfolio_table
 from .components.position_details import create_position_details
-from .data_model import OptionPosition, PortfolioGroup, Position, StockPosition
+from .components.summary_cards import create_summary_cards
+from .data_model import OptionPosition, PortfolioGroup, StockPosition
 from .error_utils import handle_callback_error
 from .exceptions import StateError
 from .logger import logger
@@ -28,173 +31,8 @@ from .security import sanitize_dataframe, validate_csv_upload
 
 def create_header() -> dbc.Card:
     """Create the header section with summary cards"""
-    return dbc.Card(
-        dbc.CardBody(
-            [
-                html.H4("Portfolio Summary", className="mb-3"),
-                dbc.Row(
-                    [
-                        dbc.Col(
-                            [
-                                dbc.Card(
-                                    dbc.CardBody(
-                                        [
-                                            html.H6(
-                                                "Total Exposure",
-                                                className="card-subtitle",
-                                            ),
-                                            html.H5(
-                                                id="total-value",
-                                                className="card-title text-primary",
-                                            ),
-                                            html.P(
-                                                id="total-beta",
-                                                className="card-text text-muted",
-                                            ),
-                                        ]
-                                    ),
-                                    className="mb-3",
-                                    id="total-value-card",
-                                ),
-                                dbc.Tooltip(
-                                    "Net portfolio value (Long - Short). Includes stock positions and option market values.",
-                                    target="total-value-card",
-                                    placement="top",
-                                ),
-                            ],
-                            width=3,
-                        ),
-                        dbc.Col(
-                            [
-                                dbc.Card(
-                                    dbc.CardBody(
-                                        [
-                                            html.H6(
-                                                "Long Exposure",
-                                                className="card-subtitle",
-                                            ),
-                                            html.H5(
-                                                id="long-exposure",
-                                                className="card-title text-success",
-                                            ),
-                                            html.P(
-                                                id="long-beta",
-                                                className="card-text text-muted",
-                                            ),
-                                        ]
-                                    ),
-                                    className="mb-3",
-                                    id="long-exposure-card",
-                                ),
-                                dbc.Tooltip(
-                                    "Long market exposure from stocks and options. Includes long stock positions, long call options (delta-adjusted), and short put options (delta-adjusted).",
-                                    target="long-exposure-card",
-                                    placement="top",
-                                ),
-                            ],
-                            width=3,
-                        ),
-                        dbc.Col(
-                            [
-                                dbc.Card(
-                                    dbc.CardBody(
-                                        [
-                                            html.H6(
-                                                "Short Exposure",
-                                                className="card-subtitle",
-                                            ),
-                                            html.H5(
-                                                id="short-exposure",
-                                                className="card-title text-danger",
-                                            ),
-                                            html.P(
-                                                id="short-beta",
-                                                className="card-text text-muted",
-                                            ),
-                                        ]
-                                    ),
-                                    className="mb-3",
-                                    id="short-exposure-card",
-                                ),
-                                dbc.Tooltip(
-                                    "Short market exposure from stocks and options. Includes short stock positions, short call options (delta-adjusted), and long put options (delta-adjusted).",
-                                    target="short-exposure-card",
-                                    placement="top",
-                                ),
-                            ],
-                            width=3,
-                        ),
-                        dbc.Col(
-                            [
-                                dbc.Card(
-                                    dbc.CardBody(
-                                        [
-                                            html.H6(
-                                                "Options Exposure",
-                                                className="card-subtitle",
-                                            ),
-                                            html.H5(
-                                                id="options-exposure",
-                                                className="card-title text-info",
-                                            ),
-                                            html.P(
-                                                id="options-beta",
-                                                className="card-text text-muted",
-                                            ),
-                                        ]
-                                    ),
-                                    className="mb-3",
-                                    id="options-exposure-card",
-                                ),
-                                dbc.Tooltip(
-                                    "Option positions' market exposure. For calls: +delta * notional for long, -delta * notional for short. For puts: -delta * notional for long, +delta * notional for short.",
-                                    target="options-exposure-card",
-                                    placement="top",
-                                ),
-                            ],
-                            width=3,
-                        ),
-                    ]
-                ),
-                # Add a new row for cash-like positions
-                dbc.Row(
-                    [
-                        dbc.Col(
-                            [
-                                dbc.Card(
-                                    dbc.CardBody(
-                                        [
-                                            html.H6(
-                                                "Cash-Like Positions",
-                                                className="card-subtitle",
-                                            ),
-                                            html.H5(
-                                                id="cash-like-value",
-                                                className="card-title text-info",
-                                            ),
-                                            html.P(
-                                                id="cash-like-percent",
-                                                className="card-text text-muted",
-                                            ),
-                                        ]
-                                    ),
-                                    className="mb-3",
-                                    id="cash-like-card",
-                                ),
-                                dbc.Tooltip(
-                                    "Positions with very low beta (< 0.1). Includes money market funds, short-term treasuries, and other cash-like instruments.",
-                                    target="cash-like-card",
-                                    placement="top",
-                                ),
-                            ],
-                            width=3,
-                        ),
-                    ]
-                ),
-            ]
-        ),
-        className="mb-3",
-    )
+    # Use the create_summary_cards function from summary_cards.py
+    return create_summary_cards()
 
 
 def create_empty_state() -> html.Div:
@@ -441,10 +279,40 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
                     children=[
                         html.Div(
                             [
-                                create_header(),
+                                # Add visualization dashboard section near the top
+                                create_dashboard_section(),
+                                # Add filters below visualizations
                                 create_filters(),
-                                # AI analysis removed from main content - now using chat panel
-                                create_main_table(),
+                                # Move table to the end
+                                dbc.Card(
+                                    [
+                                        dbc.CardHeader(
+                                            dbc.Button(
+                                                [
+                                                    html.I(
+                                                        className="fas fa-table me-2"
+                                                    ),
+                                                    "Portfolio Positions",
+                                                    html.I(
+                                                        className="fas fa-chevron-down ms-2",
+                                                        id="positions-collapse-icon",
+                                                    ),
+                                                ],
+                                                id="positions-collapse-button",
+                                                color="link",
+                                                className="text-decoration-none text-dark p-0 d-flex align-items-center w-100 justify-content-between",
+                                            ),
+                                        ),
+                                        dbc.Collapse(
+                                            dbc.CardBody(
+                                                create_main_table(),
+                                            ),
+                                            id="positions-collapse",
+                                            is_open=True,  # Initially open
+                                        ),
+                                    ],
+                                    className="mb-3",
+                                ),
                             ],
                             id="main-content",
                         )
@@ -525,6 +393,19 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
         Input("url", "pathname"),
     )
 
+    # Add clientside callback to log portfolio summary data
+    app.clientside_callback(
+        """
+        function(data) {
+            console.log("Portfolio Summary Data:", data);
+            return window.dash_clientside.no_update;
+        }
+        """,
+        Output("portfolio-summary", "data", allow_duplicate=True),
+        Input("portfolio-summary", "data"),
+        prevent_initial_call=True,
+    )
+
     # Keyboard shortcut functionality removed as it was causing issues
 
     # Toggle upload section collapse
@@ -601,9 +482,19 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
 
                 logger.info(f"Sample portfolio found at: {sample_path}")
 
+                # Debug the file content
+                with open(sample_path) as f:
+                    content = f.read()
+                    logger.info(
+                        f"Sample portfolio content (first 100 chars): {content[:100]}"
+                    )
+
                 # Read the sample portfolio file
                 with open(sample_path, "rb") as f:
-                    f.read()
+                    file_content = f.read()
+                    logger.info(
+                        f"Read {len(file_content)} bytes from sample portfolio file"
+                    )
 
                 # Validate the sample file content
                 # We'll sanitize it during the normal processing flow
@@ -712,6 +603,10 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
             # Convert to Dash-compatible format
             groups_data = [g.to_dict() for g in groups]
             summary_data = summary.to_dict()
+            logger.info(f"Summary data keys: {list(summary_data.keys())}")
+            logger.info(
+                f"Portfolio estimate value: {summary_data.get('portfolio_estimate_value', 'NOT FOUND')}"
+            )
             portfolio_data = df.to_dict("records")
 
             return portfolio_data, summary_data, groups_data, "", status, None
@@ -722,66 +617,10 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
             error_div = html.Div(error_msg, className="text-danger")
             return [], {}, [], error_msg, error_div, None
 
-    @app.callback(
-        [
-            Output("total-value", "children"),
-            Output("total-beta", "children"),
-            Output("long-exposure", "children"),
-            Output("long-beta", "children"),
-            Output("short-exposure", "children"),
-            Output("short-beta", "children"),
-            Output("options-exposure", "children"),
-            Output("options-beta", "children"),
-            Output("cash-like-value", "children"),
-            Output("cash-like-percent", "children"),
-        ],
-        Input("portfolio-summary", "data"),
-    )
-    def update_summary_cards(summary_data):
-        """Update summary cards with latest data"""
-        logger.debug("Updating summary cards")
-        try:
-            if not summary_data:
-                return ["$0.00"] * 4 + ["0.00β"] * 4 + ["$0.00", "0.0%"]
+    # Register summary cards callbacks
+    from .components.summary_cards import register_callbacks
 
-            # Calculate cash-like percentage
-            cash_like_percent = (
-                summary_data["cash_like_value"] / summary_data["total_value_abs"] * 100
-                if summary_data["total_value_abs"] != 0
-                else 0.0
-            )
-
-            return [
-                utils.format_currency(summary_data["total_value_net"]),
-                utils.format_beta(summary_data["portfolio_beta"]),
-                utils.format_currency(summary_data["long_exposure"]["total_value"]),
-                utils.format_beta(
-                    summary_data["long_exposure"]["total_beta_adjusted"]
-                    / summary_data["long_exposure"]["total_value"]
-                    if summary_data["long_exposure"]["total_value"] != 0
-                    else 0
-                ),
-                utils.format_currency(summary_data["short_exposure"]["total_value"]),
-                utils.format_beta(
-                    summary_data["short_exposure"]["total_beta_adjusted"]
-                    / summary_data["short_exposure"]["total_value"]
-                    if summary_data["short_exposure"]["total_value"] != 0
-                    else 0
-                ),
-                utils.format_currency(summary_data["options_exposure"]["total_value"]),
-                utils.format_beta(
-                    summary_data["options_exposure"]["total_beta_adjusted"]
-                    / summary_data["options_exposure"]["total_value"]
-                    if summary_data["options_exposure"]["total_value"] != 0
-                    else 0
-                ),
-                utils.format_currency(summary_data["cash_like_value"]),
-                f"{cash_like_percent:.1f}%",
-            ]
-
-        except Exception as e:
-            logger.error(f"Error updating summary cards: {e}", exc_info=True)
-            return ["$0.00"] * 4 + ["0.00β"] * 4 + ["$0.00", "0.0%"]
+    register_callbacks(app)
 
     @app.callback(
         Output("portfolio-table", "children"),
@@ -821,9 +660,18 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
             # Convert data back to PortfolioGroup objects
             groups = []
             for g in groups_data:
-                stock_position = (
-                    Position(**g["stock_position"]) if g["stock_position"] else None
-                )
+                # Filter out attributes that don't exist in Position class
+                stock_position = None
+                if g["stock_position"]:
+                    stock_position_data = g["stock_position"].copy()
+                    # Remove attributes that don't exist in StockPosition class
+                    if "sector" in stock_position_data:
+                        stock_position_data.pop("sector")
+                    if "is_cash_like" in stock_position_data:
+                        stock_position_data.pop("is_cash_like")
+                    if "position_type" in stock_position_data:
+                        stock_position_data.pop("position_type")
+                    stock_position = StockPosition(**stock_position_data)
                 option_positions = [
                     OptionPosition(**opt) for opt in g["option_positions"]
                 ]
@@ -831,7 +679,6 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
                     ticker=g["ticker"],
                     stock_position=stock_position,
                     option_positions=option_positions,
-                    total_value=g["total_value"],
                     net_exposure=g["net_exposure"],
                     beta=g["beta"],
                     beta_adjusted_exposure=g["beta_adjusted_exposure"],
@@ -857,8 +704,10 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
                     stock_pos = StockPosition(
                         ticker=pos["ticker"],
                         quantity=pos["quantity"],
-                        market_value=pos["market_value"],
                         beta=pos["beta"],
+                        market_exposure=pos.get(
+                            "market_exposure", pos.get("market_value", 0.0)
+                        ),  # Use market_exposure or fall back to market_value
                         beta_adjusted_exposure=pos["beta_adjusted_exposure"],
                     )
 
@@ -867,8 +716,9 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
                         ticker=pos["ticker"],
                         stock_position=stock_pos,
                         option_positions=[],
-                        total_value=pos["market_value"],
-                        net_exposure=pos["market_value"],
+                        net_exposure=pos.get(
+                            "market_exposure", pos.get("market_value", 0.0)
+                        ),
                         beta=pos["beta"],
                         beta_adjusted_exposure=pos["beta_adjusted_exposure"],
                         total_delta_exposure=0.0,
@@ -1085,11 +935,16 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
 
     def _create_portfolio_group_from_data(position_data):
         """Helper function to create a PortfolioGroup from position data"""
-        stock_position = (
-            Position(**position_data["stock_position"])
-            if position_data["stock_position"]
-            else None
-        )
+        stock_position = None
+        if position_data["stock_position"]:
+            stock_position_data = position_data["stock_position"].copy()
+            # Remove attributes that don't exist in Position class
+            if "sector" in stock_position_data:
+                stock_position_data.pop("sector")
+            if "is_cash_like" in stock_position_data:
+                stock_position_data.pop("is_cash_like")
+            stock_position = StockPosition(**stock_position_data)
+
         option_positions = [
             OptionPosition(**opt) for opt in position_data["option_positions"]
         ]
@@ -1098,7 +953,6 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
             ticker=position_data["ticker"],
             stock_position=stock_position,
             option_positions=option_positions,
-            total_value=position_data["total_value"],
             net_exposure=position_data["net_exposure"],
             beta=position_data["beta"],
             beta_adjusted_exposure=position_data["beta_adjusted_exposure"],
@@ -1151,8 +1005,81 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
         logger.debug(f"Sorting by {clicked_column} in {new_direction} order")
         return {"column": clicked_column, "direction": new_direction}
 
+    # Add callbacks for collapsible chart sections
+    @app.callback(
+        [
+            Output("dashboard-collapse", "is_open"),
+            Output("dashboard-collapse-icon", "className"),
+        ],
+        [Input("dashboard-collapse-button", "n_clicks")],
+        [State("dashboard-collapse", "is_open")],
+        prevent_initial_call=True,
+    )
+    def toggle_dashboard_collapse(n_clicks, is_open):
+        """Toggle the dashboard section collapse state"""
+        if n_clicks:
+            # Toggle the collapse state
+            new_state = not is_open
+            # Update the icon based on the new state
+            icon_class = (
+                "fas fa-chevron-up ms-2" if new_state else "fas fa-chevron-down ms-2"
+            )
+            return new_state, icon_class
+        return is_open, "fas fa-chevron-down ms-2"
+
+    # Add callbacks for main section collapses
+    for section in ["summary", "charts"]:
+
+        @app.callback(
+            [
+                Output(f"{section}-collapse", "is_open"),
+                Output(f"{section}-collapse-icon", "className"),
+            ],
+            [Input(f"{section}-collapse-button", "n_clicks")],
+            [State(f"{section}-collapse", "is_open")],
+            prevent_initial_call=True,
+        )
+        def toggle_chart_collapse(n_clicks, is_open, _section=section):
+            """Toggle the chart section collapse state"""
+            if n_clicks:
+                # Toggle the collapse state
+                new_state = not is_open
+                # Update the icon based on the new state
+                icon_class = (
+                    "fas fa-chevron-up ms-2"
+                    if new_state
+                    else "fas fa-chevron-down ms-2"
+                )
+                return new_state, icon_class
+            return is_open, "fas fa-chevron-down ms-2"
+
+    # Add callback for positions collapse
+    @app.callback(
+        [
+            Output("positions-collapse", "is_open"),
+            Output("positions-collapse-icon", "className"),
+        ],
+        [Input("positions-collapse-button", "n_clicks")],
+        [State("positions-collapse", "is_open")],
+        prevent_initial_call=True,
+    )
+    def toggle_positions_collapse(n_clicks, is_open):
+        """Toggle the positions section collapse state"""
+        if n_clicks:
+            # Toggle the collapse state
+            new_state = not is_open
+            # Update the icon based on the new state
+            icon_class = (
+                "fas fa-chevron-up ms-2" if new_state else "fas fa-chevron-down ms-2"
+            )
+            return new_state, icon_class
+        return is_open, "fas fa-chevron-down ms-2"
+
+    # Register chart callbacks
+    register_chart_callbacks(app)
+
     # Register premium chat callbacks
-    register_premium_chat_callbacks(app)
+    register_premium_chat_callbacks(app)  # This is now an alias for register_callbacks
 
     return app
 
