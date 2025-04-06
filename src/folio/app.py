@@ -13,12 +13,12 @@ from dash import ALL, Input, Output, State, dcc, html
 # Import portfolio processing functions
 # Import utility functions
 from . import portfolio
-from .callbacks.chart_callbacks import register_chart_callbacks
 
 # Import AI utilities directly
 # Import components
 from .components import create_premium_chat_component, register_premium_chat_callbacks
 from .components.charts import create_dashboard_section
+from .components.charts import register_callbacks as register_chart_callbacks
 from .components.portfolio_table import create_portfolio_table
 from .components.position_details import create_position_details
 from .components.summary_cards import create_summary_cards

@@ -1,4 +1,4 @@
 """Callback modules for the Folio application."""
 
 # Import callback registration functions
-from .chart_callbacks import register_chart_callbacks
+from ..components.charts import register_callbacks as register_chart_callbacks
