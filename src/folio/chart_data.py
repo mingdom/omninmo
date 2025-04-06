@@ -8,6 +8,7 @@ from typing import Any
 
 from .data_model import PortfolioGroup, PortfolioSummary
 from .logger import logger
+from .portfolio import calculate_beta_adjusted_net_exposure
 from .utils import format_currency
 
 
@@ -126,10 +127,10 @@ def transform_for_exposure_chart(
         long_value = portfolio_summary.long_exposure.total_beta_adjusted
         short_value = portfolio_summary.short_exposure.total_beta_adjusted
         options_value = portfolio_summary.options_exposure.total_beta_adjusted
-        # Use the pre-calculated beta-adjusted net exposure
-        net_value = (
-            portfolio_summary.long_exposure.total_beta_adjusted
-            - portfolio_summary.short_exposure.total_beta_adjusted
+        # Use the utility function for beta-adjusted net exposure
+        net_value = calculate_beta_adjusted_net_exposure(
+            portfolio_summary.long_exposure.total_beta_adjusted,
+            portfolio_summary.short_exposure.total_beta_adjusted
         )
     else:
         long_value = portfolio_summary.long_exposure.total_exposure

@@ -864,8 +864,8 @@ def calculate_portfolio_summary(
         )
 
         # 2. Portfolio beta (weighted average)
-        net_beta_adjusted_exposure = (
-            long_exposure.total_beta_adjusted - short_exposure.total_beta_adjusted
+        net_beta_adjusted_exposure = calculate_beta_adjusted_net_exposure(
+            long_exposure.total_beta_adjusted, short_exposure.total_beta_adjusted
         )
         portfolio_beta = (
             net_beta_adjusted_exposure / net_market_exposure
@@ -1015,6 +1015,25 @@ def calculate_position_weight(
     if not portfolio_net_exposure:
         return 0.0
     return position_market_exposure / portfolio_net_exposure
+
+
+def calculate_beta_adjusted_net_exposure(
+    long_beta_adjusted: float, short_beta_adjusted: float
+) -> float:
+    """Calculate the beta-adjusted net exposure.
+
+    This function calculates the beta-adjusted net exposure by subtracting the
+    short beta-adjusted exposure from the long beta-adjusted exposure. This is
+    the single source of truth for this calculation throughout the application.
+
+    Args:
+        long_beta_adjusted: The beta-adjusted exposure of long positions
+        short_beta_adjusted: The beta-adjusted exposure of short positions (as a positive value)
+
+    Returns:
+        The beta-adjusted net exposure
+    """
+    return long_beta_adjusted - short_beta_adjusted
 
 
 def calculate_position_metrics(group: PortfolioGroup) -> dict:

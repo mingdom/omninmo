@@ -10,6 +10,7 @@ from dash import html
 
 from .. import utils
 from ..logger import logger
+from ..portfolio import calculate_beta_adjusted_net_exposure
 
 
 def error_values():
@@ -131,9 +132,11 @@ def format_summary_card_values(summary_data):
         logger.error(f"Error validating beta values: {e}")
         return error_values()
 
-    # Calculate beta-adjusted net exposure
+    # Calculate beta-adjusted net exposure using the utility function
     # Note: options_total_beta_adjusted is already included in long/short, so we don't add it separately
-    beta_adjusted_net_exposure = long_total_beta_adjusted - short_total_beta_adjusted
+    beta_adjusted_net_exposure = calculate_beta_adjusted_net_exposure(
+        long_total_beta_adjusted, short_total_beta_adjusted
+    )
 
     # Format the values for display
     try:

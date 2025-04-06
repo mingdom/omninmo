@@ -15,6 +15,7 @@ from src.folio.data_model import (
     PortfolioSummary,
     StockPosition,
 )
+from src.folio.portfolio import calculate_beta_adjusted_net_exposure
 
 
 class TestPortfolioLoading:
@@ -228,3 +229,36 @@ class TestPortfolioLoading:
         assert summary.portfolio_estimate_value == 0.0
         assert summary.cash_percentage == 0.0
         assert summary.short_percentage == 0.0
+
+
+class TestPortfolioUtilityFunctions:
+    """Tests for utility functions in the portfolio module."""
+
+    def test_calculate_beta_adjusted_net_exposure(self):
+        """Test the calculate_beta_adjusted_net_exposure function.
+
+        This function tests that the beta-adjusted net exposure is correctly calculated
+        by subtracting the short beta-adjusted exposure from the long beta-adjusted exposure.
+        """
+        # Test with positive values
+        long_beta_adjusted = 14400.0
+        short_beta_adjusted = 7200.0
+        expected_net = 7200.0
+
+        result = calculate_beta_adjusted_net_exposure(
+            long_beta_adjusted, short_beta_adjusted
+        )
+        assert result == expected_net
+
+        # Test with zero values
+        assert calculate_beta_adjusted_net_exposure(0.0, 0.0) == 0.0
+
+        # Test with negative long value
+        assert calculate_beta_adjusted_net_exposure(-1000.0, 500.0) == -1500.0
+
+        # Test with large values
+        large_long = 1_000_000.0
+        large_short = 500_000.0
+        assert (
+            calculate_beta_adjusted_net_exposure(large_long, large_short) == 500_000.0
+        )
