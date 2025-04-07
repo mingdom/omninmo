@@ -11,7 +11,6 @@ from dash import Input, Output, State, dcc, html
 
 from ..chart_data import (
     create_dashboard_metrics,
-    transform_for_asset_allocation,
     transform_for_exposure_chart,
     transform_for_treemap,
 )
@@ -19,28 +18,7 @@ from ..data_model import PortfolioGroup, PortfolioSummary
 from ..logger import logger
 from .summary_cards import create_summary_cards
 
-
-def create_asset_allocation_chart():
-    """Create an asset allocation chart component.
-
-    Note: This component now always displays exposure values without toggle buttons.
-    """
-    logger.debug("Creating asset allocation chart component")
-    return html.Div(
-        [
-            dcc.Graph(
-                id="asset-allocation-chart",
-                config={"displayModeBar": False, "responsive": True},
-                className="dash-chart",
-            ),
-            # Hidden input to maintain the exposure view without visible toggle
-            html.Div(
-                id="allocation-view-container",
-                style={"display": "none"},
-            ),
-        ],
-        className="mb-4",
-    )
+# Asset Allocation Chart has been removed in favor of the more accurate Exposure Chart
 
 
 def create_exposure_chart():
@@ -148,20 +126,7 @@ def create_dashboard_section():
             dbc.Collapse(
                 dbc.CardBody(
                     [
-                        # Asset Allocation Chart (in its own card)
-                        dbc.Card(
-                            [
-                                dbc.CardHeader(
-                                    html.H5("Asset Allocation", className="m-0"),
-                                ),
-                                dbc.CardBody(
-                                    [
-                                        create_asset_allocation_chart(),
-                                    ]
-                                ),
-                            ],
-                            className="mb-4 chart-card",
-                        ),
+                        # Asset Allocation Chart has been removed in favor of the more accurate Exposure Chart
                         # Market Exposure Chart (in its own card)
                         dbc.Card(
                             [
@@ -263,43 +228,7 @@ def register_callbacks(app):
             logger.error(f"Error updating dashboard metrics: {e}", exc_info=True)
             return html.Div(f"Error loading metrics: {e!s}", className="text-danger")
 
-    # Asset Allocation Chart callback
-    @app.callback(
-        Output("asset-allocation-chart", "figure"),
-        Input("portfolio-summary", "data"),
-    )
-    def update_asset_allocation_chart(summary_data):
-        """Update the asset allocation chart with exposure values."""
-        if not summary_data:
-            # Return empty figure if no data
-            return {"data": [], "layout": {"height": 300}}
-
-        try:
-            # Convert the JSON data back to a PortfolioSummary object
-            portfolio_summary = PortfolioSummary.from_dict(summary_data)
-
-            # Always use exposure values (use_percentage=False)
-            chart_data = transform_for_asset_allocation(
-                portfolio_summary, use_percentage=False
-            )
-            return chart_data
-        except Exception as e:
-            logger.error(f"Error updating asset allocation chart: {e}", exc_info=True)
-            error_figure = {
-                "data": [],
-                "layout": {
-                    "height": 300,
-                    "annotations": [
-                        {
-                            "text": f"Error: {e!s}",
-                            "showarrow": False,
-                            "font": {"color": "red"},
-                        }
-                    ],
-                },
-            }
-            # Return error figure and maintain button states
-            return error_figure, value_active, percent_active
+    # Asset Allocation Chart callback has been removed in favor of the more accurate Exposure Chart
 
     # Exposure Chart callback
     @app.callback(

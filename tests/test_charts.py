@@ -5,13 +5,8 @@ import pytest
 from dash import html
 
 from src.folio.app import create_app
-from src.folio.chart_data import (
-    transform_for_asset_allocation,
-    transform_for_exposure_chart,
-    transform_for_treemap,
-)
+from src.folio.chart_data import transform_for_exposure_chart, transform_for_treemap
 from src.folio.components.charts import (
-    create_asset_allocation_chart,
     create_dashboard_section,
     create_exposure_chart,
     create_position_treemap,
@@ -28,43 +23,14 @@ from src.folio.data_model import (
 class TestChartComponents:
     """Tests for individual chart components."""
 
+    # Asset Allocation Chart has been removed in favor of the more accurate Exposure Chart
     def test_create_asset_allocation_chart(self):
         """Test that asset allocation chart can be created correctly."""
-        # Create the chart component
-        chart = create_asset_allocation_chart()
+        import pytest
 
-        # Verify that chart is a Dash component
-        assert isinstance(chart, html.Div)
-
-        # Verify that the chart contains a Graph component with the correct ID
-        graph_component = None
-        view_container = None
-
-        # Find the essential components without assuming specific structure
-        def find_components(component):
-            nonlocal graph_component, view_container
-            if hasattr(component, "id"):
-                if component.id == "asset-allocation-chart":
-                    graph_component = component
-                elif component.id == "allocation-view-container":
-                    view_container = component
-
-            # Recursively check children
-            if hasattr(component, "children") and component.children:
-                if isinstance(component.children, list):
-                    for child in component.children:
-                        find_components(child)
-                else:
-                    find_components(component.children)
-
-        find_components(chart)
-
-        # Verify essential components exist
-        assert graph_component is not None, "Graph component not found"
-        assert view_container is not None, "View container not found"
-
-        # Verify view container is hidden
-        assert view_container.style.get("display") == "none"
+        pytest.skip(
+            "Asset Allocation Chart has been removed in favor of the more accurate Exposure Chart"
+        )
 
     def test_create_exposure_chart(self):
         """Test that exposure chart can be created correctly."""
@@ -178,14 +144,13 @@ class TestChartComponents:
         card_body = collapse.children
         assert isinstance(card_body, dbc.CardBody)
 
-        # There should be 3 chart cards (asset allocation, exposure, treemap)
+        # There should be 2 chart cards (exposure, treemap) after removing Asset Allocation Chart
         chart_cards = card_body.children
-        assert len(chart_cards) == 3
+        assert len(chart_cards) == 2
 
         # Verify card titles
-        assert "Asset Allocation" in str(chart_cards[0])
-        assert "Market Exposure" in str(chart_cards[1])
-        assert "Position Size by Exposure" in str(chart_cards[2])
+        assert "Market Exposure" in str(chart_cards[0])
+        assert "Position Size by Exposure" in str(chart_cards[1])
 
 
 class TestChartDataTransformation:
@@ -292,56 +257,14 @@ class TestChartDataTransformation:
 
         return [aapl_group, msft_group]
 
-    def test_transform_for_asset_allocation(self, mock_portfolio_summary):
+    # Asset Allocation Chart has been removed in favor of the more accurate Exposure Chart
+    def test_transform_for_asset_allocation(self):
         """Test that asset allocation data is transformed correctly."""
-        # Test with percentage values (default)
-        chart_data = transform_for_asset_allocation(mock_portfolio_summary)
+        import pytest
 
-        # Verify chart data structure
-        assert "data" in chart_data
-        assert "layout" in chart_data
-
-        # Verify data contains the expected traces
-        data = chart_data["data"]
-
-        # We now have 7 traces for the stacked bar chart:
-        # 1. Long Stock, 2. Long Options, 3. Short Stock, 4. Short Options,
-        # 5. Cash & Bonds, 6. Total Long (invisible), 7. Total Short (invisible)
-        assert len(data) == 7
-
-        # Verify the traces have the expected structure
-        for trace in data:
-            assert "name" in trace
-            assert "type" in trace
-            assert "x" in trace
-            assert "y" in trace
-            assert "marker" in trace
-
-        # Verify the trace names
-        trace_names = [trace["name"] for trace in data]
-        assert "Long Stock" in trace_names
-        assert "Long Options" in trace_names
-        assert "Short Stock" in trace_names
-        assert "Short Options" in trace_names
-        assert "Cash & Bonds" in trace_names
-
-        # Test with absolute values (note: parameter is kept for backward compatibility)
-        chart_data = transform_for_asset_allocation(
-            mock_portfolio_summary, use_percentage=False
+        pytest.skip(
+            "Asset Allocation Chart has been removed in favor of the more accurate Exposure Chart"
         )
-
-        # Verify data contains the expected traces
-        data = chart_data["data"]
-
-        # Extract the values from the chart data for each component
-        long_stock_trace = next(
-            trace for trace in data if trace["name"] == "Long Stock"
-        )
-
-        # Verify the values are absolute (not percentages)
-        assert (
-            float(long_stock_trace["text"][0].replace("$", "").replace(",", "")) > 1000
-        )  # Long exposure should be a large number, not a percentage
 
     def test_transform_for_exposure_chart(self, mock_portfolio_summary):
         """Test that exposure chart data is transformed correctly."""
@@ -510,16 +433,8 @@ class TestChartIntegration:
         # Check that the callbacks for charts are registered
         callbacks = app.callback_map
 
-        # Check for asset allocation chart callback
-        asset_allocation_callback_found = False
-        for callback_id in callbacks.keys():
-            if "asset-allocation-chart.figure" in callback_id:
-                asset_allocation_callback_found = True
-                break
-
-        assert asset_allocation_callback_found, (
-            "Asset allocation chart callback not registered"
-        )
+        # Asset Allocation Chart has been removed in favor of the more accurate Exposure Chart
+        # We no longer need to check for its callback
 
         # Check for exposure chart callback
         exposure_chart_callback_found = False
@@ -549,13 +464,12 @@ class TestChartIntegration:
 
         # Define the expected component IDs
         expected_ids = [
-            "asset-allocation-chart",
+            # Asset Allocation Chart has been removed in favor of the more accurate Exposure Chart
             "exposure-chart",
             "position-treemap",
             "charts-collapse",
             "charts-collapse-button",
             "charts-collapse-icon",
-            "allocation-view-container",  # Hidden container instead of toggle buttons
             "exposure-net-btn",
             "exposure-beta-btn",
             "treemap-group-by",

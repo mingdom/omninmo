@@ -2,11 +2,8 @@
 
 import pytest
 
-from src.folio.chart_data import (
-    transform_for_asset_allocation,
-    transform_for_exposure_chart,
-    transform_for_treemap,
-)
+# Asset Allocation Chart has been removed in favor of the more accurate Exposure Chart
+from src.folio.chart_data import transform_for_exposure_chart, transform_for_treemap
 from src.folio.data_model import (
     ExposureBreakdown,
     OptionPosition,
@@ -213,10 +210,14 @@ class TestChartDataTransformations:
             "Net value should not include options separately as they are already in long/short"
         )
 
-    def test_asset_allocation_chart_values(self, mock_portfolio_summary):
+    # Asset Allocation Chart has been removed in favor of the more accurate Exposure Chart
+    def test_asset_allocation_chart_values(self):
         """Test that asset allocation chart values are correctly calculated."""
-        # Test with exposure values
-        chart_data = transform_for_asset_allocation(mock_portfolio_summary)
+        import pytest
+
+        pytest.skip(
+            "Asset Allocation Chart has been removed in favor of the more accurate Exposure Chart"
+        )
 
         # Verify that the chart has the expected structure
         assert "data" in chart_data
@@ -234,9 +235,13 @@ class TestChartDataTransformations:
         assert "Short Options" in trace_names
         assert "Cash & Bonds" in trace_names
 
-        # Test with absolute values (note: parameter is kept for backward compatibility)
+        # Verify the title does not include beta-adjusted
+        assert "(Beta-Adjusted)" not in chart_data["layout"]["title"]["text"]
+        assert "(Exposure)" in chart_data["layout"]["title"]["text"]
+
+        # Test with beta-adjusted values
         chart_data = transform_for_asset_allocation(
-            mock_portfolio_summary, use_percentage=False
+            mock_portfolio_summary, use_beta_adjusted=True
         )
 
         # Extract the values from the chart data for each component
@@ -256,22 +261,47 @@ class TestChartDataTransformations:
             trace for trace in chart_data["data"] if trace["name"] == "Cash & Bonds"
         )
 
-        # Verify the values match the expected values
+        # Verify the title includes beta-adjusted
+        assert "(Beta-Adjusted)" in chart_data["layout"]["title"]["text"]
+        assert "(Exposure)" not in chart_data["layout"]["title"]["text"]
+
+        # Verify the values match the expected beta-adjusted values
         assert (
             long_stock_trace["y"][0]
             == mock_portfolio_summary.long_exposure.stock_exposure
+            * mock_portfolio_summary.portfolio_beta
         )
+        # Options should not be beta-adjusted
         assert (
             long_options_trace["y"][0]
             == mock_portfolio_summary.long_exposure.option_delta_exposure
         )
         assert short_stock_trace["y"][1] == abs(
             mock_portfolio_summary.short_exposure.stock_exposure
+            * mock_portfolio_summary.portfolio_beta
         )
+        # Options should not be beta-adjusted
         assert short_options_trace["y"][1] == abs(
             mock_portfolio_summary.short_exposure.option_delta_exposure
         )
+        # Cash should not be beta-adjusted
         assert cash_trace["y"][2] == mock_portfolio_summary.cash_like_value
+
+        # Test with regular exposure values again to verify we can switch back
+        chart_data = transform_for_asset_allocation(
+            mock_portfolio_summary, use_beta_adjusted=False
+        )
+
+        # Extract the values again
+        long_stock_trace = next(
+            trace for trace in chart_data["data"] if trace["name"] == "Long Stock"
+        )
+
+        # Verify the values match the expected non-beta-adjusted values
+        assert (
+            long_stock_trace["y"][0]
+            == mock_portfolio_summary.long_exposure.stock_exposure
+        )
 
     def test_treemap_chart_values(self, mock_portfolio_groups):
         """Test that treemap chart values are correctly calculated."""
