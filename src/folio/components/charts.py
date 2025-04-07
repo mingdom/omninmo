@@ -11,7 +11,6 @@ from dash import Input, Output, State, dcc, html
 
 from ..chart_data import (
     create_dashboard_metrics,
-    transform_for_asset_allocation,
     transform_for_exposure_chart,
     transform_for_treemap,
 )
@@ -19,44 +18,7 @@ from ..data_model import PortfolioGroup, PortfolioSummary
 from ..logger import logger
 from .summary_cards import create_summary_cards
 
-
-def create_asset_allocation_chart():
-    """Create an asset allocation pie chart component."""
-    logger.debug("Creating asset allocation chart component")
-    return html.Div(
-        [
-            dcc.Graph(
-                id="asset-allocation-chart",
-                config={"displayModeBar": False},
-                className="dash-chart",
-            ),
-            # Add controls for toggling between absolute value and percentage
-            dbc.ButtonGroup(
-                [
-                    dbc.Button(
-                        "Exposure",
-                        id="allocation-value-btn",
-                        color="primary",
-                        outline=True,
-                        size="sm",
-                        n_clicks=0,
-                    ),
-                    dbc.Button(
-                        "Percentage",
-                        id="allocation-percent-btn",
-                        color="primary",
-                        outline=True,
-                        size="sm",
-                        active=True,
-                        n_clicks=0,
-                    ),
-                ],
-                size="sm",
-                className="mt-2",
-            ),
-        ],
-        className="mb-4",
-    )
+# Asset Allocation Chart has been removed in favor of the more accurate Exposure Chart
 
 
 def create_exposure_chart():
@@ -66,32 +28,37 @@ def create_exposure_chart():
         [
             dcc.Graph(
                 id="exposure-chart",
-                config={"displayModeBar": False},
+                config={"displayModeBar": False, "responsive": True},
                 className="dash-chart",
             ),
             # Add controls for toggling between net and beta-adjusted
-            dbc.ButtonGroup(
-                [
-                    dbc.Button(
-                        "Net Exposure",
-                        id="exposure-net-btn",
-                        color="primary",
-                        outline=True,
-                        size="sm",
-                        n_clicks=0,
-                    ),
-                    dbc.Button(
-                        "Beta-Adjusted",
-                        id="exposure-beta-btn",
-                        color="primary",
-                        outline=True,
-                        size="sm",
-                        active=True,
-                        n_clicks=0,
-                    ),
-                ],
-                size="sm",
-                className="mt-2",
+            html.Div(
+                dbc.ButtonGroup(
+                    [
+                        dbc.Button(
+                            "Net Exposure",
+                            id="exposure-net-btn",
+                            color="primary",
+                            outline=True,
+                            size="sm",
+                            n_clicks=0,
+                            className="px-3",
+                        ),
+                        dbc.Button(
+                            "Beta-Adjusted",
+                            id="exposure-beta-btn",
+                            color="primary",
+                            outline=True,
+                            size="sm",
+                            active=True,
+                            n_clicks=0,
+                            className="px-3",
+                        ),
+                    ],
+                    size="sm",
+                    className="chart-toggle-buttons",
+                ),
+                className="d-flex justify-content-center mt-3",
             ),
         ],
         className="mb-4",
@@ -105,7 +72,7 @@ def create_position_treemap():
         [
             dcc.Graph(
                 id="position-treemap",
-                config={"displayModeBar": False},
+                config={"displayModeBar": False, "responsive": True},
                 className="dash-chart",
             ),
             # Hidden input to maintain the 'ticker' grouping without a visible toggle
@@ -159,20 +126,7 @@ def create_dashboard_section():
             dbc.Collapse(
                 dbc.CardBody(
                     [
-                        # Asset Allocation Chart (in its own card)
-                        dbc.Card(
-                            [
-                                dbc.CardHeader(
-                                    html.H5("Asset Allocation", className="m-0"),
-                                ),
-                                dbc.CardBody(
-                                    [
-                                        create_asset_allocation_chart(),
-                                    ]
-                                ),
-                            ],
-                            className="mb-4 chart-card",
-                        ),
+                        # Asset Allocation Chart has been removed in favor of the more accurate Exposure Chart
                         # Market Exposure Chart (in its own card)
                         dbc.Card(
                             [
@@ -274,79 +228,7 @@ def register_callbacks(app):
             logger.error(f"Error updating dashboard metrics: {e}", exc_info=True)
             return html.Div(f"Error loading metrics: {e!s}", className="text-danger")
 
-    # Asset Allocation Chart callback
-    @app.callback(
-        [
-            Output("asset-allocation-chart", "figure"),
-            Output("allocation-value-btn", "active"),
-            Output("allocation-percent-btn", "active"),
-        ],
-        [
-            Input("portfolio-summary", "data"),
-            Input("allocation-value-btn", "n_clicks"),
-            Input("allocation-percent-btn", "n_clicks"),
-        ],
-        [
-            State("allocation-value-btn", "active"),
-            State("allocation-percent-btn", "active"),
-        ],
-    )
-    def update_asset_allocation_chart(
-        summary_data, _value_clicks, _percent_clicks, value_active, percent_active
-    ):
-        """Update the asset allocation chart based on user selection."""
-        if not summary_data:
-            # Return empty figure if no data
-            return {"data": [], "layout": {"height": 300}}, False, True
-
-        try:
-            # Determine which view to use based on button clicks
-            ctx = dash.callback_context
-            if not ctx.triggered:
-                # Default to percentage view
-                use_percentage = True
-                value_active = False
-                percent_active = True
-            else:
-                button_id = ctx.triggered[0]["prop_id"].split(".")[0]
-                if button_id == "allocation-value-btn":
-                    use_percentage = False
-                    value_active = True
-                    percent_active = False
-                elif button_id == "allocation-percent-btn":
-                    use_percentage = True
-                    value_active = False
-                    percent_active = True
-                else:
-                    # If triggered by data update, maintain current state
-                    use_percentage = percent_active
-                    # Keep button states as they are
-
-            # Convert the JSON data back to a PortfolioSummary object
-            portfolio_summary = PortfolioSummary.from_dict(summary_data)
-
-            # Transform the data for the chart
-            chart_data = transform_for_asset_allocation(
-                portfolio_summary, use_percentage
-            )
-            return chart_data, value_active, percent_active
-        except Exception as e:
-            logger.error(f"Error updating asset allocation chart: {e}", exc_info=True)
-            error_figure = {
-                "data": [],
-                "layout": {
-                    "height": 300,
-                    "annotations": [
-                        {
-                            "text": f"Error: {e!s}",
-                            "showarrow": False,
-                            "font": {"color": "red"},
-                        }
-                    ],
-                },
-            }
-            # Return error figure and maintain button states
-            return error_figure, value_active, percent_active
+    # Asset Allocation Chart callback has been removed in favor of the more accurate Exposure Chart
 
     # Exposure Chart callback
     @app.callback(

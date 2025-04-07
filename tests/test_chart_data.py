@@ -2,11 +2,8 @@
 
 import pytest
 
-from src.folio.chart_data import (
-    transform_for_asset_allocation,
-    transform_for_exposure_chart,
-    transform_for_treemap,
-)
+# Asset Allocation Chart has been removed in favor of the more accurate Exposure Chart
+from src.folio.chart_data import transform_for_exposure_chart, transform_for_treemap
 from src.folio.data_model import (
     ExposureBreakdown,
     OptionPosition,
@@ -213,37 +210,14 @@ class TestChartDataTransformations:
             "Net value should not include options separately as they are already in long/short"
         )
 
-    def test_asset_allocation_chart_values(self, mock_portfolio_summary):
+    # Asset Allocation Chart has been removed in favor of the more accurate Exposure Chart
+    def test_asset_allocation_chart_values(self):
         """Test that asset allocation chart values are correctly calculated."""
-        # Test with percentage values (default)
-        chart_data = transform_for_asset_allocation(mock_portfolio_summary)
+        import pytest
 
-        # Verify that the chart has the expected structure
-        assert "data" in chart_data
-        assert len(chart_data["data"]) == 3  # Three traces for Long, Short, Cash
-
-        # Test with absolute values
-        chart_data = transform_for_asset_allocation(
-            mock_portfolio_summary, use_percentage=False
+        pytest.skip(
+            "Asset Allocation Chart has been removed in favor of the more accurate Exposure Chart"
         )
-
-        # Extract the values from the chart data
-        long_trace = next(
-            trace for trace in chart_data["data"] if trace["name"] == "Long Exposure"
-        )
-        short_trace = next(
-            trace for trace in chart_data["data"] if trace["name"] == "Short Exposure"
-        )
-        cash_trace = next(
-            trace for trace in chart_data["data"] if trace["name"] == "Cash & Bonds"
-        )
-
-        # Verify that the values match the portfolio summary
-        assert long_trace["y"][0] == mock_portfolio_summary.long_exposure.total_exposure
-        assert (
-            short_trace["y"][0] == mock_portfolio_summary.short_exposure.total_exposure
-        )
-        assert cash_trace["y"][0] == mock_portfolio_summary.cash_like_value
 
     def test_treemap_chart_values(self, mock_portfolio_groups):
         """Test that treemap chart values are correctly calculated."""
