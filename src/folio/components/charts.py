@@ -12,6 +12,7 @@ from dash import Input, Output, State, dcc, html
 from ..chart_data import (
     create_dashboard_metrics,
     transform_for_exposure_chart,
+    transform_for_spy_sensitivity_chart,
     transform_for_treemap,
 )
 from ..data_model import PortfolioGroup, PortfolioSummary
@@ -92,6 +93,25 @@ def create_position_treemap():
 # Sector chart removed for now - will be implemented in a separate task
 
 
+def create_spy_sensitivity_chart():
+    """Create a SPY sensitivity chart component."""
+    logger.debug("Creating SPY sensitivity chart component")
+    return html.Div(
+        [
+            dcc.Graph(
+                id="spy-sensitivity-chart",
+                config={
+                    "displayModeBar": False,
+                    "responsive": True,
+                    "showlegend": True,  # Explicitly show the legend
+                },
+                className="dash-chart",
+            ),
+        ],
+        className="mb-4",
+    )
+
+
 def create_dashboard_section():
     """Create the dashboard section with all charts.
 
@@ -152,6 +172,22 @@ def create_dashboard_section():
                                 dbc.CardBody(
                                     [
                                         create_position_treemap(),
+                                    ]
+                                ),
+                            ],
+                            className="mb-4 chart-card",
+                        ),
+                        # SPY Sensitivity Chart (in its own card)
+                        dbc.Card(
+                            [
+                                dbc.CardHeader(
+                                    html.H5(
+                                        "SPY Sensitivity Analysis", className="m-0"
+                                    ),
+                                ),
+                                dbc.CardBody(
+                                    [
+                                        create_spy_sensitivity_chart(),
                                     ]
                                 ),
                             ],
@@ -344,6 +380,59 @@ def register_callbacks(app):
 
     # Sector Chart callback
     # Sector chart callback removed - will be implemented in a separate task
+
+    # SPY Sensitivity Chart callback
+    @app.callback(
+        Output("spy-sensitivity-chart", "figure"),
+        [
+            Input("portfolio-summary", "data"),
+            Input("portfolio-groups", "data"),
+        ],
+    )
+    def update_spy_sensitivity_chart(summary_data, groups_data):
+        """Update the SPY sensitivity chart based on portfolio data."""
+        if not summary_data or not groups_data:
+            return {
+                "data": [],
+                "layout": {
+                    "title": "No portfolio data available",
+                    "height": 400,
+                    "annotations": [
+                        {
+                            "text": "No portfolio data available",
+                            "showarrow": False,
+                            "font": {"size": 16},
+                            "xref": "paper",
+                            "yref": "paper",
+                            "x": 0.5,
+                            "y": 0.5,
+                        }
+                    ],
+                },
+            }
+
+        try:
+            # Convert data to objects
+            summary = PortfolioSummary.from_dict(summary_data)
+            groups = [PortfolioGroup.from_dict(g) for g in groups_data]
+
+            # Transform data for chart
+            return transform_for_spy_sensitivity_chart(summary, groups)
+        except Exception as e:
+            logger.error(f"Error updating SPY sensitivity chart: {e}", exc_info=True)
+            return {
+                "data": [],
+                "layout": {
+                    "height": 400,
+                    "annotations": [
+                        {
+                            "text": f"Error: {e!s}",
+                            "showarrow": False,
+                            "font": {"color": "red"},
+                        }
+                    ],
+                },
+            }
 
 
 # For backward compatibility
