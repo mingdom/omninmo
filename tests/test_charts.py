@@ -23,15 +23,6 @@ from src.folio.data_model import (
 class TestChartComponents:
     """Tests for individual chart components."""
 
-    # Asset Allocation Chart has been removed in favor of the more accurate Exposure Chart
-    def test_create_asset_allocation_chart(self):
-        """Test that asset allocation chart can be created correctly."""
-        import pytest
-
-        pytest.skip(
-            "Asset Allocation Chart has been removed in favor of the more accurate Exposure Chart"
-        )
-
     def test_create_exposure_chart(self):
         """Test that exposure chart can be created correctly."""
         # Create the chart component
@@ -256,15 +247,6 @@ class TestChartDataTransformation:
         )
 
         return [aapl_group, msft_group]
-
-    # Asset Allocation Chart has been removed in favor of the more accurate Exposure Chart
-    def test_transform_for_asset_allocation(self):
-        """Test that asset allocation data is transformed correctly."""
-        import pytest
-
-        pytest.skip(
-            "Asset Allocation Chart has been removed in favor of the more accurate Exposure Chart"
-        )
 
     def test_transform_for_exposure_chart(self, mock_portfolio_summary):
         """Test that exposure chart data is transformed correctly."""

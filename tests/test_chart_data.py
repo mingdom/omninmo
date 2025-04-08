@@ -2,7 +2,6 @@
 
 import pytest
 
-# Asset Allocation Chart has been removed in favor of the more accurate Exposure Chart
 from src.folio.chart_data import transform_for_exposure_chart, transform_for_treemap
 from src.folio.data_model import (
     ExposureBreakdown,
@@ -208,15 +207,6 @@ class TestChartDataTransformations:
         )
         assert value_dict["Net"] != incorrect_calculation, (
             "Net value should not include options separately as they are already in long/short"
-        )
-
-    # Asset Allocation Chart has been removed in favor of the more accurate Exposure Chart
-    def test_asset_allocation_chart_values(self):
-        """Test that asset allocation chart values are correctly calculated."""
-        import pytest
-
-        pytest.skip(
-            "Asset Allocation Chart has been removed in favor of the more accurate Exposure Chart"
         )
 
     def test_treemap_chart_values(self, mock_portfolio_groups):
