@@ -155,8 +155,8 @@ def create_portfolio_table(
             reverse=sort_direction == "desc",
         )
 
-    # Create table header
-    header = dbc.Row(
+    # Create table header with proper thead structure
+    header_row = dbc.Row(
         [
             dbc.Col(create_sortable_header("Ticker", "ticker", sort_by), width=2),
             dbc.Col(create_sortable_header("Type", "type", sort_by), width=2),
@@ -173,7 +173,18 @@ def create_portfolio_table(
     # Create table rows
     rows = [create_position_row(group, {}) for group in groups]
 
+    # Return a properly structured table with thead and tbody
     return html.Div(
-        [header, html.Div(rows, className="portfolio-table-body")],
-        className="portfolio-table",
+        [
+            # Use dbc.Table with proper HTML structure
+            dbc.Table(
+                [
+                    html.Thead(header_row),  # Wrap header in thead
+                    html.Tbody(rows),  # Wrap rows in tbody
+                ],
+                className="portfolio-table",
+                responsive=True,
+            )
+        ],
+        className="portfolio-table-container",
     )
