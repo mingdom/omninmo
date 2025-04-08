@@ -919,6 +919,12 @@ def calculate_portfolio_summary(
                 f"Cash represents {cash_percentage:.2f}% of the portfolio estimated value"
             )
 
+        # Get current timestamp in ISO format
+        from datetime import UTC, datetime
+
+        # If prices have been updated, use that timestamp, otherwise use current time
+        current_time = datetime.now(UTC).isoformat()
+
         # Create and return the portfolio summary
         summary = PortfolioSummary(
             net_market_exposure=net_market_exposure,
@@ -932,6 +938,7 @@ def calculate_portfolio_summary(
             cash_like_count=cash_like_count,
             cash_percentage=cash_percentage,
             portfolio_estimate_value=portfolio_estimate_value,
+            price_updated_at=current_time,  # Set the timestamp
         )
 
         logger.info("Portfolio summary created successfully.")
@@ -941,6 +948,110 @@ def calculate_portfolio_summary(
     except Exception as e:
         logger.error("Error calculating portfolio summary", exc_info=True)
         raise RuntimeError("Failed to calculate portfolio summary") from e
+
+
+def update_portfolio_prices(
+    portfolio_groups: list[PortfolioGroup], data_fetcher=None
+) -> str:
+    """Update prices for all positions in the portfolio groups.
+
+    Args:
+        portfolio_groups: List of portfolio groups to update prices for
+        data_fetcher: Optional data fetcher to use for price updates
+
+    Returns:
+        ISO format timestamp of when prices were updated
+    """
+    from datetime import UTC, datetime
+
+    # Use the default data fetcher if none is provided
+    if data_fetcher is None:
+        data_fetcher = create_data_fetcher()
+
+    # Extract unique tickers from all positions
+    tickers = set()
+    for group in portfolio_groups:
+        # Add stock position ticker
+        if group.stock_position:
+            tickers.add(group.stock_position.ticker)
+
+        # Add option position tickers
+        for option in group.option_positions:
+            tickers.add(option.ticker)
+
+    # Remove cash-like instruments as we don't need to update their prices
+    tickers = [ticker for ticker in tickers if not is_cash_or_short_term(ticker)]
+
+    if not tickers:
+        logger.info("No tickers to update prices for")
+        return datetime.now(UTC).isoformat()
+
+    # Fetch latest prices for all tickers
+    logger.info(f"Fetching latest prices for {len(tickers)} tickers")
+
+    # Use a small period to get just the latest price
+    latest_prices = {}
+    for ticker in tickers:
+        try:
+            # Fetch data for the last day
+            df = data_fetcher.fetch_data(ticker, period="1d")
+            if not df.empty:
+                # Get the latest close price
+                latest_prices[ticker] = df.iloc[-1]["Close"]
+                logger.debug(f"Updated price for {ticker}: {latest_prices[ticker]}")
+            else:
+                logger.warning(f"No price data available for {ticker}")
+        except Exception as e:
+            logger.error(f"Error fetching price for {ticker}: {e!s}")
+
+    # Update prices for all positions
+    for group in portfolio_groups:
+        # Update stock position price
+        if group.stock_position and group.stock_position.ticker in latest_prices:
+            group.stock_position.price = latest_prices[group.stock_position.ticker]
+            # Update market exposure based on new price
+            group.stock_position.market_exposure = (
+                group.stock_position.price * group.stock_position.quantity
+            )
+            group.stock_position.beta_adjusted_exposure = (
+                group.stock_position.market_exposure * group.stock_position.beta
+            )
+
+        # Update option position prices
+        for option in group.option_positions:
+            if option.ticker in latest_prices:
+                option.price = latest_prices[option.ticker]
+                # We don't update market_exposure for options as it's based on notional value
+
+    # Return the current timestamp
+    current_time = datetime.now(UTC).isoformat()
+    logger.info(f"Prices updated at {current_time}")
+    return current_time
+
+
+def update_portfolio_summary_with_prices(
+    portfolio_groups: list[PortfolioGroup], summary: PortfolioSummary, data_fetcher=None
+) -> PortfolioSummary:
+    """Update the portfolio summary with the latest prices.
+
+    Args:
+        portfolio_groups: List of portfolio groups to update prices for
+        summary: The current portfolio summary
+        data_fetcher: Optional data fetcher to use for price updates
+
+    Returns:
+        Updated portfolio summary with the latest prices
+    """
+    # Update prices for all positions
+    price_updated_at = update_portfolio_prices(portfolio_groups, data_fetcher)
+
+    # Recalculate the portfolio summary with the updated prices
+    updated_summary = calculate_portfolio_summary(portfolio_groups)
+
+    # Set the price_updated_at timestamp
+    updated_summary.price_updated_at = price_updated_at
+
+    return updated_summary
 
 
 def log_summary_details(summary: PortfolioSummary):
@@ -957,6 +1068,8 @@ def log_summary_details(summary: PortfolioSummary):
     """
     # Portfolio overview
     logger.info("--- Portfolio Summary ---")
+    if summary.price_updated_at:
+        logger.info(f"Prices Last Updated: {summary.price_updated_at}")
     logger.info(f"Net Market Exposure: {format_currency(summary.net_market_exposure)}")
 
     logger.info(

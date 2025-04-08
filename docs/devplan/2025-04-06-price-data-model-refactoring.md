@@ -7,7 +7,7 @@
 ## Implementation Status
 
 ### Current Approach
-The implementation is following **Option 1: Minimal Changes** from the proposed solutions, which adds the price attribute to the existing classes. The more comprehensive Option 2 approach with price update mechanism will be implemented in future phases.
+The implementation is following **Option 1: Minimal Changes** from the proposed solutions, which adds the price attribute to the existing classes. The more comprehensive Option 2 approach with price update mechanism has been implemented in Phase 2 and Phase 3.
 
 ### Completed (PR #3)
 - [x] Add `price` attribute to `StockPosition` class with default value of 0.0
@@ -18,14 +18,19 @@ The implementation is following **Option 1: Minimal Changes** from the proposed 
 - [x] Update tests to include price in test cases
 - [x] Add debug mode for Dash app to help with troubleshooting
 
+### Completed (Current Branch)
+- [x] Add `price_updated_at` timestamp to `PortfolioSummary`
+- [x] Update portfolio loading to set timestamp when prices are initially loaded
+- [x] Implement price update mechanism using data fetchers
+- [x] Add tests for the price update functionality
+
 ### Remaining
-- [ ] Implement price update mechanism using data fetchers
-- [ ] Add `price_updated_at` timestamp to `PortfolioSummary`
-- [ ] Update portfolio loading to set timestamp when prices are initially loaded
 - [ ] Add UI components to trigger price updates and display last update time
-- [ ] Address the two different `OptionPosition` classes issue
 - [ ] Update documentation to reflect the new data model
 - [ ] Create a devlog documenting the changes and their impact
+
+### Not Needed
+- [x] Address the two different `OptionPosition` classes issue (they serve different purposes and don't need to be merged)
 
 
 ## Overview
@@ -350,23 +355,23 @@ While this approach requires more changes than Option 3, it provides a more robu
 4. ✅ Ensure all tests pass with `make test` and `make lint`
 
 
-### Phase 2: Add Price Update Timestamp (PENDING)
+### Phase 2: Add Price Update Timestamp (COMPLETED)
 
-1. ❌ Add `price_updated_at` timestamp to `PortfolioSummary` to track when prices were last updated
-2. ❌ Update portfolio loading to set this timestamp when prices are initially loaded
-3. ❌ Add tests for the timestamp functionality
-4. ❌ Ensure all tests pass with `make test` and `make lint`
+1. ✅ Add `price_updated_at` timestamp to `PortfolioSummary` to track when prices were last updated
+2. ✅ Update portfolio loading to set this timestamp when prices are initially loaded
+3. ✅ Add tests for the timestamp functionality
+4. ✅ Ensure all tests pass with `make test` and `make lint`
 
-### Phase 3: Implement Price Update Mechanism (PENDING)
+### Phase 3: Implement Price Update Mechanism (PARTIALLY COMPLETED)
 
-1. ❌ Create a price update function that uses data fetchers to update prices
+1. ✅ Create a price update function that uses data fetchers to update prices
 2. ❌ Add UI components to trigger price updates
 3. ❌ Display last update time in the UI
-4. ❌ Implement caching to prevent excessive API calls
+4. ✅ Implement caching to prevent excessive API calls (using existing data fetcher caching)
 
-### Phase 4: Testing and Documentation (PENDING)
+### Phase 4: Testing and Documentation (PARTIALLY COMPLETED)
 
-1. ❌ Test all changes thoroughly
+1. ✅ Test all changes thoroughly
 2. ❌ Update documentation to reflect the new data model
 3. ❌ Create a devlog documenting the changes and their impact
 

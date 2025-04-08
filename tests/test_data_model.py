@@ -592,6 +592,9 @@ class TestPortfolioSummary:
             beta_adjusted_exposure=0.0,
         )
 
+        # Test timestamp
+        test_timestamp = "2025-04-08T12:34:56.789012"
+
         summary = PortfolioSummary(
             net_market_exposure=10550.0,
             portfolio_beta=1.2,
@@ -604,6 +607,7 @@ class TestPortfolioSummary:
             cash_like_count=1,
             cash_percentage=32.1,
             portfolio_estimate_value=15550.0,
+            price_updated_at=test_timestamp,
         )
 
         summary_dict = summary.to_dict()
@@ -619,6 +623,7 @@ class TestPortfolioSummary:
         assert summary_dict["cash_percentage"] == 32.1
         assert summary_dict["portfolio_estimate_value"] == 15550.0
         assert "help_text" in summary_dict
+        assert summary_dict["price_updated_at"] == test_timestamp
 
     def test_portfolio_summary_from_dict(self):
         """Test creation of PortfolioSummary from dictionary."""
@@ -684,6 +689,7 @@ class TestPortfolioSummary:
             "cash_percentage": 32.1,
             "portfolio_estimate_value": 15550.0,
             "help_text": {"key": "value"},  # Simplified help text for testing
+            "price_updated_at": "2025-04-08T12:34:56.789012",
         }
 
         summary = PortfolioSummary.from_dict(summary_dict)
@@ -699,3 +705,4 @@ class TestPortfolioSummary:
         assert summary.cash_like_count == 1
         assert summary.cash_percentage == 32.1
         assert summary.portfolio_estimate_value == 15550.0
+        assert summary.price_updated_at == "2025-04-08T12:34:56.789012"

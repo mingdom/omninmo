@@ -262,3 +262,146 @@ class TestPortfolioUtilityFunctions:
         assert (
             calculate_beta_adjusted_net_exposure(large_long, large_short) == 500_000.0
         )
+
+
+class TestPriceUpdates:
+    """Tests for portfolio price update functionality."""
+
+    def test_update_portfolio_prices(self, mocker):
+        """Test updating prices for portfolio positions."""
+        # Create mock data fetcher
+        mock_data_fetcher = mocker.MagicMock()
+        mock_df = pd.DataFrame({"Close": [150.0]})
+        mock_data_fetcher.fetch_data.return_value = mock_df
+
+        # Create test portfolio groups
+        stock_position = StockPosition(
+            ticker="AAPL",
+            quantity=100,
+            beta=1.2,
+            market_exposure=14000.0,  # Old price: $140
+            beta_adjusted_exposure=16800.0,
+            price=140.0,
+        )
+
+        option_position = OptionPosition(
+            ticker="AAPL",
+            position_type="option",
+            quantity=1,
+            beta=1.2,
+            market_exposure=500.0,
+            beta_adjusted_exposure=600.0,
+            strike=150.0,
+            expiry="2025-01-17",
+            option_type="CALL",
+            delta=0.5,
+            delta_exposure=50.0,
+            notional_value=15000.0,
+            underlying_beta=1.2,
+            price=5.0,  # Old price
+        )
+
+        portfolio_group = PortfolioGroup(
+            ticker="AAPL",
+            stock_position=stock_position,
+            option_positions=[option_position],
+            net_exposure=14500.0,
+            beta=1.2,
+            beta_adjusted_exposure=17400.0,
+            total_delta_exposure=50.0,
+            options_delta_exposure=50.0,
+        )
+
+        # Update prices
+        from src.folio.portfolio import update_portfolio_prices
+
+        timestamp = update_portfolio_prices([portfolio_group], mock_data_fetcher)
+
+        # Verify the timestamp is returned
+        assert timestamp is not None
+        assert isinstance(timestamp, str)
+
+        # Verify the prices were updated
+        assert stock_position.price == 150.0
+        assert option_position.price == 150.0
+
+        # Verify market exposure was updated for stock position
+        assert stock_position.market_exposure == 15000.0  # 100 shares * $150
+        assert stock_position.beta_adjusted_exposure == 18000.0  # $15000 * 1.2
+
+        # Verify the data fetcher was called correctly
+        mock_data_fetcher.fetch_data.assert_called_with("AAPL", period="1d")
+
+    def test_update_portfolio_summary_with_prices(self, mocker):
+        """Test updating the portfolio summary with the latest prices."""
+        # Mock the update_portfolio_prices function
+        mock_update_prices = mocker.patch(
+            "src.folio.portfolio.update_portfolio_prices",
+            return_value="2025-04-08T12:34:56.789012",
+        )
+
+        # Mock the calculate_portfolio_summary function
+        mock_summary = PortfolioSummary(
+            net_market_exposure=10000.0,
+            portfolio_beta=1.2,
+            long_exposure=ExposureBreakdown(
+                stock_exposure=10000.0,
+                stock_beta_adjusted=12000.0,
+                option_delta_exposure=0.0,
+                option_beta_adjusted=0.0,
+                total_exposure=10000.0,
+                total_beta_adjusted=12000.0,
+                description="Long Exposure",
+                formula="",
+                components={},
+            ),
+            short_exposure=ExposureBreakdown(
+                stock_exposure=0.0,
+                stock_beta_adjusted=0.0,
+                option_delta_exposure=0.0,
+                option_beta_adjusted=0.0,
+                total_exposure=0.0,
+                total_beta_adjusted=0.0,
+                description="Short Exposure",
+                formula="",
+                components={},
+            ),
+            options_exposure=ExposureBreakdown(
+                stock_exposure=0.0,
+                stock_beta_adjusted=0.0,
+                option_delta_exposure=0.0,
+                option_beta_adjusted=0.0,
+                total_exposure=0.0,
+                total_beta_adjusted=0.0,
+                description="Options Exposure",
+                formula="",
+                components={},
+            ),
+            short_percentage=0.0,
+            cash_like_positions=[],
+            cash_like_value=0.0,
+            cash_like_count=0,
+            cash_percentage=0.0,
+            portfolio_estimate_value=10000.0,
+        )
+        mocker.patch(
+            "src.folio.portfolio.calculate_portfolio_summary",
+            return_value=mock_summary,
+        )
+
+        # Create test portfolio groups
+        portfolio_groups = [mocker.MagicMock()]
+        current_summary = mocker.MagicMock()
+
+        # Update the portfolio summary with prices
+        from src.folio.portfolio import update_portfolio_summary_with_prices
+
+        updated_summary = update_portfolio_summary_with_prices(
+            portfolio_groups, current_summary
+        )
+
+        # Verify the price_updated_at timestamp was set
+        assert updated_summary.price_updated_at == "2025-04-08T12:34:56.789012"
+
+        # Verify the update_portfolio_prices function was called
+        mock_update_prices.assert_called_once_with(portfolio_groups, None)

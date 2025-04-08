@@ -80,6 +80,9 @@ class PortfolioSummaryDict(TypedDict):
     cash_percentage: float  # Cash / Portfolio Estimated Value
     portfolio_estimate_value: float  # Net Market Exposure + Cash
     help_text: dict[str, str]  # Explanations of each metric
+    price_updated_at: (
+        str | None
+    )  # ISO format timestamp of when prices were last updated
 
 
 @dataclass
@@ -186,14 +189,7 @@ class Position:
 
 @dataclass
 class OptionPosition(Position):
-    """Class for option positions
-
-    TODO: Extend with additional option Greeks:
-    - gamma: Measures sensitivity of delta to changes in the underlying price
-    - theta: Time decay, measures change in option value as time passes
-    - vega: Measures sensitivity to implied volatility changes
-    - implied_volatility: The market's expectation of future volatility
-    """
+    """Class for option positions"""
 
     strike: float
     expiry: str
@@ -811,6 +807,11 @@ class PortfolioSummary:
     # Derived metrics
     short_percentage: float  # Short / (Long + Short)
 
+    # Price update timestamp
+    price_updated_at: str | None = (
+        None  # ISO format timestamp of when prices were last updated
+    )
+
     @property
     def total_exposure(self) -> float:
         """DEPRECATED: Use net_market_exposure instead.
@@ -970,6 +971,7 @@ class PortfolioSummary:
             "cash_percentage": self.cash_percentage,
             "portfolio_estimate_value": self.portfolio_estimate_value,
             "help_text": self.help_text if self.help_text is not None else {},
+            "price_updated_at": self.price_updated_at,
         }
 
     @classmethod
@@ -1012,6 +1014,7 @@ class PortfolioSummary:
             cash_percentage=cash_percentage,
             portfolio_estimate_value=portfolio_estimate_value,
             help_text=data.get("help_text"),
+            price_updated_at=data.get("price_updated_at"),
         )
 
 
