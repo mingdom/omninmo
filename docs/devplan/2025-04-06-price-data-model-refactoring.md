@@ -323,21 +323,18 @@ While this approach requires more changes than Option 3, it provides a more robu
 1. Update `StockPosition` and `OptionPosition` in `data_model.py` to include price
 2. Update portfolio processing in `portfolio.py` to store price
 3. Update tests to reflect the new attributes
+4. Ensure all tests pass with `make test` and `make lint`
 
-### Phase 2: Update Option Utilities
 
-1. Keep the separate `option_utils.OptionPosition` class for calculations
-2. Update portfolio processing to store price in `data_model.OptionPosition`
-3. Update tests to reflect the changes
 
-### Phase 3: Add Price Update System
+### Phase 2: Add Price Update Timestamp
 
-1. Implement `update_portfolio_prices()` function in `portfolio.py`
-2. Add UI controls to trigger price updates
-3. Implement recalculation of option values when underlying prices change
-4. Add tests for the price update system
+1. Add `price_updated_at` timestamp to `PortfolioSummary` to track when prices were last updated
+2. Update portfolio loading to set this timestamp when prices are initially loaded
+3. Add tests for the timestamp functionality
+4. Ensure all tests pass with `make test` and `make lint`
 
-### Phase 4: Testing and Documentation
+### Phase 3: Testing and Documentation
 
 1. Test all changes thoroughly
 2. Update documentation to reflect the new data model

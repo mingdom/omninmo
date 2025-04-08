@@ -34,7 +34,6 @@ class OptionPositionDict(PositionDict):
     delta_exposure: float  # Delta * Notional Value * sign(Quantity)
     notional_value: float  # 100 * Underlying Price * |Quantity|
     underlying_beta: float
-    implied_volatility: float  # Implied volatility for recalculations
 
 
 class ExposureBreakdownDict(TypedDict):
@@ -204,7 +203,6 @@ class OptionPosition(Position):
     notional_value: float  # 100 * Underlying Price * |Quantity|
     underlying_beta: float
     price: float = 0.0  # Price per contract
-    implied_volatility: float = 0.0  # Implied volatility for recalculations
 
     def __init__(
         self,
@@ -223,7 +221,6 @@ class OptionPosition(Position):
         market_exposure: float | None = None,
         market_value: float | None = None,
         price: float = 0.0,
-        implied_volatility: float = 0.0,
     ):
         """Initialize an OptionPosition with backward compatibility for market_value.
 
@@ -243,7 +240,6 @@ class OptionPosition(Position):
             market_exposure: Market exposure (quantity * price)
             market_value: DEPRECATED - Use market_exposure instead
             price: Price per contract
-            implied_volatility: Implied volatility for recalculations
         """
         # Call the parent class constructor with market_value for backward compatibility
         super().__init__(
@@ -265,7 +261,6 @@ class OptionPosition(Position):
         self.notional_value = notional_value
         self.underlying_beta = underlying_beta
         self.price = price
-        self.implied_volatility = implied_volatility
 
         # Ensure position_type is always "option"
         self.position_type = "option"
@@ -282,7 +277,6 @@ class OptionPosition(Position):
             "notional_value": self.notional_value,
             "underlying_beta": self.underlying_beta,
             "price": self.price,
-            "implied_volatility": self.implied_volatility,
         }
 
     @classmethod
@@ -295,9 +289,8 @@ class OptionPosition(Position):
         Returns:
             A new OptionPosition instance
         """
-        # Handle price and implied_volatility if they exist in the data
+        # Handle price if it exists in the data
         price = data.get("price", 0.0)
-        implied_volatility = data.get("implied_volatility", 0.0)
 
         return cls(
             ticker=data["ticker"],
@@ -314,7 +307,6 @@ class OptionPosition(Position):
             notional_value=data["notional_value"],
             underlying_beta=data["underlying_beta"],
             price=price,
-            implied_volatility=implied_volatility,
         )
 
 
@@ -1050,9 +1042,8 @@ def create_portfolio_group(
     option_positions = []
     if option_data:
         for opt in option_data:
-            # Get price and implied_volatility if they exist in the data
+            # Get price if it exists in the data
             price = opt.get("price", 0.0)
-            implied_volatility = opt.get("implied_volatility", 0.0)
 
             option_positions.append(
                 OptionPosition(
@@ -1072,7 +1063,6 @@ def create_portfolio_group(
                     notional_value=opt["notional_value"],
                     underlying_beta=opt["beta"],  # Use same beta for underlying
                     price=price,
-                    implied_volatility=implied_volatility,
                 )
             )
 

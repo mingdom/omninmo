@@ -557,7 +557,6 @@ def process_portfolio_data(
                             "delta_exposure": delta_exposure,
                             "notional_value": notional_value,
                             "price": parsed_option.current_price,  # Store the price
-                            "implied_volatility": 0.30,  # Default implied volatility
                             # TODO: Add additional Greeks (gamma, theta, vega) to option data
                             # requires extending parsing/calculation functions.
                         }
