@@ -175,9 +175,9 @@ def create_main_table() -> html.Div:
     """Create the main portfolio table"""
     return html.Div(
         [
-            dbc.Table(
+            html.Div(
                 id="portfolio-table",
-                className="portfolio-table",
+                className="portfolio-table-container",
             ),
             # Add a Store to track sort state
             dcc.Store(id="sort-state", data={"column": "value", "direction": "desc"}),
@@ -370,6 +370,9 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
             dcc.Store(id="loading-output"),  # Add loading output store
             dcc.Store(id="theme-store", storage_type="local"),  # Theme preference store
             dcc.Store(id="ai-analysis-data"),  # Store for AI analysis results
+            dcc.Store(
+                id="portfolio-table-active-cell"
+            ),  # Store for tracking active cell in portfolio table
             dcc.Interval(
                 id="interval-component",
                 interval=5 * 60 * 1000,  # 5 minutes in milliseconds
@@ -529,9 +532,11 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
             Output("portfolio-data", "data"),
             Output("portfolio-summary", "data"),
             Output("portfolio-groups", "data"),
-            Output("loading-output", "children"),
+            Output("loading-output", "data"),  # Changed from "children" to "data"
             Output("upload-status", "children"),
-            Output("portfolio-table", "active_cell"),
+            Output(
+                "portfolio-table-active-cell", "data"
+            ),  # Changed from portfolio-table.active_cell
         ],
         [
             Input("initial-trigger", "data"),
@@ -779,12 +784,12 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
     @app.callback(
         Output("selected-position", "data"),
         [
-            Input("portfolio-table", "active_cell"),
+            Input("portfolio-table-active-cell", "data"),
             Input({"type": "position-details", "index": ALL}, "n_clicks"),
         ],
         [
             State("portfolio-groups", "data"),
-            State("portfolio-table", "active_cell"),
+            State("portfolio-table-active-cell", "data"),
         ],
     )
     @handle_callback_error(
@@ -877,7 +882,7 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
             Input("position-modal", "is_open"),
         ],
         [
-            State("portfolio-table", "active_cell"),
+            State("portfolio-table-active-cell", "data"),
             State({"type": "position-details", "index": ALL}, "n_clicks"),
         ],
     )

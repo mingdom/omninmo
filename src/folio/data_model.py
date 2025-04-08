@@ -10,19 +10,20 @@ class PositionDict(TypedDict):
     quantity: float
     beta: float
     beta_adjusted_exposure: float
-    market_exposure: float  # Quantity * Current Price (fetched at runtime)
+    market_exposure: float  # Quantity * Price (fetched at runtime)
+    price: float  # Price per share/contract
 
 
 class StockPositionDict(PositionDict):
     """Type definition for stock position dictionary"""
 
-    pass
+    price: float
 
 
 class OptionPositionDict(PositionDict):
     """Type definition for option position dictionary
 
-    TODO: Extend with additional option Greeks (gamma, theta, vega, implied_volatility)
+    TODO: Extend with additional option Greeks (gamma, theta, vega)
     to match the planned OptionPosition class enhancements.
     """
 
@@ -160,6 +161,7 @@ class Position:
             "beta": self.beta,
             "beta_adjusted_exposure": self.beta_adjusted_exposure,
             "market_exposure": self.market_exposure,
+            "price": 0.0,  # Base Position class doesn't have price, but the dict type requires it
         }
 
     @classmethod
@@ -200,6 +202,7 @@ class OptionPosition(Position):
     delta_exposure: float  # Delta * Notional Value * sign(Quantity)
     notional_value: float  # 100 * Underlying Price * |Quantity|
     underlying_beta: float
+    price: float = 0.0  # Price per contract
 
     def __init__(
         self,
@@ -217,6 +220,7 @@ class OptionPosition(Position):
         underlying_beta: float,
         market_exposure: float | None = None,
         market_value: float | None = None,
+        price: float = 0.0,
     ):
         """Initialize an OptionPosition with backward compatibility for market_value.
 
@@ -235,6 +239,7 @@ class OptionPosition(Position):
             underlying_beta: Beta of the underlying security
             market_exposure: Market exposure (quantity * price)
             market_value: DEPRECATED - Use market_exposure instead
+            price: Price per contract
         """
         # Call the parent class constructor with market_value for backward compatibility
         super().__init__(
@@ -255,6 +260,7 @@ class OptionPosition(Position):
         self.delta_exposure = delta_exposure
         self.notional_value = notional_value
         self.underlying_beta = underlying_beta
+        self.price = price
 
         # Ensure position_type is always "option"
         self.position_type = "option"
@@ -270,6 +276,7 @@ class OptionPosition(Position):
             "delta_exposure": self.delta_exposure,
             "notional_value": self.notional_value,
             "underlying_beta": self.underlying_beta,
+            "price": self.price,
         }
 
     @classmethod
@@ -282,6 +289,9 @@ class OptionPosition(Position):
         Returns:
             A new OptionPosition instance
         """
+        # Handle price if it exists in the data
+        price = data.get("price", 0.0)
+
         return cls(
             ticker=data["ticker"],
             position_type=data["position_type"],
@@ -296,6 +306,7 @@ class OptionPosition(Position):
             delta_exposure=data["delta_exposure"],
             notional_value=data["notional_value"],
             underlying_beta=data["underlying_beta"],
+            price=price,
         )
 
 
@@ -306,8 +317,9 @@ class StockPosition:
     ticker: str
     quantity: int
     beta: float
-    market_exposure: float  # Quantity * Current Price (fetched at runtime)
+    market_exposure: float  # Quantity * Price (fetched at runtime)
     beta_adjusted_exposure: float  # Market Exposure * Beta
+    price: float = 0.0  # Price per share
     position_type: str = "stock"  # Always "stock" for StockPosition
 
     def __init__(
@@ -318,6 +330,7 @@ class StockPosition:
         beta_adjusted_exposure: float,
         market_exposure: float | None = None,
         market_value: float | None = None,
+        price: float = 0.0,  # Added price parameter
         position_type: str = "stock",  # Added position_type parameter
     ):
         """Initialize a StockPosition with backward compatibility for market_value.
@@ -329,6 +342,7 @@ class StockPosition:
             beta_adjusted_exposure: Beta-adjusted market exposure
             market_exposure: Market exposure (quantity * price)
             market_value: DEPRECATED - Use market_exposure instead
+            price: Price per share
             position_type: Type of position, always "stock" for StockPosition
         """
         from .logger import logger
@@ -338,6 +352,7 @@ class StockPosition:
         self.beta = beta
         self.beta_adjusted_exposure = beta_adjusted_exposure
         self.position_type = position_type  # Store the position_type
+        self.price = price  # Store the price
 
         # Handle market_value for backward compatibility
         if market_value is not None and market_exposure is None:
@@ -377,6 +392,7 @@ class StockPosition:
             "beta": self.beta,
             "market_exposure": self.market_exposure,
             "beta_adjusted_exposure": self.beta_adjusted_exposure,
+            "price": self.price,
             "position_type": "stock",
         }
 
@@ -390,12 +406,16 @@ class StockPosition:
         Returns:
             A new StockPosition instance
         """
+        # Handle price if it exists in the data
+        price = data.get("price", 0.0)
+
         return cls(
             ticker=data["ticker"],
             quantity=data["quantity"],
             beta=data["beta"],
             market_exposure=data["market_exposure"],
             beta_adjusted_exposure=data["beta_adjusted_exposure"],
+            price=price,
             position_type=data.get("position_type", "stock"),  # Pass position_type
         )
 
@@ -1006,18 +1026,25 @@ def create_portfolio_group(
     # Create stock position if data exists
     stock_position = None
     if stock_data:
+        # Get price if it exists in the data
+        price = stock_data.get("price", 0.0)
+
         stock_position = StockPosition(
             ticker=stock_data["ticker"],
             quantity=stock_data["quantity"],
             beta=stock_data["beta"],
             market_exposure=stock_data["market_exposure"],
             beta_adjusted_exposure=stock_data["beta_adjusted_exposure"],
+            price=price,
         )
 
     # Create option positions if data exists
     option_positions = []
     if option_data:
         for opt in option_data:
+            # Get price if it exists in the data
+            price = opt.get("price", 0.0)
+
             option_positions.append(
                 OptionPosition(
                     # Base Position fields
@@ -1035,6 +1062,7 @@ def create_portfolio_group(
                     delta_exposure=opt["delta_exposure"],
                     notional_value=opt["notional_value"],
                     underlying_beta=opt["beta"],  # Use same beta for underlying
+                    price=price,
                 )
             )
 

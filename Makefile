@@ -20,6 +20,9 @@ help:
 	@echo "  train       - Train the model (use --sample for training with sample data)"
 	@echo "  predict     - Run predictions using console app (usage: make predict [NVDA])"
 	@echo "  mlflow      - Start the MLflow UI to view training results (optional: make mlflow PORT=5001)"
+	@echo "  folio       - Start the portfolio dashboard with debug mode enabled"
+	@echo "               Options: portfolio=path/to/file.csv (use custom portfolio file)"
+	@echo "  portfolio   - Start the portfolio dashboard with sample portfolio and debug mode"
 	@echo "  clean       - Clean up generated files and caches"
 	@echo "               Options: --cache (also clear data cache)"
 	@echo "  lint        - Run type checker and linter"
@@ -133,13 +136,13 @@ lint:
 .PHONY: docker-build docker-run docker-up docker-down docker-logs docker-compose-up docker-compose-down docker-test deploy-hf
 
 portfolio:
-	@echo "Starting portfolio dashboard with sample portfolio.csv..."
+	@echo "Starting portfolio dashboard with sample portfolio.csv and debug mode..."
 	@if [ ! -d "$(VENV_DIR)" ]; then \
 		echo "Virtual environment not found. Please run 'make env' first."; \
 		exit 1; \
 	fi
 	@source $(VENV_DIR)/bin/activate && \
-	PYTHONPATH=. python3 -m src.folio.app --port 8051 --portfolio src/folio/assets/sample-portfolio.csv
+	PYTHONPATH=. python3 -m src.folio.app --port 8051 --debug --portfolio src/folio/assets/sample-portfolio.csv
 
 port:
 	@echo "Running portfolio analysis..."
@@ -151,13 +154,13 @@ port:
 	PYTHONPATH=. python3 src/lab/portfolio.py "$(if $(csv),$(csv),src/folio/assets/sample-portfolio.csv)"
 
 folio:
-	@echo "Starting portfolio dashboard..."
+	@echo "Starting portfolio dashboard with debug mode..."
 	@if [ ! -d "$(VENV_DIR)" ]; then \
 		echo "Virtual environment not found. Please run 'make env' first."; \
 		exit 1; \
 	fi
 	@source $(VENV_DIR)/bin/activate && \
-	PYTHONPATH=. python3 -m src.folio.app --port 8051 $(if $(portfolio),--portfolio $(portfolio),)
+	PYTHONPATH=. python3 -m src.folio.app --port 8051 --debug $(if $(portfolio),--portfolio $(portfolio),)
 
 stop-folio:
 	@echo "Stopping portfolio dashboard..."

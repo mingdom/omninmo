@@ -3,7 +3,6 @@
 This module tests the core functionality of the data model classes in src/folio/data_model.py.
 """
 
-
 from src.folio.data_model import (
     ExposureBreakdown,
     OptionPosition,
@@ -25,6 +24,7 @@ class TestStockPosition:
             beta=1.2,
             market_exposure=15000.0,
             beta_adjusted_exposure=18000.0,
+            price=150.0,
         )
 
         assert stock.ticker == "AAPL"
@@ -32,6 +32,7 @@ class TestStockPosition:
         assert stock.beta == 1.2
         assert stock.market_exposure == 15000.0
         assert stock.beta_adjusted_exposure == 18000.0
+        assert stock.price == 150.0
         assert stock.position_type == "stock"
 
     def test_stock_position_to_dict(self):
@@ -42,6 +43,7 @@ class TestStockPosition:
             beta=1.2,
             market_exposure=15000.0,
             beta_adjusted_exposure=18000.0,
+            price=150.0,
         )
 
         stock_dict = stock.to_dict()
@@ -50,6 +52,7 @@ class TestStockPosition:
         assert stock_dict["beta"] == 1.2
         assert stock_dict["market_exposure"] == 15000.0
         assert stock_dict["beta_adjusted_exposure"] == 18000.0
+        assert stock_dict["price"] == 150.0
         assert stock_dict["position_type"] == "stock"
 
     def test_stock_position_from_dict(self):
@@ -60,6 +63,7 @@ class TestStockPosition:
             "beta": 1.2,
             "market_exposure": 15000.0,
             "beta_adjusted_exposure": 18000.0,
+            "price": 150.0,
             "position_type": "stock",
         }
 
@@ -69,6 +73,7 @@ class TestStockPosition:
         assert stock.beta == 1.2
         assert stock.market_exposure == 15000.0
         assert stock.beta_adjusted_exposure == 18000.0
+        assert stock.price == 150.0
         assert stock.position_type == "stock"
 
 
@@ -91,6 +96,7 @@ class TestOptionPosition:
             delta_exposure=1050.0,
             notional_value=15000.0,
             underlying_beta=1.2,
+            price=15.0,
         )
 
         assert option.ticker == "AAPL"
@@ -106,6 +112,7 @@ class TestOptionPosition:
         assert option.delta_exposure == 1050.0
         assert option.notional_value == 15000.0
         assert option.underlying_beta == 1.2
+        assert option.price == 15.0
 
     def test_option_position_to_dict(self):
         """Test conversion of OptionPosition to dictionary."""
@@ -123,6 +130,7 @@ class TestOptionPosition:
             delta_exposure=1050.0,
             notional_value=15000.0,
             underlying_beta=1.2,
+            price=15.0,
         )
 
         option_dict = option.to_dict()
@@ -139,6 +147,7 @@ class TestOptionPosition:
         assert option_dict["delta_exposure"] == 1050.0
         assert option_dict["notional_value"] == 15000.0
         assert option_dict["underlying_beta"] == 1.2
+        assert option_dict["price"] == 15.0
 
     def test_option_position_from_dict(self):
         """Test creation of OptionPosition from dictionary."""
@@ -156,6 +165,7 @@ class TestOptionPosition:
             "delta_exposure": 1050.0,
             "notional_value": 15000.0,
             "underlying_beta": 1.2,
+            "price": 15.0,
         }
 
         option = OptionPosition.from_dict(option_dict)
@@ -172,6 +182,7 @@ class TestOptionPosition:
         assert option.delta_exposure == 1050.0
         assert option.notional_value == 15000.0
         assert option.underlying_beta == 1.2
+        assert option.price == 15.0
 
 
 class TestExposureBreakdown:
@@ -416,6 +427,7 @@ class TestPortfolioGroup:
             "market_exposure": 15000.0,
             "beta_adjusted_exposure": 18000.0,
             "description": "APPLE INC",
+            "price": 150.0,
         }
 
         option_data = [
@@ -433,6 +445,7 @@ class TestPortfolioGroup:
                 "delta": 0.7,
                 "delta_exposure": 1050.0,
                 "notional_value": 15000.0,
+                "price": 15.0,
             }
         ]
 
@@ -440,11 +453,13 @@ class TestPortfolioGroup:
         assert group.ticker == "AAPL"
         assert group.stock_position.ticker == "AAPL"
         assert group.stock_position.quantity == 100
+        assert group.stock_position.price == 150.0
         assert len(group.option_positions) == 1
         assert group.option_positions[0].ticker == "AAPL"
         assert group.option_positions[0].option_type == "CALL"
         assert group.option_positions[0].strike == 220.0
         assert group.option_positions[0].expiry == "2025-04-17"
+        assert group.option_positions[0].price == 15.0
         assert group.net_exposure == 16050.0  # 15000 + 1050
         assert group.beta == 1.2
         assert group.beta_adjusted_exposure == 19800.0  # 18000 + 1800
@@ -501,6 +516,7 @@ class TestPortfolioSummary:
             beta=0.0,
             market_exposure=5000.0,
             beta_adjusted_exposure=0.0,
+            price=5000.0,
         )
 
         summary = PortfolioSummary(
@@ -639,7 +655,11 @@ class TestPortfolioSummary:
             "total_beta_adjusted": 660.0,
             "description": "Options Exposure",
             "formula": "Long Options Delta - Short Options Delta",
-            "components": {"Long Options": 1050.0, "Short Options": 500.0, "Net": 550.0},
+            "components": {
+                "Long Options": 1050.0,
+                "Short Options": 500.0,
+                "Net": 550.0,
+            },
         }
 
         cash_position_dict = {
