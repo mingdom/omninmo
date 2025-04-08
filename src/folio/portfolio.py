@@ -336,6 +336,7 @@ def process_portfolio_data(
                         "beta": beta,
                         "beta_adjusted_exposure": value_to_use * beta,
                         "description": description,
+                        "price": price,  # Store the price
                     }
                     cash_like_by_ticker[symbol] = cash_like_position
                     cash_like_positions.append(cash_like_position)
@@ -408,6 +409,7 @@ def process_portfolio_data(
                 "market_exposure": value,  # This is the market exposure (quantity * price)
                 "beta_adjusted_exposure": value * beta,
                 "description": stock_info.get("description", ""),
+                "price": stock_info["price"],  # Store the price
             }
 
             # Find and process related options from the filtered option_df
@@ -554,6 +556,8 @@ def process_portfolio_data(
                             "delta": delta,
                             "delta_exposure": delta_exposure,
                             "notional_value": notional_value,
+                            "price": parsed_option.current_price,  # Store the price
+                            "implied_volatility": 0.30,  # Default implied volatility
                             # TODO: Add additional Greeks (gamma, theta, vega) to option data
                             # requires extending parsing/calculation functions.
                         }
@@ -895,6 +899,7 @@ def calculate_portfolio_summary(
                     "market_value"
                 ],  # Cash has no market exposure, but we store the value
                 beta_adjusted_exposure=pos["beta_adjusted_exposure"],
+                price=pos.get("price", 0.0),  # Get price if it exists
             )
             for pos in cash_like_positions
         ]
