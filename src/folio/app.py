@@ -1125,8 +1125,8 @@ def main():
             return 1
         portfolio_file = str(portfolio_file)
 
-    # Create and run app
-    app = create_app(portfolio_file, args.debug)
+    # Initialize and run app
+    app = AppHolder.init_app(portfolio_file, args.debug)
 
     # Display a helpful message about where to access the app
     is_docker = os.path.exists("/.dockerenv")
@@ -1151,9 +1151,25 @@ def main():
     return 0
 
 
+# Create a class to hold the app instance
+class AppHolder:
+    """Class to hold the app instance"""
+
+    app = None
+    server = None
+
+    @classmethod
+    def init_app(cls, portfolio_file: str | None = None, debug: bool = False):
+        """Initialize the app for WSGI servers"""
+        if cls.app is None:
+            cls.app = create_app(portfolio_file, debug)
+            cls.server = cls.app.server
+        return cls.app
+
+
 # Create the app instance for Uvicorn to use
-app = create_app()
-server = app.server
+app = AppHolder.init_app()
+server = AppHolder.server
 
 if __name__ == "__main__":
     sys.exit(main())

@@ -1030,7 +1030,7 @@ def update_portfolio_prices(
 
 
 def update_portfolio_summary_with_prices(
-    portfolio_groups: list[PortfolioGroup], summary: PortfolioSummary, data_fetcher=None
+    portfolio_groups: list[PortfolioGroup], _: PortfolioSummary, data_fetcher=None
 ) -> PortfolioSummary:
     """Update the portfolio summary with the latest prices.
 
