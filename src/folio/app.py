@@ -373,11 +373,6 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
             dcc.Store(
                 id="portfolio-table-active-cell"
             ),  # Store for tracking active cell in portfolio table
-            dcc.Interval(
-                id="interval-component",
-                interval=5 * 60 * 1000,  # 5 minutes in milliseconds
-                n_intervals=0,
-            ),
             # Add initial trigger
             dcc.Store(id="initial-trigger", data=True),
         ],
