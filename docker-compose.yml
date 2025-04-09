@@ -6,6 +6,7 @@ services:
     environment:
       - PORT=8050
       - HF_SPACE=
+      - ENVIRONMENT=development
       - PYTHONPATH=/app
       - DATA_SOURCE=yfinance
       - LOG_LEVEL=INFO

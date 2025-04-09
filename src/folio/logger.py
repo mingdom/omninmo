@@ -22,11 +22,13 @@ def setup_logger() -> logging.Logger:
     # Determine the logs directory based on the environment
     # In Hugging Face Spaces, use /tmp for logs
     # In other environments, use the logs directory in the current working directory
-    is_huggingface = os.environ.get('HF_SPACE') == '1' or os.environ.get('SPACE_ID') is not None
+    is_huggingface = (
+        os.environ.get("HF_SPACE") == "1" or os.environ.get("SPACE_ID") is not None
+    )
 
     # Get log level from environment variable
     # Default to WARNING for Hugging Face, INFO for other environments
-    log_level_str = os.environ.get('LOG_LEVEL')
+    log_level_str = os.environ.get("LOG_LEVEL")
     if log_level_str:
         # Use the provided log level
         log_level_str = log_level_str.upper()
@@ -39,7 +41,9 @@ def setup_logger() -> logging.Logger:
 
     # Configure root logger to prevent duplicate logs
     root_logger = logging.getLogger()
-    root_logger.setLevel(logging.WARNING)  # Only show warnings and errors from other libraries
+    root_logger.setLevel(
+        logging.WARNING
+    )  # Only show warnings and errors from other libraries
 
     # Clear any existing handlers on the root logger
     if root_logger.hasHandlers():
@@ -52,7 +56,9 @@ def setup_logger() -> logging.Logger:
 
     # Create our application logger
     logger = logging.getLogger("folio")
-    logger.setLevel(logging.DEBUG)  # Set to DEBUG to allow all levels to be logged based on handlers
+    logger.setLevel(
+        logging.DEBUG
+    )  # Set to DEBUG to allow all levels to be logged based on handlers
     logger.propagate = False  # Prevent propagation to avoid duplicate logs
 
     # Create handlers
@@ -95,7 +101,10 @@ def setup_logger() -> logging.Logger:
             # If we can't create a log file, log to console only
             logger.warning("Could not create log file. Logging to console only.")
 
-    logger.info("Logger initialized")
+    # Only log initialization message if this is the first time
+    # This prevents duplicate messages when using Flask's debug reloader
+    if not os.environ.get("WERKZEUG_RUN_MAIN") == "true":
+        logger.info("Logger initialized")
     return logger
 
 

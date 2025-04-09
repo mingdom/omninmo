@@ -1,0 +1,46 @@
+/* Custom styles for Folio app */
+
+/* Logo styling */
+.logo-text {
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+}
+
+.logo-letter {
+    display: inline-block;
+    padding: 0 2px;
+    border-radius: 4px;
+    margin-right: 1px;
+}
+
+.logo-letter-primary {
+    background-color: #007bff;
+    color: white;
+    padding: 0 6px;
+    margin-right: 2px;
+}
+
+/* Navbar styling */
+.navbar {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Price update section */
+#price-timestamp-display {
+    font-family: monospace;
+    font-size: 0.9rem;
+}
+
+/* Update button styling */
+#update-prices-button {
+    transition: all 0.2s ease;
+}
+
+#update-prices-button:hover {
+    transform: scale(1.05);
+}
+
+#update-prices-button:active {
+    transform: scale(0.95);
+}

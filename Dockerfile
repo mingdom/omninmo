@@ -8,6 +8,7 @@ ENV PYTHONPATH=/app
 # The application will check for HF_SPACE environment variable to determine the environment
 ENV PORT=8050
 ENV HF_SPACE=1
+ENV ENVIRONMENT=production
 # Set logging level to WARNING for Hugging Face deployment (for privacy reasons)
 ENV LOG_LEVEL=WARNING
 # Note: Sensitive environment variables like GEMINI_API_KEY should be passed at runtime
@@ -41,4 +42,5 @@ EXPOSE 7860 8050
 
 # Run the application with Gunicorn for production deployment
 # The command will determine the correct port based on environment
-CMD ["sh", "-c", "if [ -n \"$HF_SPACE\" ]; then PORT=7860; fi && gunicorn --bind 0.0.0.0:$PORT --workers 2 --timeout 60 src.folio.app:server"]
+# We explicitly set --no-debug to ensure debug mode is disabled in production
+CMD ["sh", "-c", "if [ -n \"$HF_SPACE\" ]; then PORT=7860; fi && echo 'Starting Folio in PRODUCTION mode (debug disabled)' && gunicorn --bind 0.0.0.0:$PORT --workers 2 --timeout 60 src.folio.app:server"]
