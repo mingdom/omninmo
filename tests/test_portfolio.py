@@ -405,3 +405,69 @@ class TestPriceUpdates:
 
         # Verify the update_portfolio_prices function was called
         mock_update_prices.assert_called_once_with(portfolio_groups, None)
+
+    def test_process_orphaned_options(self):
+        """Test that options without a matching stock position are properly processed.
+
+        This test verifies that the portfolio processing logic correctly handles
+        options without a matching stock position (like SPY options without a SPY stock position).
+        """
+        # Create a test DataFrame with only option positions (no matching stock)
+        data = {
+            "Symbol": ["-SPY250620C580", "-SPY250620P470", "-SPY250620P525"],
+            "Description": [
+                "SPY JUN 20 2025 $580 CALL",
+                "SPY JUN 20 2025 $470 PUT",
+                "SPY JUN 20 2025 $525 PUT",
+            ],
+            "Quantity": [-30, -30, 30],
+            "Last Price": [5.37, 7.29, 17.76],
+            "Current Value": [-16110.00, -21870.00, 53280.00],
+            "Percent Of Account": [-0.60, -0.81, 1.98],
+            "Type": ["Margin", "Margin", "Margin"],
+        }
+        df = pd.DataFrame(data)
+
+        # Import the function directly in the test to avoid circular imports
+        from src.folio.portfolio import process_portfolio_data
+
+        # Process the portfolio data
+        groups, summary, cash_like = process_portfolio_data(df)
+
+        # Verify that a group was created for the SPY options
+        assert len(groups) > 0, "No portfolio groups were created"
+
+        # Find the SPY group
+        spy_group = None
+        for group in groups:
+            if group.ticker == "SPY":
+                spy_group = group
+                break
+
+        # Verify that the SPY group exists
+        assert spy_group is not None, "SPY group was not created"
+
+        # Verify that the SPY group has options but no stock position
+        assert len(spy_group.option_positions) == 3, (
+            "SPY group should have 3 option positions"
+        )
+
+        # Verify the option positions
+        assert spy_group.option_positions[0].ticker == "SPY"
+        assert spy_group.option_positions[1].ticker == "SPY"
+        assert spy_group.option_positions[2].ticker == "SPY"
+
+        # Verify the option types
+        call_count = sum(
+            1 for opt in spy_group.option_positions if opt.option_type == "CALL"
+        )
+        put_count = sum(
+            1 for opt in spy_group.option_positions if opt.option_type == "PUT"
+        )
+        assert call_count == 1, "Should have 1 CALL option"
+        assert put_count == 2, "Should have 2 PUT options"
+
+        # Verify the quantities
+        assert spy_group.option_positions[0].quantity == -30
+        assert spy_group.option_positions[1].quantity == -30
+        assert spy_group.option_positions[2].quantity == 30

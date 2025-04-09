@@ -611,15 +611,244 @@ def process_portfolio_data(
                 logger.warning(f"Skipping group '{symbol}' due to error.")
                 continue  # Continue processing other groups
 
-    # Log any options that were not processed (didn't match any stock group)
+    # Process any options that were not matched to a stock position
     unprocessed_options = set(option_df.index) - processed_option_indices
     if unprocessed_options:
         logger.info(
-            f"{len(unprocessed_options)} options without matching stock positions found (normal for some strategies):"
+            f"{len(unprocessed_options)} options without matching stock positions found - creating standalone option groups"
         )
-        for idx in unprocessed_options:
-            logger.info(f"  - Index {idx}: {option_df.loc[idx, 'Description']}")
 
+        # Group unprocessed options by underlying symbol
+        orphaned_options_by_underlying = {}
+        for idx in unprocessed_options:
+            opt_row = option_df.loc[idx]
+            opt_desc = opt_row["Description"]
+
+            # Extract the underlying symbol from the description
+            # Description format is expected to be: "SPY JUN 20 2025 $580 CALL"
+            parts = opt_desc.strip().split()
+            if len(parts) >= 1:
+                underlying = parts[0]  # First part should be the underlying symbol
+
+                # Add to the dictionary, grouped by underlying
+                if underlying not in orphaned_options_by_underlying:
+                    orphaned_options_by_underlying[underlying] = []
+                orphaned_options_by_underlying[underlying].append(idx)
+                logger.info(
+                    f"  - Orphaned option: {opt_desc} (Underlying: {underlying})"
+                )
+            else:
+                logger.warning(
+                    f"  - Could not extract underlying from option description: {opt_desc}"
+                )
+
+        # Process each group of orphaned options
+        for underlying, option_indices in orphaned_options_by_underlying.items():
+            logger.info(
+                f"Creating standalone option group for {underlying} with {len(option_indices)} options"
+            )
+
+            # Process options for this underlying
+            option_data_for_group = []
+            for opt_idx in option_indices:
+                opt_row = option_df.loc[opt_idx]
+                try:
+                    option_desc = opt_row["Description"]
+                    option_symbol = opt_row["Symbol"]
+
+                    # Validate and process option fields (similar to the stock option processing)
+                    if pd.isna(opt_row["Quantity"]) or opt_row["Quantity"] == "--":
+                        logger.warning(
+                            f"Option {option_desc}: Missing quantity. Skipping."
+                        )
+                        continue
+                    try:
+                        opt_quantity = int(float(opt_row["Quantity"]))
+                    except (ValueError, TypeError):
+                        logger.warning(
+                            f"Option {option_desc}: Invalid quantity format '{opt_row['Quantity']}'. Skipping."
+                        )
+                        continue
+
+                    if pd.isna(opt_row["Last Price"]) or opt_row["Last Price"] in (
+                        "--",
+                        "",
+                    ):
+                        logger.warning(
+                            f"Option {option_desc}: Missing price. Skipping."
+                        )
+                        continue
+                    try:
+                        opt_last_price = clean_currency_value(opt_row["Last Price"])
+                    except ValueError:
+                        logger.warning(
+                            f"Option {option_desc}: Invalid price format '{opt_row['Last Price']}'. Skipping."
+                        )
+                        continue
+
+                    # Parse option details
+                    try:
+                        parsed_option = parse_option_description(
+                            option_desc, opt_quantity, opt_last_price
+                        )
+                    except ValueError as e:
+                        logger.warning(
+                            f"Could not parse option description for '{option_desc}': {e}. Skipping."
+                        )
+                        continue
+
+                    # Get beta for the underlying
+                    try:
+                        beta = get_beta(underlying)
+                    except Exception as beta_err:
+                        logger.error(
+                            f"Error getting beta for {underlying}: {beta_err}. Using beta=1.0."
+                        )
+                        beta = 1.0  # Use a default beta of 1.0 for the market index
+
+                    # Get the latest price for the underlying
+                    try:
+                        # Try to fetch the latest price
+                        price_data = data_fetcher.fetch_data(underlying, period="1d")
+                        if price_data is not None and not price_data.empty:
+                            underlying_price = price_data.iloc[-1]["Close"]
+                        else:
+                            # If we can't get the price data, use the strike price as a fallback
+                            logger.warning(
+                                f"Could not fetch price data for {underlying}. Using strike price as fallback."
+                            )
+                            underlying_price = parsed_option.strike
+                    except Exception as price_err:
+                        logger.error(
+                            f"Error fetching price for {underlying}: {price_err}. Using strike price as fallback."
+                        )
+                        underlying_price = parsed_option.strike
+
+                    # Calculate delta
+                    try:
+                        delta = calculate_option_delta(
+                            parsed_option,
+                            underlying_price,
+                            use_black_scholes=True,
+                            risk_free_rate=0.05,
+                            implied_volatility=None,
+                        )
+                    except Exception as delta_err:
+                        logger.error(
+                            f"Error calculating delta for option '{option_desc}': {delta_err}. Using delta=0."
+                        )
+                        delta = 0.0
+
+                    # Calculate market value and notional value
+                    try:
+                        market_value = clean_currency_value(opt_row["Current Value"])
+                    except ValueError:
+                        logger.warning(
+                            f"Option {option_desc}: Invalid 'Current Value' format '{opt_row['Current Value']}'. Using 0."
+                        )
+                        market_value = 0.0
+
+                    notional_value = parsed_option.notional_value
+                    delta_exposure = delta * notional_value
+                    beta_adjusted_exposure = delta_exposure * beta
+
+                    logger.info(f"Orphaned Option Added: {option_desc}")
+                    logger.info(f"  Quantity: {parsed_option.quantity:,.0f}")
+                    logger.info(f"  Market Value: {format_currency(market_value)}")
+                    logger.info(f"  Delta: {delta:.3f}")
+                    logger.info(f"  Notional Value: {format_currency(notional_value)}")
+                    logger.info(f"  Delta Exposure: {format_currency(delta_exposure)}")
+                    logger.info(
+                        f"  Beta-Adjusted Exposure: {format_currency(beta_adjusted_exposure)}"
+                    )
+
+                    # Add to option data for this group
+                    option_data_for_group.append(
+                        {
+                            "ticker": underlying,
+                            "option_symbol": option_symbol,
+                            "description": option_desc,
+                            "quantity": parsed_option.quantity,
+                            "beta": beta,
+                            "beta_adjusted_exposure": beta_adjusted_exposure,
+                            "market_exposure": delta_exposure,
+                            "strike": parsed_option.strike,
+                            "expiry": parsed_option.expiry.strftime("%Y-%m-%d"),
+                            "option_type": parsed_option.option_type,
+                            "delta": delta,
+                            "delta_exposure": delta_exposure,
+                            "notional_value": notional_value,
+                            "price": parsed_option.current_price,
+                        }
+                    )
+                    processed_option_indices.add(opt_idx)  # Mark as processed
+
+                except Exception as e:
+                    logger.error(f"Error processing orphaned option {option_desc}: {e}")
+                    continue
+
+            # Create a portfolio group with just options (no stock position)
+            if option_data_for_group:
+                # For options-only groups, we'll create the group with a zero-quantity stock position
+                # We need to pass a minimal stock_data dictionary to create_portfolio_group
+                # but we'll set the quantity to 0 so it doesn't affect calculations
+                stock_data_for_group = {
+                    "ticker": underlying,
+                    "quantity": 0,
+                    "beta": beta,
+                    "market_exposure": 0,
+                    "beta_adjusted_exposure": 0,
+                    "description": f"{underlying} (Options Only)",
+                    "price": 0,
+                }
+
+                # Create the group
+                group = create_portfolio_group(
+                    stock_data_for_group, option_data_for_group
+                )
+                if group:
+                    # We'll keep the stock_position with quantity=0 to maintain the ticker information
+                    # This ensures the group is properly displayed in the UI
+                    groups.append(group)
+                    logger.info(
+                        f"Successfully created options-only group for {underlying} with {len(option_data_for_group)} options"
+                    )
+
+                    # Log the group details
+                    logger.info(f"Group details for {underlying}:")
+                    logger.info(
+                        f"  Net Exposure: {format_currency(group.net_exposure)}"
+                    )
+                    logger.info(f"  Beta: {format_beta(group.beta)}")
+                    logger.info(
+                        f"  Beta-Adjusted Exposure: {format_currency(group.beta_adjusted_exposure)}"
+                    )
+                    logger.info(
+                        f"  Options Delta Exposure: {format_currency(group.options_delta_exposure)}"
+                    )
+                    logger.info(f"  Number of Options: {len(group.option_positions)}")
+                    logger.info(
+                        f"  Stock Position: {'Yes' if group.stock_position else 'No'}"
+                    )
+                    if group.stock_position:
+                        logger.info(
+                            f"  Stock Quantity: {group.stock_position.quantity}"
+                        )
+                        logger.info(
+                            f"  Stock Market Exposure: {format_currency(group.stock_position.market_exposure)}"
+                        )
+                        logger.info(
+                            f"  Stock Beta-Adjusted Exposure: {format_currency(group.stock_position.beta_adjusted_exposure)}"
+                        )
+                    logger.info(
+                        f"  Option Types: {group.call_count} calls, {group.put_count} puts"
+                    )
+                else:
+                    logger.warning(
+                        f"Failed to create options-only group for {underlying}"
+                    )
+
+    # Check if we have any valid groups after processing
     if not groups:
         logger.warning(
             "No valid portfolio groups were created after processing. This may be an all-cash portfolio."

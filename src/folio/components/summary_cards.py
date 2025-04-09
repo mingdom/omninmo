@@ -581,7 +581,7 @@ def register_callbacks(app):
                 else:
                     logger.debug(f"  {key}: {summary_data[key]}")
         else:
-            logger.warning("No summary data available, returning error values")
+            # Return error values when no summary data is available (normal during initial load)
             return error_values()
 
         try:
