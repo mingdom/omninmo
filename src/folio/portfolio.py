@@ -23,7 +23,6 @@ from .data_model import (
     create_portfolio_group,
 )
 from .logger import logger
-from .option_utils import calculate_option_delta, parse_option_description
 from .utils import clean_currency_value, format_beta, format_currency, get_beta
 
 # Initialize data fetcher
@@ -431,167 +430,124 @@ def process_portfolio_data(
                 f"  Found {len(potential_options)} potential option(s) for {symbol} based on description prefix."
             )
 
+            # Import the process_options function from option_utils
+            from .option_utils import process_options
+
+            # Prepare option data for processing
+            options_data = []
             for opt_index, opt_row in potential_options.iterrows():
                 # Skip if this option index was already processed (e.g., duplicate description)
                 if opt_index in processed_option_indices:
                     continue
 
+                # Basic validation before adding to the list
+                option_desc = opt_row.get("Description")
+                if pd.isna(option_desc) or option_desc == "--":
+                    logger.warning(
+                        f"    Option with symbol {opt_row.get('Symbol', 'unknown')}: Missing description. Skipping."
+                    )
+                    continue
+
+                if pd.isna(opt_row["Quantity"]) or opt_row["Quantity"] == "--":
+                    logger.warning(
+                        f"    Option {option_desc}: Missing quantity. Skipping."
+                    )
+                    continue
+
+                if pd.isna(opt_row["Last Price"]) or opt_row["Last Price"] in (
+                    "--",
+                    "",
+                ):
+                    logger.warning(
+                        f"    Option {option_desc}: Missing price. Skipping."
+                    )
+                    continue
+
                 try:
-                    option_desc = opt_row["Description"]
-                    option_symbol = opt_row["Symbol"]  # May start with '-'
+                    opt_quantity = int(float(opt_row["Quantity"]))
+                    opt_last_price = clean_currency_value(opt_row["Last Price"])
 
-                    logger.debug(
-                        f"    Attempting to process potential option: {option_desc} (Symbol: {option_symbol})"
-                    )
-
-                    # --- Validate critical option fields ---
-                    if pd.isna(opt_row["Quantity"]) or opt_row["Quantity"] == "--":
-                        logger.warning(
-                            f"    Option {option_desc}: Missing quantity. Skipping."
-                        )
-                        continue
-                    try:
-                        opt_quantity = int(float(opt_row["Quantity"]))
-                    except (ValueError, TypeError):
-                        logger.warning(
-                            f"    Option {option_desc}: Invalid quantity format '{opt_row['Quantity']}'. Skipping."
-                        )
-                        continue
-
-                    if pd.isna(opt_row["Last Price"]) or opt_row["Last Price"] in (
-                        "--",
-                        "",
-                    ):
-                        logger.warning(
-                            f"    Option {option_desc}: Missing price. Skipping."
-                        )
-                        continue
-                    try:
-                        opt_last_price = clean_currency_value(opt_row["Last Price"])
-                    except ValueError:
-                        logger.warning(
-                            f"    Option {option_desc}: Invalid price format '{opt_row['Last Price']}'. Skipping."
-                        )
-                        continue
-
-                    # --- Parse option details using option_utils ---
-                    try:
-                        parsed_option = parse_option_description(
-                            option_desc, opt_quantity, opt_last_price
-                        )
-                    except ValueError as e:
-                        # This happens if the description doesn't match the expected 6-part format
-                        logger.warning(
-                            f"    Could not parse option description for '{option_desc}': {e}. Skipping."
-                        )
-                        continue
-
-                    # --- Sanity check: Ensure parsed underlying matches the current group symbol ---
-                    if parsed_option.underlying != symbol:
-                        # This should theoretically not happen with the current filtering, but good practice
-                        logger.error(
-                            f"    Mismatch! Option '{option_desc}' parsed underlying '{parsed_option.underlying}' does not match group symbol '{symbol}'. Skipping."
-                        )
-                        continue
-
-                    # --- Calculate Delta ---
-                    # Use the stock's current price from stock_info
-                    # TODO: Make risk-free rate and default IV configurable
-                    # TODO: Consider fetching/calculating IV per option instead of using a default
-                    try:
-                        delta = calculate_option_delta(
-                            parsed_option,
-                            stock_info[
-                                "price"
-                            ],  # Use the fetched stock price for consistency
-                            use_black_scholes=True,
-                            risk_free_rate=0.05,  # Default RFR
-                            implied_volatility=None,  # Let calculate_option_delta estimate IV
-                        )
-                    except Exception as delta_err:
-                        logger.error(
-                            f"    Error calculating delta for option '{option_desc}': {delta_err}. Using delta=0.",
-                            exc_info=True,
-                        )
-                        delta = 0.0
-
-                    # --- Calculate Market Value and Notional Value ---
-                    try:
-                        market_value = clean_currency_value(opt_row["Current Value"])
-                    except ValueError:
-                        logger.warning(
-                            f"    Option {option_desc}: Invalid 'Current Value' format '{opt_row['Current Value']}'. Using 0."
-                        )
-                        market_value = 0.0
-
-                    # Notional value calculation moved inside OptionPosition dataclass in option_utils
-                    notional_value = (
-                        parsed_option.notional_value
-                    )  # Absolute notional value
-
-                    # Use the notional value for delta exposure calculation
-                    # The delta from calculate_option_delta already accounts for the position direction
-                    # (positive for long, negative for short)
-                    delta_exposure = delta * parsed_option.notional_value
-
-                    beta_adjusted_exposure = (
-                        delta_exposure * beta
-                    )  # Factor in underlying's beta
-
-                    logger.info(f"    Option Added: {option_desc}")
-                    logger.info(f"      Quantity: {parsed_option.quantity:,.0f}")
-                    logger.info(f"      Market Value: {format_currency(market_value)}")
-                    logger.info(f"      Delta: {delta:.3f}")
-                    logger.info(
-                        f"      Notional Value: {format_currency(notional_value)}"
-                    )
-                    logger.info(
-                        f"      Delta Exposure: {format_currency(delta_exposure)}"
-                    )
-                    logger.info(
-                        f"      Beta-Adjusted Exposure: {format_currency(beta_adjusted_exposure)}"
-                    )
-
-                    # --- Append structured option data ---
-                    option_data_for_group.append(
+                    # Add to the list for batch processing
+                    options_data.append(
                         {
-                            "ticker": symbol,  # Underlying ticker
-                            "option_symbol": option_symbol,  # The actual option symbol (e.g., '-AAPL...')
                             "description": option_desc,
-                            "quantity": parsed_option.quantity,
-                            "beta": beta,  # Underlying's beta
-                            "beta_adjusted_exposure": beta_adjusted_exposure,
-                            "market_exposure": delta_exposure,  # Delta-adjusted exposure is the market exposure
-                            "strike": parsed_option.strike,
-                            "expiry": parsed_option.expiry.strftime("%Y-%m-%d"),
-                            "option_type": parsed_option.option_type,
-                            "delta": delta,
-                            "delta_exposure": delta_exposure,
-                            "notional_value": notional_value,
-                            "price": parsed_option.current_price,  # Store the price
-                            # TODO: Add additional Greeks (gamma, theta, vega) to option data
-                            # requires extending parsing/calculation functions.
+                            "symbol": opt_row["Symbol"],
+                            "quantity": opt_quantity,
+                            "price": opt_last_price,
+                            "current_value": opt_row.get("Current Value"),
+                            "row_index": opt_index,  # Store the index for marking as processed later
                         }
                     )
-                    processed_option_indices.add(opt_index)  # Mark as processed
+                except (ValueError, TypeError) as e:
+                    logger.warning(
+                        f"    Error parsing option data for {option_desc}: {e}. Skipping."
+                    )
+                    continue
 
-                except ValueError as opt_val_err:
-                    logger.warning(
-                        f"    Data conversion error processing option row {opt_index} ('{opt_row.get('Description', 'N/A')}'): {opt_val_err}. Skipping option."
+            # Process all options at once using our new function
+            prices = {symbol: stock_info["price"]}  # Use the fetched stock price
+            betas = {symbol: beta}  # Use the beta we already calculated
+
+            try:
+                processed_options = process_options(options_data, prices, betas)
+
+                # Filter out options with mismatched underlying
+                processed_options = [
+                    opt for opt in processed_options if opt["ticker"] == symbol
+                ]
+
+                # Convert to the format expected by create_portfolio_group
+                option_data_for_group = []
+                for opt in processed_options:
+                    # Mark the option as processed
+                    row_index = next(
+                        data["row_index"]
+                        for data in options_data
+                        if data["description"] == opt["description"]
+                        and data["quantity"] == opt["quantity"]
                     )
-                    continue
-                except TypeError as opt_type_err:
-                    logger.warning(
-                        f"    Type error processing option row {opt_index} ('{opt_row.get('Description', 'N/A')}'): {opt_type_err}. Skipping option."
+                    processed_option_indices.add(row_index)
+
+                    # Log the option details
+                    logger.info(f"    Option Added: {opt['description']}")
+                    logger.info(f"      Quantity: {opt['quantity']:,.0f}")
+                    logger.info(f"      Delta: {opt['delta']:.3f}")
+                    logger.info(
+                        f"      Notional Value: {format_currency(opt['notional_value'])}"
                     )
-                    continue
-                except Exception as opt_err:
-                    # Catch unexpected errors during option processing for this group
-                    logger.error(
-                        f"    Unexpected error processing option row {opt_index} ('{opt_row.get('Description', 'N/A')}') for group {symbol}: {opt_err}",
-                        exc_info=True,
+                    logger.info(
+                        f"      Delta Exposure: {format_currency(opt['delta_exposure'])}"
                     )
-                    continue  # Skip this option, continue with the next for this group
+                    logger.info(
+                        f"      Beta-Adjusted Exposure: {format_currency(opt['beta_adjusted_exposure'])}"
+                    )
+
+                    # Add to the group data
+                    option_data_for_group.append(
+                        {
+                            "ticker": opt["ticker"],
+                            "option_symbol": opt["option_symbol"],
+                            "description": opt["description"],
+                            "quantity": opt["quantity"],
+                            "beta": opt["beta"],
+                            "beta_adjusted_exposure": opt["beta_adjusted_exposure"],
+                            "market_exposure": opt[
+                                "delta_exposure"
+                            ],  # Delta-adjusted exposure is the market exposure
+                            "strike": opt["strike"],
+                            "expiry": opt["expiry"],
+                            "option_type": opt["option_type"],
+                            "delta": opt["delta"],
+                            "delta_exposure": opt["delta_exposure"],
+                            "notional_value": opt["notional_value"],
+                            "price": opt["price"],
+                        }
+                    )
+            except Exception as e:
+                logger.error(
+                    f"    Error processing options for {symbol}: {e}", exc_info=True
+                )
+                option_data_for_group = []  # Use an empty list if processing fails
 
             # Create portfolio group using the dedicated function from data_model
             # Ensure the create function handles cases with stock only, or stock + options
@@ -660,150 +616,154 @@ def process_portfolio_data(
                 f"Creating standalone option group for {underlying} with {len(option_indices)} options"
             )
 
-            # Process options for this underlying
-            option_data_for_group = []
+            # Import the process_options function from option_utils
+            from .option_utils import process_options
+
+            # Prepare option data for processing
+            options_data = []
             for opt_idx in option_indices:
                 opt_row = option_df.loc[opt_idx]
-                try:
-                    option_desc = opt_row["Description"]
-                    option_symbol = opt_row["Symbol"]
 
-                    # Validate and process option fields (similar to the stock option processing)
-                    if pd.isna(opt_row["Quantity"]) or opt_row["Quantity"] == "--":
-                        logger.warning(
-                            f"Option {option_desc}: Missing quantity. Skipping."
-                        )
-                        continue
-                    try:
-                        opt_quantity = int(float(opt_row["Quantity"]))
-                    except (ValueError, TypeError):
-                        logger.warning(
-                            f"Option {option_desc}: Invalid quantity format '{opt_row['Quantity']}'. Skipping."
-                        )
-                        continue
-
-                    if pd.isna(opt_row["Last Price"]) or opt_row["Last Price"] in (
-                        "--",
-                        "",
-                    ):
-                        logger.warning(
-                            f"Option {option_desc}: Missing price. Skipping."
-                        )
-                        continue
-                    try:
-                        opt_last_price = clean_currency_value(opt_row["Last Price"])
-                    except ValueError:
-                        logger.warning(
-                            f"Option {option_desc}: Invalid price format '{opt_row['Last Price']}'. Skipping."
-                        )
-                        continue
-
-                    # Parse option details
-                    try:
-                        parsed_option = parse_option_description(
-                            option_desc, opt_quantity, opt_last_price
-                        )
-                    except ValueError as e:
-                        logger.warning(
-                            f"Could not parse option description for '{option_desc}': {e}. Skipping."
-                        )
-                        continue
-
-                    # Get beta for the underlying
-                    try:
-                        beta = get_beta(underlying)
-                    except Exception as beta_err:
-                        logger.error(
-                            f"Error getting beta for {underlying}: {beta_err}. Using beta=1.0."
-                        )
-                        beta = 1.0  # Use a default beta of 1.0 for the market index
-
-                    # Get the latest price for the underlying
-                    try:
-                        # Try to fetch the latest price
-                        price_data = data_fetcher.fetch_data(underlying, period="1d")
-                        if price_data is not None and not price_data.empty:
-                            underlying_price = price_data.iloc[-1]["Close"]
-                        else:
-                            # If we can't get the price data, use the strike price as a fallback
-                            logger.warning(
-                                f"Could not fetch price data for {underlying}. Using strike price as fallback."
-                            )
-                            underlying_price = parsed_option.strike
-                    except Exception as price_err:
-                        logger.error(
-                            f"Error fetching price for {underlying}: {price_err}. Using strike price as fallback."
-                        )
-                        underlying_price = parsed_option.strike
-
-                    # Calculate delta
-                    try:
-                        delta = calculate_option_delta(
-                            parsed_option,
-                            underlying_price,
-                            use_black_scholes=True,
-                            risk_free_rate=0.05,
-                            implied_volatility=None,
-                        )
-                    except Exception as delta_err:
-                        logger.error(
-                            f"Error calculating delta for option '{option_desc}': {delta_err}. Using delta=0."
-                        )
-                        delta = 0.0
-
-                    # Calculate market value and notional value
-                    try:
-                        market_value = clean_currency_value(opt_row["Current Value"])
-                    except ValueError:
-                        logger.warning(
-                            f"Option {option_desc}: Invalid 'Current Value' format '{opt_row['Current Value']}'. Using 0."
-                        )
-                        market_value = 0.0
-
-                    notional_value = (
-                        parsed_option.notional_value
-                    )  # Absolute notional value
-
-                    # Use the signed notional value for delta exposure calculation
-                    # This ensures the exposure correctly reflects the direction (long/short)
-                    # without double-counting the sign (delta already accounts for option type)
-                    delta_exposure = delta * parsed_option.signed_notional_value
-                    beta_adjusted_exposure = delta_exposure * beta
-
-                    logger.info(f"Orphaned Option Added: {option_desc}")
-                    logger.info(f"  Quantity: {parsed_option.quantity:,.0f}")
-                    logger.info(f"  Market Value: {format_currency(market_value)}")
-                    logger.info(f"  Delta: {delta:.3f}")
-                    logger.info(f"  Notional Value: {format_currency(notional_value)}")
-                    logger.info(f"  Delta Exposure: {format_currency(delta_exposure)}")
-                    logger.info(
-                        f"  Beta-Adjusted Exposure: {format_currency(beta_adjusted_exposure)}"
+                # Basic validation before adding to the list
+                option_desc = opt_row.get("Description")
+                if pd.isna(option_desc) or option_desc == "--":
+                    logger.warning(
+                        f"Option with index {opt_idx}: Missing description. Skipping."
                     )
+                    continue
 
-                    # Add to option data for this group
-                    option_data_for_group.append(
+                if pd.isna(opt_row["Quantity"]) or opt_row["Quantity"] == "--":
+                    logger.warning(f"Option {option_desc}: Missing quantity. Skipping.")
+                    continue
+
+                if pd.isna(opt_row["Last Price"]) or opt_row["Last Price"] in (
+                    "--",
+                    "",
+                ):
+                    logger.warning(f"Option {option_desc}: Missing price. Skipping.")
+                    continue
+
+                try:
+                    opt_quantity = int(float(opt_row["Quantity"]))
+                    opt_last_price = clean_currency_value(opt_row["Last Price"])
+
+                    # Add to the list for batch processing
+                    options_data.append(
                         {
-                            "ticker": underlying,
-                            "option_symbol": option_symbol,
                             "description": option_desc,
-                            "quantity": parsed_option.quantity,
-                            "beta": beta,
-                            "beta_adjusted_exposure": beta_adjusted_exposure,
-                            "market_exposure": delta_exposure,
-                            "strike": parsed_option.strike,
-                            "expiry": parsed_option.expiry.strftime("%Y-%m-%d"),
-                            "option_type": parsed_option.option_type,
-                            "delta": delta,
-                            "delta_exposure": delta_exposure,
-                            "notional_value": notional_value,
-                            "price": parsed_option.current_price,
+                            "symbol": opt_row["Symbol"],
+                            "quantity": opt_quantity,
+                            "price": opt_last_price,
+                            "current_value": opt_row.get("Current Value"),
+                            "row_index": opt_idx,  # Store the index for marking as processed later
                         }
                     )
-                    processed_option_indices.add(opt_idx)  # Mark as processed
-
-                except Exception as e:
-                    logger.error(f"Error processing orphaned option {option_desc}: {e}")
+                except (ValueError, TypeError) as e:
+                    logger.warning(
+                        f"Error parsing option data for {option_desc}: {e}. Skipping."
+                    )
                     continue
+
+            # Get beta for the underlying
+            try:
+                beta = get_beta(underlying)
+            except Exception as beta_err:
+                logger.error(
+                    f"Error getting beta for {underlying}: {beta_err}. Using beta=1.0."
+                )
+                beta = 1.0  # Use a default beta of 1.0 for the market index
+
+            # Get the latest price for the underlying
+            try:
+                # Try to fetch the latest price
+                price_data = data_fetcher.fetch_data(underlying, period="1d")
+                if price_data is not None and not price_data.empty:
+                    underlying_price = price_data.iloc[-1]["Close"]
+                else:
+                    # If we can't get the price data, use a fallback
+                    logger.warning(
+                        f"Could not fetch price data for {underlying}. Using strike price as fallback."
+                    )
+                    # We'll use the strike price of the first option as a fallback
+                    # Extract the strike price from the first option description
+                    first_option_desc = options_data[0]["description"]
+                    parts = first_option_desc.strip().split()
+                    if len(parts) >= 5 and parts[4].startswith("$"):
+                        try:
+                            strike_price = float(
+                                parts[4][1:]
+                            )  # Remove the $ and convert to float
+                            underlying_price = strike_price
+                        except (ValueError, IndexError):
+                            underlying_price = 200.0  # Default fallback
+                    else:
+                        underlying_price = 200.0  # Default fallback
+            except Exception as price_err:
+                logger.error(
+                    f"Error fetching price for {underlying}: {price_err}. Using fallback."
+                )
+                underlying_price = 200.0  # Default fallback
+
+            # Process all options at once using our new function
+            prices = {underlying: underlying_price}
+            betas = {underlying: beta}
+
+            try:
+                processed_options = process_options(options_data, prices, betas)
+
+                # Convert to the format expected by create_portfolio_group
+                option_data_for_group = []
+                for opt in processed_options:
+                    # Mark the option as processed
+                    row_index = next(
+                        data["row_index"]
+                        for data in options_data
+                        if data["description"] == opt["description"]
+                        and data["quantity"] == opt["quantity"]
+                    )
+                    processed_option_indices.add(row_index)
+
+                    # Log the option details
+                    logger.info(f"Orphaned Option Added: {opt['description']}")
+                    logger.info(f"  Quantity: {opt['quantity']:,.0f}")
+                    logger.info(f"  Delta: {opt['delta']:.3f}")
+                    logger.info(
+                        f"  Notional Value: {format_currency(opt['notional_value'])}"
+                    )
+                    logger.info(
+                        f"  Delta Exposure: {format_currency(opt['delta_exposure'])}"
+                    )
+                    logger.info(
+                        f"  Beta-Adjusted Exposure: {format_currency(opt['beta_adjusted_exposure'])}"
+                    )
+
+                    # Add to the group data
+                    option_data_for_group.append(
+                        {
+                            "ticker": opt["ticker"],
+                            "option_symbol": opt["option_symbol"],
+                            "description": opt["description"],
+                            "quantity": opt["quantity"],
+                            "beta": opt["beta"],
+                            "beta_adjusted_exposure": opt["beta_adjusted_exposure"],
+                            "market_exposure": opt[
+                                "delta_exposure"
+                            ],  # Delta-adjusted exposure is the market exposure
+                            "strike": opt["strike"],
+                            "expiry": opt["expiry"],
+                            "option_type": opt["option_type"],
+                            "delta": opt["delta"],
+                            "delta_exposure": opt["delta_exposure"],
+                            "notional_value": opt["notional_value"],
+                            "price": opt["price"],
+                        }
+                    )
+            except Exception as e:
+                logger.error(
+                    f"Error processing orphaned options for {underlying}: {e}",
+                    exc_info=True,
+                )
+                option_data_for_group = []  # Use an empty list if processing fails
 
             # Create a portfolio group with just options (no stock position)
             if option_data_for_group:
@@ -1377,7 +1337,7 @@ def calculate_position_weight(
         The position's weight as a decimal (0.0 to 1.0)
     """
     if not portfolio_net_exposure:
-        return 0.0
+        raise ValueError("Portfolio net exposure cannot be zero")
     return position_market_exposure / portfolio_net_exposure
 
 
