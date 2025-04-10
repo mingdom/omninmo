@@ -127,24 +127,13 @@ This document outlines issues related to the handling of negative numbers, short
 
 1. **Consistent Representation**
    - Store all position quantities with their natural sign (negative for short positions) throughout the codebase.
-   - Update the `StockPosition` class to explicitly document that negative quantities represent short positions and add an `is_short` property similar to the one in `OptionPosition`:
-     ```python
-     @property
-     def is_short(self) -> bool:
-         """Check if position is short (quantity is negative)."""
-         return self.quantity < 0
-     ```
+   - Update the `StockPosition` class documentation to explicitly state that negative quantities represent short positions.
+   - Remove any redundant `is_short` properties and simply use `quantity < 0` directly in the code where needed.
    - Modify the stock quantity parsing in `portfolio.py` to preserve negative values for short positions:
      ```python
-     # Check if this is a short position (indicated by negative value or special marker)
-     is_short = False
-     if isinstance(row["Quantity"], str) and row["Quantity"].startswith("-"):
-         is_short = True
-     # or check other indicators like account type or position type
-
+     # Parse quantity and preserve negative sign for short positions
      quantity = int(float(row["Quantity"]))
-     if is_short:
-         quantity = -abs(quantity)  # Ensure negative for short positions
+     # No need for special handling - the negative sign in the input already indicates a short position
      ```
 
 2. **Exposure Calculations**
@@ -249,20 +238,30 @@ This document outlines issues related to the handling of negative numbers, short
 
 ## Implementation Priority
 
+### Completed Items
+
+1. **Update Exposure Calculations**
+   - ✅ Modified `calculate_portfolio_summary` to handle negative exposures naturally
+   - ✅ Updated `calculate_beta_adjusted_net_exposure` to add exposures (with short as negative)
+   - ✅ Removed unnecessary `abs()` calls in calculations
+   - ✅ Added `signed_notional_value` property to `OptionPosition` class
+   - ✅ Fixed options exposure calculation to correctly handle short positions
+   - ✅ Updated exposure chart to show short positions as negative
+   - ✅ Removed `gross_market_exposure` metric as it was deemed unnecessary
+   - ✅ Updated short percentage calculation to use long exposure as the denominator
+   - ✅ Added comprehensive tests for option notional value and exposure calculations
+
+### Remaining Items
+
 1. **Fix Short Position Representation**
-   - Update `StockPosition` class to add `is_short` property
-   - Modify stock quantity parsing to preserve negative values
+   - Ensure stock quantities are stored with their natural sign (negative for short positions)
+   - Remove any redundant `is_short` properties and use `quantity < 0` directly in the code
    - Update documentation to clarify that negative quantities represent short positions
 
-2. **Update Exposure Calculations**
-   - Modify `calculate_portfolio_summary` to handle negative exposures naturally
-   - Update `calculate_beta_adjusted_net_exposure` to add exposures (with short as negative)
-   - Remove unnecessary `abs()` calls in calculations
-
-3. **Refactor Option Processing**
+2. **Refactor Option Processing**
    - Extract common option processing logic into helper functions
    - Create a unified option processing pipeline
 
-4. **Improve UI for Short Positions**
+3. **Improve UI for Short Positions**
    - Update `components/position_details.py` to visually distinguish short positions
    - Add indicators in `components/portfolio_table.py` for short positions

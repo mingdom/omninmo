@@ -31,11 +31,15 @@ class OptionPosition:
         description (str): The original description string from the data source (e.g., "AAPL APR 17 2025 $220 CALL").
 
     Properties:
-        notional_value (float): The total value controlled by the option contract(s), calculated as
-                                  `strike * 100 * abs(quantity)`.
+        notional_value (float): The absolute value controlled by the option contract(s), calculated as
+                                `strike * 100 * abs(quantity)`. Always positive regardless of position direction.
+        signed_notional_value (float): The signed value controlled by the option contract(s), calculated as
+                                      `strike * 100 * quantity`. Positive for long positions, negative for short.
         market_value (float): The current market value of the option position(s), calculated as
-                                `current_price * 100 * quantity`.
-        is_short (bool): True if the quantity is negative, indicating a short position.
+                             `current_price * 100 * quantity`. Positive for long positions, negative for short.
+
+    Note:
+        A position is considered short if quantity < 0, and long if quantity > 0.
 
     TODO:
         - Consider adding fields for Greeks (delta, gamma, theta, vega) if calculated elsewhere
@@ -78,10 +82,7 @@ class OptionPosition:
         # Market value reflects the direction (long/short) via quantity sign
         return self.current_price * 100 * self.quantity
 
-    @property
-    def is_short(self) -> bool:
-        """Check if position is short (quantity is negative)."""
-        return self.quantity < 0
+    # Removed redundant is_short property - use quantity < 0 directly
 
 
 def parse_month(month_str: str) -> int:
@@ -320,7 +321,8 @@ def calculate_black_scholes_delta(
             delta_signed = 1.0 if underlying_price > option.strike else 0.0
         else:  # PUT
             delta_signed = -1.0 if underlying_price < option.strike else 0.0
-        return delta_signed if not option.is_short else -delta_signed
+        # Return the raw delta without adjusting for short positions
+        return delta_signed
 
     # Calculate d1 component of the BSM formula
     # Standard deviation for the time period
@@ -336,7 +338,8 @@ def calculate_black_scholes_delta(
             delta_signed = 1.0 if underlying_price > discounted_strike else 0.0
         else:  # PUT
             delta_signed = -1.0 if underlying_price < discounted_strike else 0.0
-        return delta_signed if not option.is_short else -delta_signed
+        # Return the raw delta without adjusting for short positions
+        return delta_signed
 
     d1 = (
         math.log(underlying_price / option.strike)
@@ -349,11 +352,12 @@ def calculate_black_scholes_delta(
     else:  # PUT
         delta_signed = norm.cdf(d1) - 1  # Equivalent to -norm.cdf(-d1)
 
-    # Adjust final delta based on position direction (short position has inverted delta)
-    final_delta = delta_signed if not option.is_short else -delta_signed
+    # Return the raw delta without adjusting for short positions
+    # The adjustment for short positions should be done at the exposure calculation level
+    # by using the signed notional value or by the caller
 
     # Clamp result to ensure it's within the theoretical [-1, 1] bounds
-    return max(-1.0, min(final_delta, 1.0))
+    return max(-1.0, min(delta_signed, 1.0))
 
 
 def calculate_bs_price(
@@ -804,46 +808,38 @@ def get_implied_volatility(
 def calculate_option_delta(
     option: OptionPosition,
     underlying_price: float,
-    use_black_scholes: bool = True,
+    use_black_scholes: bool = True,  # Kept for backward compatibility
     risk_free_rate: float = 0.05,
     implied_volatility: float | None = None,  # Allow optional IV override
 ) -> float:
-    """Calculates the option delta, offering a choice between Black-Scholes and a simple model.
+    """Calculates the option delta using the Black-Scholes-Merton model.
 
-    This function serves as a wrapper to compute delta using either:
-    - The Black-Scholes-Merton model (`calculate_black_scholes_delta`): More accurate,
-      accounts for time, volatility, and interest rates. Requires implied volatility.
-    - A simple linear approximation (`calculate_simple_delta`): Less accurate, only considers
-      moneyness. Does not require volatility or rates.
+    This function serves as a wrapper to compute delta using the Black-Scholes-Merton model,
+    which accounts for time, volatility, and interest rates.
 
-    If using Black-Scholes and `implied_volatility` is not provided, this function will
-    attempt to obtain it using `get_implied_volatility` (which may calculate from market
-    price or estimate using a skew model).
+    If `implied_volatility` is not provided, this function will attempt to obtain it
+    using `get_implied_volatility` (which may calculate from market price or estimate
+    using a skew model).
 
     Args:
         option: The `OptionPosition` object.
         underlying_price: The current market price of the underlying asset.
-        use_black_scholes: If True (default), uses the BSM model. If False, uses the
-                           simple approximation.
-        risk_free_rate: The annualized risk-free interest rate (only used if `use_black_scholes`
-                        is True). Defaults to 0.05 (5%).
+        use_black_scholes: Kept for backward compatibility. No longer used as simple delta
+                           calculation has been removed.
+        risk_free_rate: The annualized risk-free interest rate. Defaults to 0.05 (5%).
         implied_volatility: Optional. If provided, this IV value is used directly for the
                             BSM calculation, overriding the value obtained by
                             `get_implied_volatility`. Defaults to None.
 
     Returns:
-        The calculated delta value for the option position (between -1.0 and 1.0).
+        The calculated delta value for the option position (between -1.0 and 1.0),
+        adjusted for the position direction (negative for short positions).
 
     Raises:
         Propagates exceptions from the underlying calculation functions (e.g., `ValueError`
         from `calculate_black_scholes_delta` if inputs are invalid).
 
     """
-    # Simple delta calculation based on moneyness
-    if not use_black_scholes:
-        logger.debug(f"Using simple delta calculation for {option.description}")
-        return _calculate_simple_delta(option, underlying_price)
-
     # Black-Scholes delta calculation
     logger.debug(f"Calculating Black-Scholes delta for {option.description}")
 
@@ -856,57 +852,19 @@ def calculate_option_delta(
     elif not (0.001 <= iv_to_use <= 3.0):  # Basic sanity check on provided IV
         logger.warning(f"Unusual IV value ({iv_to_use}) for {option.description}")
 
-    try:
-        delta = calculate_black_scholes_delta(
-            option, underlying_price, risk_free_rate, iv_to_use
-        )
-        logger.debug(f"Black-Scholes delta calculated: {delta:.4f}")
-        return delta
-    except Exception as e:
-        logger.error(f"Error calculating Black-Scholes delta: {e}")
-        logger.info("Falling back to simple delta calculation")
-        return _calculate_simple_delta(option, underlying_price)
+    # Get the raw delta from Black-Scholes
+    raw_delta = calculate_black_scholes_delta(
+        option, underlying_price, risk_free_rate, iv_to_use
+    )
+
+    # Adjust for position direction (short positions have inverted delta)
+    adjusted_delta = raw_delta if option.quantity >= 0 else -raw_delta
+
+    logger.debug(f"Black-Scholes delta calculated: {adjusted_delta:.4f}")
+    return adjusted_delta
 
 
-def _calculate_simple_delta(option: OptionPosition, underlying_price: float) -> float:
-    """Calculate a simplified delta based on moneyness.
-
-    This function provides a rough estimate of delta based on the moneyness of the option
-    (how far in-the-money or out-of-the-money it is).
-
-    Args:
-        option: The option position
-        underlying_price: The current price of the underlying asset
-
-    Returns:
-        float: The estimated delta of the option position, adjusted for quantity
-    """
-    # Calculate moneyness (price / strike for calls, strike / price for puts)
-    if option.option_type == "CALL":
-        moneyness = underlying_price / option.strike
-        # Deep ITM calls approach delta of 1, deep OTM approach 0
-        if moneyness >= 1.1:  # Deep in-the-money
-            delta = 0.95
-        elif moneyness <= 0.9:  # Deep out-of-the-money
-            delta = 0.05
-        else:  # Near the money
-            # Linear interpolation between 0.05 and 0.95
-            delta = 0.05 + (moneyness - 0.9) * (0.95 - 0.05) / (1.1 - 0.9)
-            delta = max(0.05, min(delta, 0.95))  # Clamp within bounds
-    else:  # PUT
-        moneyness = option.strike / underlying_price
-        # Deep ITM puts approach delta of -1, deep OTM approach 0
-        if moneyness >= 1.1:  # Deep in-the-money
-            delta = -0.95
-        elif moneyness <= 0.9:  # Deep out-of-the-money
-            delta = -0.05
-        else:  # Near the money
-            # Linear interpolation between -0.05 and -0.95
-            delta = -0.05 - (moneyness - 0.9) * (0.95 - 0.05) / (1.1 - 0.9)
-            delta = min(-0.05, max(delta, -0.95))  # Clamp within bounds
-
-    # Adjust for quantity
-    return delta * option.quantity
+# _calculate_simple_delta function has been removed
 
 
 def group_options_by_underlying(

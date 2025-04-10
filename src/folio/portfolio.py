@@ -529,10 +529,10 @@ def process_portfolio_data(
                         parsed_option.notional_value
                     )  # Absolute notional value
 
-                    # Use the signed notional value for delta exposure calculation
-                    # This ensures the exposure correctly reflects the direction (long/short)
-                    # without double-counting the sign (delta already accounts for option type)
-                    delta_exposure = delta * parsed_option.signed_notional_value
+                    # Use the notional value for delta exposure calculation
+                    # The delta from calculate_option_delta already accounts for the position direction
+                    # (positive for long, negative for short)
+                    delta_exposure = delta * parsed_option.notional_value
 
                     beta_adjusted_exposure = (
                         delta_exposure * beta
