@@ -91,7 +91,12 @@ def test_market_benchmark(mock_data_fetcher):
     mock_data_fetcher.fetch_market_data.return_value = create_price_data(moves)
 
     beta = get_beta("SPY")
-    assert abs(beta - 1.0) < 0.01  # Should be very close to 1.0
+    assert abs(beta - 1.0) < 0.01, f"SPY beta should be very close to 1.0, got {beta}"
+
+    # Test with a different ticker that has identical movements to SPY
+    # This should also have a beta of 1.0
+    beta = get_beta("IVV")  # IVV is another S&P 500 ETF
+    assert abs(beta - 1.0) < 0.01, f"IVV beta should be very close to 1.0, got {beta}"
 
 
 def test_insufficient_data(mock_data_fetcher):

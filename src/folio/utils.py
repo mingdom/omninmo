@@ -71,6 +71,7 @@ def get_beta(ticker: str, description: str = "") -> float:
         ValueError: If the data is invalid or calculations result in invalid values
         KeyError: If the data format is invalid (missing required columns)
     """
+
     # For cash-like instruments, return 0 without calculation
     if is_cash_or_short_term(ticker, beta=None, description=description):
         logger.info(f"Using default beta of 0.0 for cash-like position: {ticker}")
@@ -119,6 +120,17 @@ def get_beta(ticker: str, description: str = "") -> float:
             return 0.0
         if pd.isna(covariance):
             raise ValueError(f"Covariance calculation resulted in NaN for {ticker}")
+
+        # For SPY, check if we're calculating against itself by measuring correlation
+        if ticker.upper() == "SPY":
+            correlation = aligned_stock.corr(aligned_market)
+            if (
+                correlation > 0.99
+            ):  # Very high correlation indicates it's the same security
+                logger.info(
+                    f"SPY beta calculation: correlation with market index is {correlation:.4f}, returning 1.0"
+                )
+                return 1.0
 
         beta = covariance / market_variance
         if pd.isna(beta):

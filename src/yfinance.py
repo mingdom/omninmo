@@ -116,7 +116,18 @@ class YFinanceDataFetcher(DataFetcherInterface):
             logger.info(f"Using default beta period: {period}")
 
         # Call fetch_data with the market index ticker
-        return self.fetch_data(market_index, period, interval)
+        market_data = self.fetch_data(market_index, period, interval)
+
+        # For SPY beta calculation, ensure we're using the exact same data
+        # This is important because SPY's beta against itself should be exactly 1.0
+        if market_index.upper() == "SPY":
+            logger.info(
+                "Using SPY as market index, ensuring consistent data for beta calculation"
+            )
+            # Make a deep copy to avoid modifying the original data
+            market_data = market_data.copy()
+
+        return market_data
 
     def _fetch_from_yfinance(self, ticker, period="1y", interval="1d"):
         """

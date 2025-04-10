@@ -1,29 +1,29 @@
 === Initial Values ===
-price_updated_at: 2025-04-10T15:24:10.667900+00:00
-net_market_exposure: 822884.5234306375
-portfolio_beta: 0.9028579135382249
-long_exposure_total: 3667004.5342455674
-short_exposure_total: 2844120.01081493
-options_exposure_total: -998754.8615333517
-portfolio_estimate_value: 1356157.4934306375
+price_updated_at: 2025-04-10T17:13:12.372315+00:00
+net_market_exposure: 823128.5343597224
+portfolio_beta: 0.7777299281168029
+long_exposure_total: 3666805.7894781837
+short_exposure_total: 2843677.2551184613
+options_exposure_total: -998510.8506042666
+portfolio_estimate_value: 1356401.5043597224
 
 === Updated Values ===
-price_updated_at: 2025-04-10T15:24:11.697756+00:00
-net_market_exposure: 822884.5234306375
-portfolio_beta: 0.9028579135382249
-long_exposure_total: 3667004.5342455674
-short_exposure_total: 2844120.01081493
-options_exposure_total: -998754.8615333517
-portfolio_estimate_value: 1356157.4934306375
+price_updated_at: 2025-04-10T17:13:13.415978+00:00
+net_market_exposure: 823128.5343597224
+portfolio_beta: 0.7777299281168029
+long_exposure_total: 3666805.7894781837
+short_exposure_total: 2843677.2551184613
+options_exposure_total: -998510.8506042666
+portfolio_estimate_value: 1356401.5043597224
 
 === Changes in Portfolio Values ===
-price_updated_at: Changed by 0:00:01.029856
-net_market_exposure: 822884.5234306375 -> 822884.5234306375 (Diff: 0.0, 0.00%)
-portfolio_beta: 0.9028579135382249 -> 0.9028579135382249 (Diff: 0.0, 0.00%)
-long_exposure_total: 3667004.5342455674 -> 3667004.5342455674 (Diff: 0.0, 0.00%)
-short_exposure_total: 2844120.01081493 -> 2844120.01081493 (Diff: 0.0, 0.00%)
-options_exposure_total: -998754.8615333517 -> -998754.8615333517 (Diff: 0.0, -0.00%)
-portfolio_estimate_value: 1356157.4934306375 -> 1356157.4934306375 (Diff: 0.0, 0.00%)
+price_updated_at: Changed by 0:00:01.043663
+net_market_exposure: 823128.5343597224 -> 823128.5343597224 (Diff: 0.0, 0.00%)
+portfolio_beta: 0.7777299281168029 -> 0.7777299281168029 (Diff: 0.0, 0.00%)
+long_exposure_total: 3666805.7894781837 -> 3666805.7894781837 (Diff: 0.0, 0.00%)
+short_exposure_total: 2843677.2551184613 -> 2843677.2551184613 (Diff: 0.0, 0.00%)
+options_exposure_total: -998510.8506042666 -> -998510.8506042666 (Diff: 0.0, -0.00%)
+portfolio_estimate_value: 1356401.5043597224 -> 1356401.5043597224 (Diff: 0.0, 0.00%)
 
 === Changes in Position Values ===
 AMZN_price: 191.1000061035156 -> 191.1000061035156 (Diff: 0.0, 0.00%)
