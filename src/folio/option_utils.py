@@ -160,8 +160,8 @@ def parse_option_description(
         ValueError: If the description string does not match the expected 6-part format,
                     if the month abbreviation is invalid, if the day/year/strike cannot
                     be converted to numbers, or if the option type is not 'CALL' or 'PUT'.
-
     """
+
     logger.debug(f"Parsing option description: '{description}'")
 
     # Split the description into parts
@@ -181,67 +181,63 @@ def parse_option_description(
     strike_str = parts[4]
     option_type = parts[5]
 
-    # Validate and convert the month
+    # Parse the components with better error handling
     try:
+        # Parse month
         month = parse_month(month_str)
-    except ValueError as e:
-        logger.error(f"Invalid month in option description: {description}")
-        raise ValueError(f"Invalid month in option description: {description}") from e
 
-    # Validate and convert the day
-    try:
+        # Parse day
         day = int(day_str)
-        if not 1 <= day <= 31:
-            error_msg = f"Day out of range: {day}"
-            logger.error(error_msg)
-            raise ValueError(error_msg)
-    except ValueError as e:
-        logger.error(f"Invalid day in option description: {description}")
-        raise ValueError(f"Invalid day in option description: {description}") from e
+        if not 1 <= day <= 31:  # Basic range check
+            raise ValueError(f"Day out of range: {day}")
 
-    # Validate and convert the year
-    try:
+        # Parse year
         year = int(year_str)
         if not 2000 <= year <= 2100:  # Reasonable range check
-            error_msg = f"Year out of range: {year}"
-            logger.error(error_msg)
-            raise ValueError(error_msg)
-    except ValueError as e:
-        logger.error(f"Invalid year in option description: {description}")
-        raise ValueError(f"Invalid year in option description: {description}") from e
+            raise ValueError(f"Year out of range: {year}")
 
-    # Validate and convert the strike price
-    if not strike_str.startswith("$"):
-        error_msg = (
-            f"Strike price must start with $ in option description: {description}"
-        )
-        logger.error(error_msg)
-        raise ValueError(error_msg)
-    try:
+        # Parse strike price
+        if not strike_str.startswith("$"):
+            raise ValueError("Strike price must start with $")
+
         strike = float(strike_str[1:])  # Remove the $ and convert to float
         if strike <= 0:
-            error_msg = f"Strike price must be positive: {strike}"
-            logger.error(error_msg)
-            raise ValueError(error_msg)
-    except ValueError as e:
-        logger.error(f"Invalid strike price in option description: {description}")
-        raise ValueError(
-            f"Invalid strike price in option description: {description}"
-        ) from e
+            raise ValueError(f"Strike price must be positive: {strike}")
 
-    # Validate the option type
-    option_type = option_type.upper()
-    if option_type not in ["CALL", "PUT"]:
-        error_msg = f"Invalid option type in option description: {description}. Expected 'CALL' or 'PUT', got '{option_type}'."
-        logger.error(error_msg)
-        raise ValueError(error_msg)
+        # Validate option type
+        option_type = option_type.upper()
+        if option_type not in ["CALL", "PUT"]:
+            raise ValueError(
+                f"Invalid option type: '{option_type}'. Expected 'CALL' or 'PUT'."
+            )
 
-    # Create the expiry date
-    try:
+        # Create the expiry date
         expiry = datetime(year, month, day)
+
     except ValueError as e:
-        logger.error(f"Invalid date in option description: {description}")
-        raise ValueError(f"Invalid date in option description: {description}") from e
+        # Provide a more specific error message based on which component failed
+        error_context = str(e)
+        if "month" in error_context.lower():
+            error_msg = (
+                f"Invalid month '{month_str}' in option description: {description}"
+            )
+        elif "day" in error_context.lower():
+            error_msg = f"Invalid day '{day_str}' in option description: {description}"
+        elif "year" in error_context.lower():
+            error_msg = (
+                f"Invalid year '{year_str}' in option description: {description}"
+            )
+        elif "strike" in error_context.lower():
+            error_msg = f"Invalid strike price '{strike_str}' in option description: {description}"
+        elif "option type" in error_context.lower():
+            error_msg = f"Invalid option type '{option_type}' in option description: {description}"
+        elif "out of range" in error_context.lower():
+            error_msg = f"Date out of range in option description: {description}"
+        else:
+            error_msg = f"Invalid option description: {description}. Error: {e}"
+
+        logger.error(error_msg)
+        raise ValueError(error_msg) from e
 
     # Create and return the OptionPosition
     logger.debug(
@@ -808,7 +804,6 @@ def get_implied_volatility(
 def calculate_option_delta(
     option: OptionPosition,
     underlying_price: float,
-    use_black_scholes: bool = True,  # Kept for backward compatibility
     risk_free_rate: float = 0.05,
     implied_volatility: float | None = None,  # Allow optional IV override
 ) -> float:
@@ -824,8 +819,6 @@ def calculate_option_delta(
     Args:
         option: The `OptionPosition` object.
         underlying_price: The current market price of the underlying asset.
-        use_black_scholes: Kept for backward compatibility. No longer used as simple delta
-                           calculation has been removed.
         risk_free_rate: The annualized risk-free interest rate. Defaults to 0.05 (5%).
         implied_volatility: Optional. If provided, this IV value is used directly for the
                             BSM calculation, overriding the value obtained by
@@ -836,32 +829,43 @@ def calculate_option_delta(
         adjusted for the position direction (negative for short positions).
 
     Raises:
-        Propagates exceptions from the underlying calculation functions (e.g., `ValueError`
-        from `calculate_black_scholes_delta` if inputs are invalid).
-
+        ValueError: If underlying_price is non-positive or if option data is invalid.
     """
-    # Black-Scholes delta calculation
-    logger.debug(f"Calculating Black-Scholes delta for {option.description}")
+    # Validate inputs
+    if underlying_price <= 0:
+        error_msg = f"Underlying price must be positive: {underlying_price}"
+        logger.error(error_msg)
+        raise ValueError(error_msg)
 
-    # Determine the IV to use
-    iv_to_use = implied_volatility  # Use provided IV if available
-    if iv_to_use is None:
-        logger.debug(f"No IV provided, estimating IV for {option.description}")
-        iv_to_use = get_implied_volatility(option, underlying_price, risk_free_rate)
-        logger.debug(f"Estimated IV: {iv_to_use:.4f}")
-    elif not (0.001 <= iv_to_use <= 3.0):  # Basic sanity check on provided IV
-        logger.warning(f"Unusual IV value ({iv_to_use}) for {option.description}")
+    # Log the calculation
+    logger.debug(f"Calculating delta for {option.description}")
 
-    # Get the raw delta from Black-Scholes
-    raw_delta = calculate_black_scholes_delta(
-        option, underlying_price, risk_free_rate, iv_to_use
-    )
+    try:
+        # Determine the IV to use
+        iv_to_use = implied_volatility  # Use provided IV if available
+        if iv_to_use is None:
+            logger.debug(f"No IV provided, estimating IV for {option.description}")
+            iv_to_use = get_implied_volatility(option, underlying_price, risk_free_rate)
+            logger.debug(f"Estimated IV: {iv_to_use:.4f}")
+        elif not (0.001 <= iv_to_use <= 3.0):  # Basic sanity check on provided IV
+            logger.warning(f"Unusual IV value ({iv_to_use}) for {option.description}")
 
-    # Adjust for position direction (short positions have inverted delta)
-    adjusted_delta = raw_delta if option.quantity >= 0 else -raw_delta
+        # Get the raw delta from Black-Scholes
+        raw_delta = calculate_black_scholes_delta(
+            option, underlying_price, risk_free_rate, iv_to_use
+        )
 
-    logger.debug(f"Black-Scholes delta calculated: {adjusted_delta:.4f}")
-    return adjusted_delta
+        # Adjust for position direction (short positions have inverted delta)
+        adjusted_delta = raw_delta if option.quantity >= 0 else -raw_delta
+
+        logger.debug(f"Delta calculated: {adjusted_delta:.4f}")
+        return adjusted_delta
+
+    except Exception as e:
+        error_msg = f"Error calculating delta for {option.description}: {e}"
+        logger.error(error_msg)
+        # Re-raise with a more specific message
+        raise ValueError(error_msg) from e
 
 
 # _calculate_simple_delta function has been removed
