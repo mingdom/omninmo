@@ -867,6 +867,132 @@ def calculate_option_delta(
 # _calculate_simple_delta function has been removed
 
 
+def calculate_option_exposure(
+    option: OptionPosition,
+    underlying_price: float,
+    beta: float = 1.0,
+    risk_free_rate: float = 0.05,
+    implied_volatility: float | None = None,
+) -> dict[str, float]:
+    """Calculate exposure metrics for an option position.
+
+    This function calculates various exposure metrics for an option position, including
+    delta, delta exposure (delta * notional_value), and beta-adjusted exposure
+    (delta_exposure * beta).
+
+    Args:
+        option: The option position
+        underlying_price: The price of the underlying asset
+        beta: The beta of the underlying asset relative to the market. Defaults to 1.0.
+        risk_free_rate: The risk-free interest rate. Defaults to 0.05 (5%).
+        implied_volatility: Optional override for implied volatility. Defaults to None.
+
+    Returns:
+        A dictionary containing exposure metrics:
+        - 'delta': The option's delta
+        - 'delta_exposure': The delta-adjusted exposure (delta * notional_value)
+        - 'beta_adjusted_exposure': The beta-adjusted exposure (delta_exposure * beta)
+    """
+    # Calculate delta using Black-Scholes
+    delta = calculate_option_delta(
+        option,
+        underlying_price,
+        risk_free_rate=risk_free_rate,
+        implied_volatility=implied_volatility,
+    )
+
+    # Calculate delta exposure
+    delta_exposure = delta * option.notional_value
+
+    # Calculate beta-adjusted exposure
+    beta_adjusted_exposure = delta_exposure * beta
+
+    return {
+        "delta": delta,
+        "delta_exposure": delta_exposure,
+        "beta_adjusted_exposure": beta_adjusted_exposure,
+    }
+
+
+def process_options(
+    options_data: list[dict],
+    prices: dict[str, float],
+    betas: dict[str, float] | None = None,
+) -> list[dict]:
+    """Process a list of option data dictionaries.
+
+    This function takes a list of dictionaries containing option data, parses the option
+    descriptions, calculates exposure metrics, and returns a list of dictionaries with
+    the processed data.
+
+    Args:
+        options_data: List of dictionaries containing option data.
+            Each dictionary must have:
+            - 'description': Option description string
+            - 'quantity': Option quantity
+            - 'price': Option price
+            It may optionally have:
+            - 'symbol': Option symbol
+        prices: Dictionary mapping tickers to prices
+        betas: Dictionary mapping tickers to betas. If None, all betas default to 1.0.
+
+    Returns:
+        List of dictionaries with processed option data including exposures
+    """
+    if betas is None:
+        betas = {}
+
+    processed_options = []
+
+    for opt_data in options_data:
+        try:
+            # Parse option description
+            parsed_option = parse_option_description(
+                opt_data["description"], opt_data["quantity"], opt_data["price"]
+            )
+
+            # Get underlying price and beta
+            underlying = parsed_option.underlying
+            if underlying not in prices:
+                logger.warning(
+                    f"No price found for {underlying}. Skipping option {parsed_option.description}."
+                )
+                continue
+
+            underlying_price = prices[underlying]
+            beta = betas.get(underlying, 1.0)  # Default to 1.0 if no beta found
+
+            # Calculate exposures
+            exposures = calculate_option_exposure(parsed_option, underlying_price, beta)
+
+            # Combine original data with calculated metrics
+            processed_opt = {
+                "ticker": underlying,
+                "option_symbol": opt_data.get("symbol", ""),
+                "description": parsed_option.description,
+                "quantity": parsed_option.quantity,
+                "beta": beta,
+                "strike": parsed_option.strike,
+                "expiry": parsed_option.expiry.strftime("%Y-%m-%d"),
+                "option_type": parsed_option.option_type,
+                "price": parsed_option.current_price,
+                "delta": exposures["delta"],
+                "delta_exposure": exposures["delta_exposure"],
+                "beta_adjusted_exposure": exposures["beta_adjusted_exposure"],
+                "notional_value": parsed_option.notional_value,
+            }
+
+            processed_options.append(processed_opt)
+
+        except Exception as e:
+            logger.error(
+                f"Error processing option {opt_data.get('description', 'unknown')}: {e}"
+            )
+            continue
+
+    return processed_options
+
+
 def group_options_by_underlying(
     options: list[OptionPosition],
 ) -> dict[str, list[OptionPosition]]:
