@@ -471,3 +471,135 @@ class TestPriceUpdates:
         assert spy_group.option_positions[0].quantity == -30
         assert spy_group.option_positions[1].quantity == -30
         assert spy_group.option_positions[2].quantity == 30
+
+    def test_recalculate_option_metrics(self, mocker):
+        """Test recalculating option metrics."""
+        # Mock the calculate_option_delta function
+        mock_calculate_delta = mocker.patch(
+            "src.folio.portfolio.calculate_option_delta",
+            return_value=0.75,  # New delta value
+        )
+
+        # Create a test option position
+        option_position = OptionPosition(
+            ticker="AAPL",
+            position_type="option",
+            quantity=1,
+            beta=1.2,
+            market_exposure=500.0,
+            beta_adjusted_exposure=600.0,
+            strike=160.0,
+            expiry="2023-06-16",
+            option_type="CALL",
+            delta=0.5,  # Old delta
+            delta_exposure=50.0,  # Old delta exposure
+            notional_value=16000.0,  # Old notional value
+            underlying_beta=1.2,
+            price=5.0,
+        )
+
+        # Create a test portfolio group
+        portfolio_group = PortfolioGroup(
+            ticker="AAPL",
+            stock_position=None,
+            option_positions=[option_position],
+            net_exposure=50.0,
+            beta=1.2,
+            beta_adjusted_exposure=60.0,
+            total_delta_exposure=50.0,
+            options_delta_exposure=50.0,
+        )
+
+        # Create a dictionary of latest prices
+        latest_prices = {"AAPL": 150.0}  # New price
+
+        # Import the function
+        from src.folio.portfolio import recalculate_option_metrics
+
+        # Recalculate option metrics
+        recalculate_option_metrics(option_position, portfolio_group, latest_prices)
+
+        # Verify that calculate_option_delta was called with the correct parameters
+        mock_calculate_delta.assert_called_once()
+
+        # Verify that the option metrics were updated
+        assert option_position.delta == 0.75  # New delta
+        # The notional value is calculated based on the underlying price (not the strike price)
+        assert option_position.notional_value == 15000.0  # 150.0 * 100 * 1
+        assert option_position.delta_exposure == 11250.0  # 0.75 * 15000.0
+        assert option_position.beta_adjusted_exposure == 13500.0  # 11250.0 * 1.2
+
+    def test_recalculate_group_metrics(self):
+        """Test recalculating group metrics."""
+        # Create a test stock position
+        stock_position = StockPosition(
+            ticker="AAPL",
+            quantity=100,
+            beta=1.2,
+            market_exposure=15000.0,
+            beta_adjusted_exposure=18000.0,
+            price=150.0,
+        )
+
+        # Create test option positions
+        option_position1 = OptionPosition(
+            ticker="AAPL",
+            position_type="option",
+            quantity=1,
+            beta=1.2,
+            market_exposure=12000.0,
+            beta_adjusted_exposure=14400.0,
+            strike=160.0,
+            expiry="2023-06-16",
+            option_type="CALL",
+            delta=0.75,
+            delta_exposure=12000.0,
+            notional_value=16000.0,
+            underlying_beta=1.2,
+            price=150.0,
+        )
+
+        option_position2 = OptionPosition(
+            ticker="AAPL",
+            position_type="option",
+            quantity=-1,
+            beta=1.2,
+            market_exposure=-3500.0,
+            beta_adjusted_exposure=-4200.0,
+            strike=140.0,
+            expiry="2023-06-16",
+            option_type="PUT",
+            delta=-0.25,
+            delta_exposure=-3500.0,
+            notional_value=14000.0,
+            underlying_beta=1.2,
+            price=150.0,
+        )
+
+        # Create a test portfolio group
+        portfolio_group = PortfolioGroup(
+            ticker="AAPL",
+            stock_position=stock_position,
+            option_positions=[option_position1, option_position2],
+            net_exposure=23500.0,  # Old value
+            beta=1.2,
+            beta_adjusted_exposure=28200.0,  # Old value
+            total_delta_exposure=8500.0,  # Old value
+            options_delta_exposure=8500.0,  # Old value
+        )
+
+        # Import the function
+        from src.folio.portfolio import recalculate_group_metrics
+
+        # Recalculate group metrics
+        recalculate_group_metrics(portfolio_group)
+
+        # Verify that the group metrics were updated
+        assert portfolio_group.options_delta_exposure == 8500.0  # 12000.0 - 3500.0
+        assert (
+            portfolio_group.total_delta_exposure == 8500.0
+        )  # Same as options_delta_exposure
+        assert portfolio_group.net_exposure == 23500.0  # 15000.0 + 8500.0
+        assert (
+            portfolio_group.beta_adjusted_exposure == 28200.0
+        )  # 18000.0 + 14400.0 - 4200.0

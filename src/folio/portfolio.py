@@ -23,7 +23,12 @@ from .data_model import (
     create_portfolio_group,
 )
 from .logger import logger
-from .option_utils import calculate_option_delta, parse_option_description
+from .option_utils import (
+    OptionPosition,
+    calculate_option_delta,
+    parse_option_description,
+    parse_option_symbol,
+)
 from .utils import clean_currency_value, format_beta, format_currency, get_beta
 
 # Initialize data fetcher
@@ -166,39 +171,57 @@ def process_portfolio_data(
         df = df[valid_rows].reset_index(drop=True)
         logger.info(f"Continuing with {len(df)} remaining rows")
 
-    # Function to identify options based on description format
-    def is_option_desc(desc: str) -> bool:
-        """Checks if a description string matches a specific option format.
+    # Function to identify options based on description format or symbol
+    def is_option_desc(desc: str, symbol: str | None = None) -> bool:
+        """Checks if a description string or symbol matches an option format.
 
-        Example format: 'TSM APR 17 2025 $190 CALL'
+        Handles multiple formats:
+        1. Description format: 'TSM APR 17 2025 $190 CALL'
+        2. Symbol format: '-AMAT250516P130' (starts with '-')
+        3. Description contains 'PUT' or 'CALL'
 
         Args:
             desc: The description string to check.
+            symbol: The symbol to check (optional).
 
         Returns:
-            True if the description appears to be an option in the expected format, False otherwise.
-
-        TODO:
-            - Implement more robust option description detection that handles different formats
-              and edge cases, including weekly options, non-standard date formats, and LEAPS.
-              Current implementation is very brittle and only works with one specific format (6 parts).
-            - Consider using regular expressions for more flexible parsing.
+            True if the description or symbol appears to be an option, False otherwise.
         """
+        # Check if symbol starts with '-' (common for options in some brokerages)
+        if symbol and isinstance(symbol, str) and symbol.strip().startswith("-"):
+            return True
+
         if not isinstance(desc, str):
             return False
+
+        # Check for keywords 'PUT' or 'CALL' in the description
+        desc_upper = desc.upper()
+        if (
+            " PUT " in desc_upper
+            or desc_upper.endswith(" PUT")
+            or " CALL " in desc_upper
+            or desc_upper.endswith(" CALL")
+        ):
+            return True
+
+        # Check for the standard 6-part format
         parts = desc.strip().split()
         # Expecting format: UNDERLYING MONTH DAY YEAR $STRIKE TYPE (6 parts)
-        if len(parts) != 6:
-            return False
-        # Check if the 5th part starts with '$' and the 6th is CALL/PUT
-        return parts[4].startswith("$") and parts[5].upper() in ["CALL", "PUT"]
+        if len(parts) == 6:
+            # Check if the 5th part starts with '$' and the 6th is CALL/PUT
+            if parts[4].startswith("$") and parts[5].upper() in ["CALL", "PUT"]:
+                return True
+
+        return False
 
     # Basic portfolio statistics
     total_positions = len(df)
     # Note: We no longer calculate portfolio_value from the CSV as it may be out of date
 
-    # Filter for non-options and options using the description parser
-    is_opt_mask = df["Description"].apply(is_option_desc)
+    # Filter for non-options and options using the description parser and symbol
+    is_opt_mask = df.apply(
+        lambda row: is_option_desc(row["Description"], row["Symbol"]), axis=1
+    )
     stock_df = df[~is_opt_mask]
     option_df = df[is_opt_mask]
 
@@ -469,15 +492,25 @@ def process_portfolio_data(
 
                     # --- Parse option details using option_utils ---
                     try:
+                        # First try to parse the description
                         parsed_option = parse_option_description(
                             option_desc, opt_quantity, opt_last_price
                         )
                     except ValueError as e:
-                        # This happens if the description doesn't match the expected 6-part format
-                        logger.warning(
-                            f"    Could not parse option description for '{option_desc}': {e}. Skipping."
+                        # If description parsing fails, try parsing the symbol
+                        logger.debug(
+                            f"    Could not parse option description for '{option_desc}': {e}. Trying symbol parsing."
                         )
-                        continue
+                        try:
+                            parsed_option = parse_option_symbol(
+                                option_symbol, opt_quantity, opt_last_price, option_desc
+                            )
+                        except ValueError as e2:
+                            # If both parsing methods fail, skip this option
+                            logger.warning(
+                                f"    Could not parse option symbol '{option_symbol}' or description '{option_desc}': {e2}. Skipping."
+                            )
+                            continue
 
                     # --- Sanity check: Ensure parsed underlying matches the current group symbol ---
                     if parsed_option.underlying != symbol:
@@ -1179,6 +1212,112 @@ def calculate_portfolio_summary(
         raise RuntimeError("Failed to calculate portfolio summary") from e
 
 
+def recalculate_group_metrics(group):
+    """Recalculate group-level metrics based on updated position metrics.
+
+    Args:
+        group: The PortfolioGroup to update
+    """
+    # Calculate total delta exposure from options
+    total_delta_exposure = sum(
+        option.delta_exposure for option in group.option_positions
+    )
+
+    # Update group metrics
+    group.total_delta_exposure = total_delta_exposure
+    group.options_delta_exposure = total_delta_exposure
+
+    # Calculate net exposure (stock exposure + options delta exposure)
+    stock_exposure = group.stock_position.market_exposure if group.stock_position else 0
+    group.net_exposure = stock_exposure + total_delta_exposure
+
+    # Recalculate beta-adjusted exposure
+    stock_beta_adjusted = (
+        group.stock_position.beta_adjusted_exposure if group.stock_position else 0
+    )
+    options_beta_adjusted = sum(
+        option.beta_adjusted_exposure for option in group.option_positions
+    )
+    group.beta_adjusted_exposure = stock_beta_adjusted + options_beta_adjusted
+
+    logger.debug(
+        f"Updated group metrics for {group.ticker}: "
+        f"net_exposure={group.net_exposure:.2f}, "
+        f"total_delta_exposure={group.total_delta_exposure:.2f}, "
+        f"beta_adjusted_exposure={group.beta_adjusted_exposure:.2f}"
+    )
+
+
+def recalculate_option_metrics(option, group, latest_prices):
+    """Recalculate option metrics based on updated prices.
+
+    Args:
+        option: The OptionPosition to update
+        group: The PortfolioGroup containing the option
+        latest_prices: Dictionary of latest prices by ticker
+    """
+    from datetime import datetime
+
+    # Get the underlying ticker and price
+    underlying_ticker = (
+        option.ticker.split("_")[0] if "_" in option.ticker else group.ticker
+    )
+    underlying_price = None
+
+    # Try to get the underlying price from latest_prices
+    if underlying_ticker in latest_prices:
+        underlying_price = latest_prices[underlying_ticker]
+    # If not available and there's a stock position, use its price
+    elif group.stock_position and group.stock_position.ticker == underlying_ticker:
+        underlying_price = group.stock_position.price
+
+    # Only recalculate if we have the underlying price
+    if underlying_price is not None:
+        try:
+            # Create a parsed option object for delta calculation
+
+            parsed_option = OptionPosition(
+                underlying=underlying_ticker,
+                strike=option.strike,
+                expiry=datetime.fromisoformat(option.expiry),
+                option_type=option.option_type,
+                quantity=option.quantity,
+                current_price=option.price,
+                description=option.ticker,
+            )
+
+            # Recalculate delta
+            new_delta = calculate_option_delta(
+                parsed_option,
+                underlying_price,
+                use_black_scholes=True,
+                risk_free_rate=0.05,
+                implied_volatility=None,
+            )
+
+            # Update delta and recalculate exposures
+            option.delta = new_delta
+
+            # Recalculate notional value based on new underlying price
+            option.notional_value = 100 * underlying_price * abs(option.quantity)
+
+            # Recalculate delta exposure
+            option.delta_exposure = (
+                option.delta
+                * option.notional_value
+                * (1 if option.quantity > 0 else -1)
+            )
+
+            # Recalculate beta-adjusted exposure
+            option.beta_adjusted_exposure = option.delta_exposure * option.beta
+
+            logger.debug(
+                f"Recalculated option metrics for {option.ticker}: delta={option.delta:.3f}, delta_exposure={option.delta_exposure:.2f}"
+            )
+        except Exception as e:
+            logger.error(f"Error recalculating option metrics for {option.ticker}: {e}")
+
+
 def update_portfolio_prices(
     portfolio_groups: list[PortfolioGroup], data_fetcher=None
 ) -> str:
@@ -1246,11 +1385,15 @@ def update_portfolio_prices(
                 group.stock_position.market_exposure * group.stock_position.beta
             )
 
-        # Update option position prices
+        # Update option position prices and recalculate exposures
         for option in group.option_positions:
             if option.ticker in latest_prices:
                 option.price = latest_prices[option.ticker]
-                # We don't update market_exposure for options as it's based on notional value
+                recalculate_option_metrics(option, group, latest_prices)
+
+    # Recalculate group-level metrics after updating all positions
+    for group in portfolio_groups:
+        recalculate_group_metrics(group)
 
     # Return the current timestamp
     current_time = datetime.now(UTC).isoformat()
@@ -1259,7 +1402,7 @@ def update_portfolio_prices(
 
 
 def update_portfolio_summary_with_prices(
-    portfolio_groups: list[PortfolioGroup], _: PortfolioSummary, data_fetcher=None
+    portfolio_groups: list[PortfolioGroup], summary: PortfolioSummary, data_fetcher=None
 ) -> PortfolioSummary:
     """Update the portfolio summary with the latest prices.
 
@@ -1274,11 +1417,47 @@ def update_portfolio_summary_with_prices(
     # Update prices for all positions
     price_updated_at = update_portfolio_prices(portfolio_groups, data_fetcher)
 
-    # Recalculate the portfolio summary with the updated prices
-    updated_summary = calculate_portfolio_summary(portfolio_groups)
+    # Extract cash-like positions from the current summary
+    cash_like_positions = []
+    if summary and summary.cash_like_positions:
+        # Convert StockPosition objects back to dictionaries for calculate_portfolio_summary
+        for pos in summary.cash_like_positions:
+            cash_like_positions.append(
+                {
+                    "ticker": pos.ticker,
+                    "quantity": pos.quantity,
+                    "beta": pos.beta,
+                    "market_value": pos.market_exposure,  # Use market_exposure as market_value
+                    "beta_adjusted_exposure": pos.beta_adjusted_exposure,
+                    "price": pos.price,
+                }
+            )
+
+    # Recalculate the portfolio summary with the updated prices and cash-like positions
+    updated_summary = calculate_portfolio_summary(portfolio_groups, cash_like_positions)
 
     # Set the price_updated_at timestamp
     updated_summary.price_updated_at = price_updated_at
+
+    # Update the portfolio_estimate_value to include both net market exposure and cash-like value
+    # This ensures consistency in the portfolio value calculation
+    updated_summary.portfolio_estimate_value = (
+        updated_summary.net_market_exposure + updated_summary.cash_like_value
+    )
+
+    # Recalculate cash percentage based on the updated portfolio estimate value
+    if updated_summary.portfolio_estimate_value > 0:
+        updated_summary.cash_percentage = (
+            updated_summary.cash_like_value / updated_summary.portfolio_estimate_value
+        ) * 100
+    else:
+        updated_summary.cash_percentage = 0.0
+
+    logger.info(
+        f"Updated portfolio summary: net_market_exposure={updated_summary.net_market_exposure:.2f}, "
+        f"cash_like_value={updated_summary.cash_like_value:.2f}, "
+        f"portfolio_estimate_value={updated_summary.portfolio_estimate_value:.2f}"
+    )
 
     return updated_summary
 

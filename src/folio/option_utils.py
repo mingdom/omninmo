@@ -116,6 +116,120 @@ def parse_month(month_str: str) -> int:
         raise ValueError(f"Invalid month abbreviation: '{month_str}'") from err
 
 
+def parse_option_symbol(
+    symbol: str, quantity: int, current_price: float, description: str | None = None
+) -> OptionPosition:
+    """Parses an option symbol in the format '-AMAT250516P130' into an OptionPosition object.
+
+    This function handles option symbols in the format:
+    - First character may be '-' (for short positions)
+    - Followed by the underlying ticker (e.g., 'AMAT')
+    - Followed by the expiry date (YY MM DD)
+    - Followed by option type ('P' for PUT, 'C' for CALL)
+    - Followed by the strike price (may include decimal point)
+
+    Example: '-AMAT250516P130' represents a short AMAT PUT with strike $130 expiring on May 16, 2025
+
+    Args:
+        symbol: The option symbol to parse
+        quantity: The number of contracts (positive for long, negative for short)
+        current_price: The current market price per contract
+        description: Optional description string for additional context
+
+    Returns:
+        OptionPosition: A populated OptionPosition object
+
+    Raises:
+        ValueError: If the symbol cannot be parsed as an option
+    """
+    logger.debug(f"Parsing option symbol: '{symbol}'")
+
+    # Remove the leading '-' if present (short indicator)
+    clean_symbol = symbol.strip()
+    if clean_symbol.startswith("-"):
+        clean_symbol = clean_symbol[1:]
+
+    # Find where the date part starts (first digit)
+    ticker_end = 0
+    for i, char in enumerate(clean_symbol):
+        if char.isdigit():
+            ticker_end = i
+            break
+
+    if ticker_end == 0:
+        error_msg = f"Could not find date part in option symbol: {symbol}"
+        logger.error(error_msg)
+        raise ValueError(error_msg)
+
+    # Extract the underlying ticker
+    underlying = clean_symbol[:ticker_end]
+
+    # Find the option type character (P or C)
+    option_type_idx = None
+    for i in range(ticker_end, len(clean_symbol)):
+        if clean_symbol[i].upper() in ["P", "C"]:
+            option_type_idx = i
+            break
+
+    if option_type_idx is None:
+        error_msg = f"Could not find option type (P/C) in option symbol: {symbol}"
+        logger.error(error_msg)
+        raise ValueError(error_msg)
+
+    # Extract the date part (YY MM DD)
+    date_part = clean_symbol[ticker_end:option_type_idx]
+    if len(date_part) < 6:  # Need at least YYMMDD
+        error_msg = f"Date part too short in option symbol: {symbol}"
+        logger.error(error_msg)
+        raise ValueError(error_msg)
+
+    # Parse the date
+    try:
+        year = 2000 + int(date_part[:2])  # Assuming 20xx
+        month = int(date_part[2:4])
+        day = int(date_part[4:6])
+        expiry = datetime(year, month, day)
+    except (ValueError, IndexError) as e:
+        error_msg = f"Invalid date in option symbol: {symbol}"
+        logger.error(error_msg)
+        raise ValueError(error_msg) from e
+
+    # Extract the option type
+    option_type_char = clean_symbol[option_type_idx].upper()
+    option_type = "PUT" if option_type_char == "P" else "CALL"
+
+    # Extract the strike price
+    strike_str = clean_symbol[option_type_idx + 1 :]
+    try:
+        # Handle strike prices with implied decimal points
+        # For example, "130" means $130.00, "1325" means $132.50
+        if len(strike_str) <= 3:
+            strike = float(strike_str)
+        else:
+            # Insert decimal point 2 places from the end
+            decimal_idx = len(strike_str) - 2
+            strike = float(strike_str[:decimal_idx] + "." + strike_str[decimal_idx:])
+    except ValueError as e:
+        error_msg = f"Invalid strike price in option symbol: {symbol}"
+        logger.error(error_msg)
+        raise ValueError(error_msg) from e
+
+    # Create and return the OptionPosition
+    logger.debug(
+        f"Successfully parsed option symbol: {underlying} {expiry.strftime('%b %d %Y')} ${strike} {option_type}"
+    )
+
+    return OptionPosition(
+        underlying=underlying,
+        expiry=expiry,
+        strike=strike,
+        option_type=option_type,
+        quantity=quantity,
+        current_price=current_price,
+        description=description or symbol,
+    )
+
+
 def parse_option_description(
     description: str, quantity: int, current_price: float
 ) -> OptionPosition:
