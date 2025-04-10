@@ -3,7 +3,6 @@ import base64
 import io
 import os
 import sys
-import uuid
 from pathlib import Path
 
 import dash
@@ -20,8 +19,6 @@ from . import portfolio
 from .components import create_premium_chat_component, register_premium_chat_callbacks
 from .components.charts import create_dashboard_section
 from .components.charts import register_callbacks as register_chart_callbacks
-from .components.navbar import create_navbar
-from .components.navbar import register_callbacks as register_navbar_callbacks
 from .components.portfolio_table import create_portfolio_table
 from .components.position_details import create_position_details
 from .components.summary_cards import create_summary_cards
@@ -203,33 +200,9 @@ def create_position_modal() -> dbc.Modal:
     )
 
 
-def create_app(
-    portfolio_file: str | None = None,
-    debug_mode: bool = False,
-    is_reloader: bool = False,
-) -> dash.Dash:
+def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.Dash:
     """Create and configure the Dash application"""
-    # Generate a unique ID for this app instance
-    app_id = str(uuid.uuid4())[:8]
-
-    # Log with the unique ID to see if we're creating multiple instances
-    process_type = "RELOADER" if is_reloader else "MAIN"
-    logger.info(f"[{process_type} PROCESS] Creating Dash application instance {app_id}")
-
-    # Check if running in production environment
-    is_production = (
-        os.environ.get("HF_SPACE") == "1"
-        or os.environ.get("SPACE_ID") is not None
-        or (
-            os.path.exists("/.dockerenv")
-            and os.environ.get("ENVIRONMENT") == "production"
-        )
-    )
-
-    # Force debug mode to False in production environments
-    if is_production and debug_mode:
-        logger.warning("Debug mode disabled for production environment")
-        debug_mode = False
+    logger.info("Initializing Dash application")
 
     # Create Dash app
     app = dash.Dash(
@@ -243,9 +216,6 @@ def create_app(
         use_pages=False,
         suppress_callback_exceptions=True,
     )
-
-    # Store debug mode as an attribute for later use in run_server
-    app._debug_mode = debug_mode
 
     # Enhanced UI CSS is automatically loaded from the assets folder
 
@@ -299,7 +269,7 @@ def create_app(
     app.layout = dbc.Container(
         [
             dcc.Location(id="url", refresh=False),  # Add URL component
-            create_navbar(),  # Add the navbar component
+            html.Div(html.H2("Folio"), className="app-header my-3"),
             create_upload_section(),  # Always show upload section
             # Wrap the main content in a loading component with gradient border
             html.Div(
@@ -1108,9 +1078,6 @@ def create_app(
     # Register chart callbacks
     register_chart_callbacks(app)
 
-    # Register navbar callbacks
-    register_navbar_callbacks(app)
-
     # Register premium chat callbacks
     register_premium_chat_callbacks(app)  # This is now an alias for register_callbacks
 
@@ -1154,30 +1121,7 @@ def main():
         portfolio_file = str(portfolio_file)
 
     # Initialize and run app
-    # Check if this is the reloader process
-    is_reloader = os.environ.get("WERKZEUG_RUN_MAIN") == "true"
-
-    # Check if running in production environment (Hugging Face or Docker)
-    is_docker = os.path.exists("/.dockerenv")
-    is_huggingface = (
-        os.environ.get("HF_SPACE") == "1" or os.environ.get("SPACE_ID") is not None
-    )
-    is_production = is_huggingface or (
-        is_docker and os.environ.get("ENVIRONMENT") == "production"
-    )
-
-    # Force debug mode to False in production environments
-    if is_production and args.debug:
-        logger.warning("Debug mode disabled for production environment")
-        debug_mode = False
-    else:
-        debug_mode = args.debug
-
-    # Only log the initialization message in the main process
-    if not is_reloader:
-        logger.debug(f"Initializing application... (debug_mode={debug_mode})")
-
-    app = AppHolder.init_app(portfolio_file, debug_mode, is_reloader)
+    app = AppHolder.init_app(portfolio_file, args.debug)
 
     # Display a helpful message about where to access the app
     is_docker = os.path.exists("/.dockerenv")
@@ -1185,29 +1129,20 @@ def main():
         os.environ.get("HF_SPACE") == "1" or os.environ.get("SPACE_ID") is not None
     )
 
-    # Only show startup messages in the main process, not the reloader
-    if not is_reloader:
-        # Log debug mode status
-        debug_status = "ENABLED" if debug_mode else "DISABLED"
-        env_type = "PRODUCTION" if is_production else "DEVELOPMENT"
-        logger.info(f"Environment: {env_type}, Debug Mode: {debug_status}")
+    if is_huggingface:
+        logger.info("\n\n🚀 Folio is running on Hugging Face Spaces!")
+        logger.info("📊 Access the dashboard at the URL provided by Hugging Face\n")
+    elif is_docker and args.host == "0.0.0.0":
+        logger.info("\n\n🚀 Folio is running inside a Docker container!")
+        logger.info(f"📊 Access the dashboard at: http://localhost:{args.port}")
+        logger.info(
+            f"💻 (The app is bound to {args.host}:{args.port} inside the container)\n"
+        )
+    else:
+        logger.info("\n\n🚀 Folio is running!")
+        logger.info(f"📊 Access the dashboard at: http://localhost:{args.port}\n")
 
-        if is_huggingface:
-            logger.info("\n\n🚀 Folio is running on Hugging Face Spaces!")
-            logger.info("📊 Access the dashboard at the URL provided by Hugging Face\n")
-        elif is_docker and args.host == "0.0.0.0":
-            logger.info("\n\n🚀 Folio is running inside a Docker container!")
-            logger.info(f"📊 Access the dashboard at: http://localhost:{args.port}")
-            logger.info(
-                f"💻 (The app is bound to {args.host}:{args.port} inside the container)\n"
-            )
-        else:
-            logger.info("\n\n🚀 Folio is running!")
-            logger.info(f"📊 Access the dashboard at: http://localhost:{args.port}\n")
-
-    app.run_server(
-        debug=getattr(app, "_debug_mode", False), port=args.port, host=args.host
-    )
+    app.run_server(debug=args.debug, port=args.port, host=args.host)
     return 0
 
 
@@ -1218,60 +1153,18 @@ class AppHolder:
     app = None
     server = None
 
-    # Add a class variable to track initialization
-    init_count = 0
-    holder_id = str(uuid.uuid4())[:8]
-
     @classmethod
-    def init_app(
-        cls,
-        portfolio_file: str | None = None,
-        debug: bool = False,
-        is_reloader: bool = False,
-    ):
-        """Initialize the app for WSGI servers
-
-        Args:
-            portfolio_file: Path to portfolio CSV file
-            debug: Whether to enable debug mode
-            is_reloader: Whether this is the Flask reloader process
-        """
-        # Increment the initialization counter
-        cls.init_count += 1
-
-        # Log the initialization with the holder ID and count
-        process_type = "RELOADER" if is_reloader else "MAIN"
-        logger.info(
-            f"[{process_type} PROCESS] AppHolder {cls.holder_id} init_app called {cls.init_count} times"
-        )
-
+    def init_app(cls, portfolio_file: str | None = None, debug: bool = False):
+        """Initialize the app for WSGI servers"""
         if cls.app is None:
-            logger.info(
-                f"[{process_type} PROCESS] Creating new Dash application instance"
-            )
-            cls.app = create_app(portfolio_file, debug, is_reloader)
+            cls.app = create_app(portfolio_file, debug)
             cls.server = cls.app.server
-        else:
-            logger.info(
-                f"[{process_type} PROCESS] Reusing existing Dash application instance"
-            )
         return cls.app
 
 
 # Create the app instance for Uvicorn to use
-# Only initialize if running as a module, not when running as a script
-if __name__ != "__main__":
-    # Check if this is the reloader process
-    is_reloader = os.environ.get("WERKZEUG_RUN_MAIN") == "true"
-    process_type = "RELOADER" if is_reloader else "MAIN"
-    logger.info(f"[{process_type} PROCESS] Initializing app at module level for WSGI")
-    app = AppHolder.init_app(is_reloader=is_reloader)
-    server = AppHolder.server
-else:
-    # These will be initialized in main()
-    logger.info("[SCRIPT MODE] App will be initialized in main()")
-    app = None
-    server = None
+app = AppHolder.init_app()
+server = AppHolder.server
 
 if __name__ == "__main__":
     sys.exit(main())
