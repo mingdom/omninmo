@@ -24,10 +24,10 @@ from .data_model import (
 )
 from .logger import logger
 from .option_utils import (
-    OptionPosition,
     calculate_option_delta,
     parse_option_description,
     parse_option_symbol,
+    recalculate_option_metrics,
 )
 from .utils import clean_currency_value, format_beta, format_currency, get_beta
 
@@ -825,6 +825,25 @@ def process_portfolio_data(
                 # For options-only groups, we'll create the group with a zero-quantity stock position
                 # We need to pass a minimal stock_data dictionary to create_portfolio_group
                 # but we'll set the quantity to 0 so it doesn't affect calculations
+                # For options-only groups, we need to get the current price of the underlying
+                try:
+                    # Try to fetch the latest price
+                    price_data = data_fetcher.fetch_data(underlying, period="1d")
+                    if price_data is not None and not price_data.empty:
+                        underlying_price = price_data.iloc[-1]["Close"]
+                    else:
+                        # If we can't get the price data, use a default price of 0
+                        # The price will be updated later by update_portfolio_prices
+                        logger.warning(
+                            f"Could not fetch price data for {underlying}. Using 0 as placeholder."
+                        )
+                        underlying_price = 0
+                except Exception as price_err:
+                    logger.error(
+                        f"Error fetching price for {underlying}: {price_err}. Using 0 as placeholder."
+                    )
+                    underlying_price = 0
+
                 stock_data_for_group = {
                     "ticker": underlying,
                     "quantity": 0,
@@ -832,7 +851,7 @@ def process_portfolio_data(
                     "market_exposure": 0,
                     "beta_adjusted_exposure": 0,
                     "description": f"{underlying} (Options Only)",
-                    "price": 0,
+                    "price": underlying_price,
                 }
 
                 # Create the group
@@ -919,10 +938,23 @@ def process_portfolio_data(
             )
             return [], empty_summary, []
 
+    # Update prices for all positions to ensure we have the latest prices
+    # This is especially important for options-only positions where we might not have the underlying price
+    logger.info("Updating prices for all positions...")
+    try:
+        price_updated_at = update_portfolio_prices(groups, data_fetcher)
+        logger.info(f"Prices updated successfully at {price_updated_at}")
+    except Exception as price_err:
+        logger.error(f"Failed to update prices: {price_err}", exc_info=True)
+        # Continue with potentially incomplete price data
+        price_updated_at = None
+
     # Calculate portfolio summary using the final list of groups
     logger.info("Calculating final portfolio summary...")
     try:
         summary = calculate_portfolio_summary(groups, cash_like_positions)
+        if price_updated_at:
+            summary.price_updated_at = price_updated_at
         logger.info("Portfolio summary calculated successfully.")
     except Exception as summary_err:
         logger.error(
@@ -1248,74 +1280,7 @@ def recalculate_group_metrics(group):
     )
 
 
-def recalculate_option_metrics(option, group, latest_prices):
-    """Recalculate option metrics based on updated prices.
-
-    Args:
-        option: The OptionPosition to update
-        group: The PortfolioGroup containing the option
-        latest_prices: Dictionary of latest prices by ticker
-    """
-    from datetime import datetime
-
-    # Get the underlying ticker and price
-    underlying_ticker = (
-        option.ticker.split("_")[0] if "_" in option.ticker else group.ticker
-    )
-    underlying_price = None
-
-    # Try to get the underlying price from latest_prices
-    if underlying_ticker in latest_prices:
-        underlying_price = latest_prices[underlying_ticker]
-    # If not available and there's a stock position, use its price
-    elif group.stock_position and group.stock_position.ticker == underlying_ticker:
-        underlying_price = group.stock_position.price
-
-    # Only recalculate if we have the underlying price
-    if underlying_price is not None:
-        try:
-            # Create a parsed option object for delta calculation
-
-            parsed_option = OptionPosition(
-                underlying=underlying_ticker,
-                strike=option.strike,
-                expiry=datetime.fromisoformat(option.expiry),
-                option_type=option.option_type,
-                quantity=option.quantity,
-                current_price=option.price,
-                description=option.ticker,
-            )
-
-            # Recalculate delta
-            new_delta = calculate_option_delta(
-                parsed_option,
-                underlying_price,
-                use_black_scholes=True,
-                risk_free_rate=0.05,
-                implied_volatility=None,
-            )
-
-            # Update delta and recalculate exposures
-            option.delta = new_delta
-
-            # Recalculate notional value based on new underlying price
-            option.notional_value = 100 * underlying_price * abs(option.quantity)
-
-            # Recalculate delta exposure
-            option.delta_exposure = (
-                option.delta
-                * option.notional_value
-                * (1 if option.quantity > 0 else -1)
-            )
-
-            # Recalculate beta-adjusted exposure
-            option.beta_adjusted_exposure = option.delta_exposure * option.beta
-
-            logger.debug(
-                f"Recalculated option metrics for {option.ticker}: delta={option.delta:.3f}, delta_exposure={option.delta_exposure:.2f}"
-            )
-        except Exception as e:
-            logger.error(f"Error recalculating option metrics for {option.ticker}: {e}")
+# recalculate_option_metrics has been moved to option_utils.py
 
 
 def update_portfolio_prices(
@@ -1338,14 +1303,23 @@ def update_portfolio_prices(
 
     # Extract unique tickers from all positions
     tickers = set()
+    underlying_tickers = set()
     for group in portfolio_groups:
         # Add stock position ticker
         if group.stock_position:
             tickers.add(group.stock_position.ticker)
+            underlying_tickers.add(group.stock_position.ticker)
 
-        # Add option position tickers
+        # Add option position tickers and their underlyings
         for option in group.option_positions:
             tickers.add(option.ticker)
+            # Add the underlying ticker for options
+            underlying_ticker = group.ticker
+            if underlying_ticker and underlying_ticker not in tickers:
+                underlying_tickers.add(underlying_ticker)
+
+    # Add underlying tickers to the main tickers set
+    tickers.update(underlying_tickers)
 
     # Remove cash-like instruments as we don't need to update their prices
     tickers = [ticker for ticker in tickers if not is_cash_or_short_term(ticker)]

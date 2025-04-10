@@ -25,6 +25,24 @@ def create_position_row(group: PortfolioGroup, _metrics: dict) -> dbc.Row:
         Dash Bootstrap Components Row for the portfolio table
     """
     ticker = get_group_ticker(group)
+
+    # Get the price from the stock position or the first option position
+    price = None
+    if group.stock_position:
+        price = group.stock_position.price
+    elif group.option_positions:
+        # For option-only positions, show the underlying price if available
+        for option in group.option_positions:
+            if (
+                hasattr(option, "underlying_price")
+                and option.underlying_price is not None
+            ):
+                price = option.underlying_price
+                break
+            # Fallback to option price if underlying price is not available
+            price = option.price
+            break
+
     return dbc.Row(
         [
             dbc.Col(html.Strong(ticker), width=2),
@@ -41,7 +59,11 @@ def create_position_row(group: PortfolioGroup, _metrics: dict) -> dbc.Row:
                         ]
                     )
                 ],
-                width=2,
+                width=1,
+            ),
+            dbc.Col(
+                format_currency(price) if price is not None else "-",
+                width=1,
             ),
             dbc.Col(format_currency(group.net_exposure), width=2),
             dbc.Col(
@@ -144,6 +166,25 @@ def create_portfolio_table(
             key=lambda x: x.beta_adjusted_exposure,
             reverse=sort_direction == "desc",
         )
+    elif sort_key == "price":
+        # Sort by price
+        def get_price(group):
+            if group.stock_position:
+                return group.stock_position.price or 0
+            elif group.option_positions:
+                for option in group.option_positions:
+                    if (
+                        hasattr(option, "underlying_price")
+                        and option.underlying_price is not None
+                    ):
+                        return option.underlying_price
+                    return option.price or 0
+            return 0
+
+        groups.sort(
+            key=get_price,
+            reverse=sort_direction == "desc",
+        )
     elif sort_key == "ticker":
         groups.sort(
             key=lambda x: get_group_ticker(x).lower(), reverse=sort_direction == "desc"
@@ -159,7 +200,8 @@ def create_portfolio_table(
     header_row = dbc.Row(
         [
             dbc.Col(create_sortable_header("Ticker", "ticker", sort_by), width=2),
-            dbc.Col(create_sortable_header("Type", "type", sort_by), width=2),
+            dbc.Col(create_sortable_header("Type", "type", sort_by), width=1),
+            dbc.Col(create_sortable_header("Price", "price", sort_by), width=1),
             dbc.Col(create_sortable_header("Exposure", "value", sort_by), width=2),
             dbc.Col(create_sortable_header("Beta", "beta", sort_by), width=2),
             dbc.Col(

@@ -1029,3 +1029,102 @@ def group_options_by_underlying(
         # Add option to the list for its underlying ticker
         grouped.setdefault(option.underlying, []).append(option)
     return grouped
+
+
+def recalculate_option_metrics(option, group, latest_prices):
+    """Recalculate option metrics based on updated prices.
+
+    Args:
+        option: The OptionPosition to update (from data_model.OptionPosition)
+        group: The PortfolioGroup containing the option
+        latest_prices: Dictionary of latest prices by ticker
+    """
+    from datetime import datetime
+
+    # Get the underlying ticker and price
+    underlying_ticker = (
+        option.ticker.split("_")[0] if "_" in option.ticker else group.ticker
+    )
+    underlying_price = None
+
+    # Try to get the underlying price from latest_prices
+    if underlying_ticker in latest_prices:
+        underlying_price = latest_prices[underlying_ticker]
+    # If not available and there's a stock position, use its price
+    elif group.stock_position and group.stock_position.ticker == underlying_ticker:
+        underlying_price = group.stock_position.price
+
+    # Only recalculate if we have the underlying price
+    if underlying_price is not None:
+        try:
+            # Create a parsed option object for delta calculation
+            parsed_option = OptionPosition(
+                underlying=underlying_ticker,
+                strike=option.strike,
+                expiry=datetime.fromisoformat(option.expiry),
+                option_type=option.option_type,
+                quantity=option.quantity,
+                current_price=option.price,
+                description=option.ticker,
+            )
+
+            # Recalculate delta using the same implied volatility if available
+            # This ensures consistency in delta calculations
+            implied_volatility = getattr(option, "implied_volatility", None)
+
+            # If we don't have an implied_volatility value stored, use the current delta
+            # to ensure consistency when prices haven't changed
+            if implied_volatility is None and option.delta is not None:
+                # Only recalculate delta if the underlying price has changed
+                # This prevents delta from changing when prices are the same
+                if (
+                    hasattr(option, "last_underlying_price")
+                    and option.last_underlying_price == underlying_price
+                ):
+                    logger.debug(
+                        f"Skipping delta recalculation for {option.ticker} as underlying price hasn't changed"
+                    )
+                    new_delta = option.delta
+                else:
+                    # Calculate new delta
+                    new_delta = calculate_option_delta(
+                        parsed_option,
+                        underlying_price,
+                        use_black_scholes=True,
+                        risk_free_rate=0.05,
+                        implied_volatility=implied_volatility,
+                    )
+                    # Store the underlying price for future comparisons
+                    option.last_underlying_price = underlying_price
+            else:
+                # Calculate new delta
+                new_delta = calculate_option_delta(
+                    parsed_option,
+                    underlying_price,
+                    use_black_scholes=True,
+                    risk_free_rate=0.05,
+                    implied_volatility=implied_volatility,
+                )
+                # Store the underlying price for future comparisons
+                option.last_underlying_price = underlying_price
+
+            # Update delta
+            option.delta = new_delta
+
+            # Use the standard definition of notional value: strike * 100 * abs(quantity)
+            # This ensures consistency with the OptionPosition class property
+            option.notional_value = option.strike * 100 * abs(option.quantity)
+
+            # Recalculate delta exposure
+            # Delta already accounts for the direction (positive for long calls/short puts, negative for short calls/long puts)
+            # So we just multiply by notional value to get the exposure
+            option.delta_exposure = option.delta * option.notional_value
+
+            # Recalculate beta-adjusted exposure
+            option.beta_adjusted_exposure = option.delta_exposure * option.beta
+
+            logger.debug(
+                f"Recalculated option metrics for {option.ticker}: delta={option.delta:.3f}, delta_exposure={option.delta_exposure:.2f}"
+            )
+        except Exception as e:
+            logger.error(f"Error recalculating option metrics for {option.ticker}: {e}")

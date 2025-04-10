@@ -16,6 +16,7 @@ class TestPortfolioTable:
             beta=1.2,
             market_exposure=15000.0,
             beta_adjusted_exposure=18000.0,
+            price=150.0,  # Add price for testing the price column
         )
         option_position = OptionPosition(
             ticker="AAPL",
@@ -31,6 +32,7 @@ class TestPortfolioTable:
             notional_value=15000.0,
             underlying_beta=1.2,
             market_exposure=1500.0,
+            price=15.0,  # Add price for testing the price column
         )
         group = PortfolioGroup(
             ticker="AAPL",
@@ -49,6 +51,13 @@ class TestPortfolioTable:
         # Verify that row is a Dash component
         assert row is not None
 
+        # Verify that the price column is included
+        # The price column should be the third column (index 2)
+        price_column = row.children[2]
+        assert "$150.00" in str(
+            price_column.children
+        )  # Check that the price is displayed correctly
+
     def test_portfolio_table_serialization(self):
         """Test that a portfolio group can be serialized and deserialized correctly."""
         # Create a portfolio group
@@ -58,6 +67,7 @@ class TestPortfolioTable:
             beta=1.2,
             market_exposure=15000.0,
             beta_adjusted_exposure=18000.0,
+            price=150.0,  # Add price for testing the price column
         )
         option_position = OptionPosition(
             ticker="AAPL",
@@ -73,6 +83,7 @@ class TestPortfolioTable:
             notional_value=15000.0,
             underlying_beta=1.2,
             market_exposure=1500.0,
+            price=15.0,  # Add price for testing the price column
         )
         group = PortfolioGroup(
             ticker="AAPL",
@@ -113,6 +124,7 @@ class TestPortfolioTable:
             "market_exposure": 15000.0,
             "beta_adjusted_exposure": 18000.0,
             "position_type": "stock",  # This should be ignored by StockPosition constructor
+            "price": 150.0,  # Add price for testing the price column
         }
 
         # Create a StockPosition with position_type included (now accepted)

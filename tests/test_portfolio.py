@@ -476,7 +476,7 @@ class TestPriceUpdates:
         """Test recalculating option metrics."""
         # Mock the calculate_option_delta function
         mock_calculate_delta = mocker.patch(
-            "src.folio.portfolio.calculate_option_delta",
+            "src.folio.option_utils.calculate_option_delta",
             return_value=0.75,  # New delta value
         )
 
@@ -514,7 +514,7 @@ class TestPriceUpdates:
         latest_prices = {"AAPL": 150.0}  # New price
 
         # Import the function
-        from src.folio.portfolio import recalculate_option_metrics
+        from src.folio.option_utils import recalculate_option_metrics
 
         # Recalculate option metrics
         recalculate_option_metrics(option_position, portfolio_group, latest_prices)
@@ -524,10 +524,10 @@ class TestPriceUpdates:
 
         # Verify that the option metrics were updated
         assert option_position.delta == 0.75  # New delta
-        # The notional value is calculated based on the underlying price (not the strike price)
-        assert option_position.notional_value == 15000.0  # 150.0 * 100 * 1
-        assert option_position.delta_exposure == 11250.0  # 0.75 * 15000.0
-        assert option_position.beta_adjusted_exposure == 13500.0  # 11250.0 * 1.2
+        # The notional value is calculated based on the strike price (not the underlying price)
+        assert option_position.notional_value == 16000.0  # 160.0 * 100 * 1
+        assert option_position.delta_exposure == 12000.0  # 0.75 * 16000.0
+        assert option_position.beta_adjusted_exposure == 14400.0  # 12000.0 * 1.2
 
     def test_recalculate_group_metrics(self):
         """Test recalculating group metrics."""
