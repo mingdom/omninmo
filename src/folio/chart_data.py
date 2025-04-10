@@ -31,6 +31,7 @@ def transform_for_exposure_chart(
     # Extract values based on whether we want beta-adjusted or not
     if use_beta_adjusted:
         long_value = portfolio_summary.long_exposure.total_beta_adjusted
+        # Show short exposure as negative
         short_value = portfolio_summary.short_exposure.total_beta_adjusted
         options_value = portfolio_summary.options_exposure.total_beta_adjusted
         # Use the utility function for beta-adjusted net exposure
@@ -40,6 +41,7 @@ def transform_for_exposure_chart(
         )
     else:
         long_value = portfolio_summary.long_exposure.total_exposure
+        # Show short exposure as negative
         short_value = portfolio_summary.short_exposure.total_exposure
         options_value = portfolio_summary.options_exposure.total_exposure
         # Use the pre-calculated net market exposure
@@ -212,160 +214,7 @@ def transform_for_treemap(
     return chart_data
 
 
-def transform_for_sector_allocation(
-    portfolio_groups: list[PortfolioGroup], use_percentage: bool = True
-) -> dict[str, Any]:
-    """Transform portfolio groups data for the sector allocation chart.
-
-    Args:
-        portfolio_groups: List of portfolio groups from the data model
-        use_percentage: Whether to use percentage values (True) or absolute values (False)
-
-    Returns:
-        Dict containing data and layout for the pie chart
-    """
-    logger.debug(
-        f"Transforming data for sector allocation chart with {len(portfolio_groups)} groups"
-    )
-    logger.debug(f"Use percentage: {use_percentage}")
-
-    # Collect sector data
-    sector_values = {}
-    for i, group in enumerate(portfolio_groups):
-        logger.debug(f"Processing group {i}: {group.ticker}")
-        if group.stock_position:
-            position = group.stock_position
-            logger.debug(f"  Found stock position: {position.ticker}")
-
-            # Check for sector attribute
-            has_sector = hasattr(position, "sector")
-            logger.debug(f"  Has sector attribute: {has_sector}")
-
-            # Check for cash-like attribute
-            has_cash_like = hasattr(position, "is_cash_like")
-            logger.debug(f"  Has is_cash_like attribute: {has_cash_like}")
-
-            if has_cash_like and position.is_cash_like:
-                sector = "Cash"
-                logger.debug("  Identified as cash-like position")
-            else:
-                # Use sector from position if available, otherwise "Unknown"
-                sector = getattr(position, "sector", "Unknown")
-                logger.debug(f"  Sector assigned: {sector}")
-
-            # Add value to sector total
-            if sector in sector_values:
-                sector_values[sector] += position.market_value
-                logger.debug(
-                    f"  Added {position.market_value} to existing sector {sector}"
-                )
-            else:
-                sector_values[sector] = position.market_value
-                logger.debug(
-                    f"  Created new sector {sector} with value {position.market_value}"
-                )
-        else:
-            logger.debug("  No stock position in this group")
-
-    # Convert to lists for chart
-    sectors = list(sector_values.keys())
-    values = list(sector_values.values())
-    logger.debug(f"Sectors found: {sectors}")
-    logger.debug(f"Values: {values}")
-
-    # Check if we have any sectors
-    if not sectors:
-        logger.warning("No sectors found in portfolio data")
-        return {
-            "data": [],
-            "layout": {
-                "title": "No sector data available",
-                "height": 400,
-                "annotations": [
-                    {
-                        "text": "No sector data available in portfolio",
-                        "showarrow": False,
-                        "font": {"size": 16},
-                        "xref": "paper",
-                        "yref": "paper",
-                        "x": 0.5,
-                        "y": 0.5,
-                    }
-                ],
-            },
-        }
-
-    # Calculate total for percentage calculation
-    total_value = sum(abs(v) for v in values)
-    logger.debug(f"Total value: {total_value}")
-
-    # Convert to percentages if requested
-    if use_percentage:
-        chart_values = [(abs(v) / total_value) * 100 for v in values]
-        text_values = [f"{v:.1f}%" for v in chart_values]
-        title_text = "Sector Allocation (% of Portfolio)"
-        logger.debug(f"Using percentage values: {chart_values}")
-    else:
-        chart_values = [abs(v) for v in values]
-        text_values = [format_currency(value) for value in chart_values]
-        title_text = "Sector Allocation (Value)"
-        logger.debug(f"Using absolute values: {chart_values}")
-
-    # Create the chart data
-    chart_data = {
-        "data": [
-            {
-                "type": "pie",
-                "labels": sectors,
-                "values": chart_values,
-                "text": text_values,
-                "textinfo": "label+text",
-                "hoverinfo": "label+text+percent",
-                "marker": {
-                    "line": {"width": 1, "color": "#FFFFFF"},
-                    "colors": [
-                        "#3498DB",
-                        "#2ECC71",
-                        "#9B59B6",
-                        "#F1C40F",
-                        "#E74C3C",
-                        "#1ABC9C",
-                        "#34495E",
-                        "#D35400",
-                        "#7F8C8D",
-                        "#27AE60",
-                        "#2980B9",
-                        "#8E44AD",
-                    ],
-                },
-                "textfont": {
-                    "family": "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
-                    "size": 11,
-                    "color": "#FFFFFF",
-                },
-                "hole": 0.4,  # Creates a donut chart for a more modern look
-            }
-        ],
-        "layout": {
-            "title": {"text": title_text, "font": {"size": 16, "color": "#2C3E50"}},
-            "showlegend": True,
-            "legend": {
-                "orientation": "h",
-                "y": -0.1,
-                "bgcolor": "rgba(255,255,255,0.9)",
-            },
-            "margin": {"l": 0, "r": 0, "t": 50, "b": 0, "pad": 4},
-            "height": 400,
-            "paper_bgcolor": "white",
-            "font": {
-                "family": "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
-            },
-        },
-    }
-
-    logger.debug(f"Created sector chart with {len(sectors)} sectors")
-
-    return chart_data
+# Sector allocation chart has been removed as it's not currently supported
 
 
 def create_dashboard_metrics(

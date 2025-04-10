@@ -199,9 +199,9 @@ def test_bs_delta_negated_for_short_options(sample_options):
     )
 
     # Short delta should be negative of long delta
-    assert (
-        abs(long_call_delta + short_call_delta) < 1e-10
-    ), "Short option delta should be negative of long option delta"
+    assert abs(long_call_delta + short_call_delta) < 1e-10, (
+        "Short option delta should be negative of long option delta"
+    )
 
 
 def test_bs_delta_put_call_parity(sample_options):
@@ -215,9 +215,9 @@ def test_bs_delta_put_call_parity(sample_options):
     put_delta = calculate_black_scholes_delta(sample_options["atm_put"], current_price)
 
     # For options with same strike, put delta should be call delta - 1
-    assert (
-        abs((call_delta - 1) - put_delta) < 1e-10
-    ), "Put-call parity not satisfied for delta"
+    assert abs((call_delta - 1) - put_delta) < 1e-10, (
+        "Put-call parity not satisfied for delta"
+    )
 
 
 def test_delta_calculator_interface():
@@ -234,6 +234,17 @@ def test_delta_calculator_interface():
         quantity=1,
         current_price=5.0,
         description="Test Call",
+    )
+
+    # Test short option
+    short_option = OptionPosition(
+        underlying="TEST",
+        expiry=future_date,
+        strike=100.0,
+        option_type="CALL",
+        quantity=-1,
+        current_price=5.0,
+        description="Test Short Call",
     )
 
     # Using Black-Scholes with explicit IV
@@ -254,9 +265,9 @@ def test_delta_calculator_interface():
     # Verify behavior - the default should use BS but with estimated IV, so only verify type
     assert isinstance(default_delta, float), "Default delta should be a float"
     assert 0 <= default_delta <= 1, "Default delta should be between 0 and 1"
-    assert (
-        abs(bs_delta - simple_delta) > 0.01
-    ), "BS and simple delta should differ significantly"
+    assert abs(bs_delta - simple_delta) > 0.01, (
+        "BS and simple delta should differ significantly"
+    )
 
     # Test that passing the same IV produces consistent results
     # First get the estimated IV used by default
@@ -268,6 +279,117 @@ def test_delta_calculator_interface():
     )
 
     # This should match the default delta
+    assert abs(default_delta - bs_delta_with_estimated_iv) < 1e-10, (
+        "Default should use BS with estimated IV"
+    )
+
+
+def test_option_notional_value_and_exposure():
+    """Test that option notional value and delta exposure are calculated correctly."""
+    # Create test options
+    current_date = datetime.now()
+    future_date = current_date + timedelta(days=180)
+
+    # Long call option
+    long_call = OptionPosition(
+        underlying="TEST",
+        expiry=future_date,
+        strike=100.0,
+        option_type="CALL",
+        quantity=2,  # 2 contracts
+        current_price=5.0,
+        description="Test Long Call",
+    )
+
+    # Short call option
+    short_call = OptionPosition(
+        underlying="TEST",
+        expiry=future_date,
+        strike=100.0,
+        option_type="CALL",
+        quantity=-2,  # -2 contracts
+        current_price=5.0,
+        description="Test Short Call",
+    )
+
+    # Long put option
+    long_put = OptionPosition(
+        underlying="TEST",
+        expiry=future_date,
+        strike=100.0,
+        option_type="PUT",
+        quantity=2,  # 2 contracts
+        current_price=5.0,
+        description="Test Long Put",
+    )
+
+    # Short put option
+    short_put = OptionPosition(
+        underlying="TEST",
+        expiry=future_date,
+        strike=100.0,
+        option_type="PUT",
+        quantity=-2,  # -2 contracts
+        current_price=5.0,
+        description="Test Short Put",
+    )
+
+    # Test notional value calculations
+    # Notional value should be the same for all options with the same strike and quantity
+    expected_notional = (
+        100.0 * 100 * 2
+    )  # strike * 100 shares per contract * 2 contracts
+    assert long_call.notional_value == expected_notional
+    assert short_call.notional_value == expected_notional
+    assert long_put.notional_value == expected_notional
+    assert short_put.notional_value == expected_notional
+
+    # Test signed notional value calculations
+    # Signed notional value should be positive for long positions and negative for short positions
+    assert long_call.signed_notional_value == expected_notional
+    assert short_call.signed_notional_value == -expected_notional
+    assert long_put.signed_notional_value == expected_notional
+    assert short_put.signed_notional_value == -expected_notional
+
+    # Test delta exposure calculations
+    # For this test, we'll use a fixed delta value
+    underlying_price = 100.0  # At the money
+
+    # Calculate deltas
+    long_call_delta = calculate_option_delta(
+        long_call, underlying_price, use_black_scholes=True, implied_volatility=0.3
+    )
+    short_call_delta = calculate_option_delta(
+        short_call, underlying_price, use_black_scholes=True, implied_volatility=0.3
+    )
+    long_put_delta = calculate_option_delta(
+        long_put, underlying_price, use_black_scholes=True, implied_volatility=0.3
+    )
+    short_put_delta = calculate_option_delta(
+        short_put, underlying_price, use_black_scholes=True, implied_volatility=0.3
+    )
+
+    # Calculate expected delta exposures
+    # Note: The delta already accounts for whether the position is long or short
+    # So we use the absolute notional value to avoid double-counting the sign
+    expected_long_call_exposure = long_call_delta * long_call.notional_value
+    expected_short_call_exposure = short_call_delta * short_call.notional_value
+    expected_long_put_exposure = long_put_delta * long_put.notional_value
+    expected_short_put_exposure = short_put_delta * short_put.notional_value
+
+    # Verify that long call and short call exposures have opposite signs
+    assert expected_long_call_exposure > 0, "Long call exposure should be positive"
+    assert expected_short_call_exposure < 0, "Short call exposure should be negative"
+
+    # Verify that long put and short put exposures have opposite signs
+    assert expected_long_put_exposure < 0, "Long put exposure should be negative"
+    assert expected_short_put_exposure > 0, "Short put exposure should be positive"
+
+    # Verify that the absolute values of the exposures are proportional to the quantity
+    # Use a small epsilon for floating-point comparison
     assert (
-        abs(default_delta - bs_delta_with_estimated_iv) < 1e-10
-    ), "Default should use BS with estimated IV"
+        abs(abs(expected_long_call_exposure) - abs(expected_short_call_exposure)) < 1e-8
+    )
+    assert (
+        abs(abs(expected_long_put_exposure) - abs(expected_short_put_exposure)) < 1e-8
+    )

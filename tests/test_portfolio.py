@@ -238,11 +238,12 @@ class TestPortfolioUtilityFunctions:
         """Test the calculate_beta_adjusted_net_exposure function.
 
         This function tests that the beta-adjusted net exposure is correctly calculated
-        by subtracting the short beta-adjusted exposure from the long beta-adjusted exposure.
+        by adding the long and short beta-adjusted exposures, where short is represented
+        as a negative value.
         """
-        # Test with positive values
+        # Test with positive long and negative short values
         long_beta_adjusted = 14400.0
-        short_beta_adjusted = 7200.0
+        short_beta_adjusted = -7200.0  # Negative value for short exposure
         expected_net = 7200.0
 
         result = calculate_beta_adjusted_net_exposure(
@@ -253,12 +254,12 @@ class TestPortfolioUtilityFunctions:
         # Test with zero values
         assert calculate_beta_adjusted_net_exposure(0.0, 0.0) == 0.0
 
-        # Test with negative long value
-        assert calculate_beta_adjusted_net_exposure(-1000.0, 500.0) == -1500.0
+        # Test with negative long value and negative short value
+        assert calculate_beta_adjusted_net_exposure(-1000.0, -500.0) == -1500.0
 
         # Test with large values
         large_long = 1_000_000.0
-        large_short = 500_000.0
+        large_short = -500_000.0  # Negative value for short exposure
         assert (
             calculate_beta_adjusted_net_exposure(large_long, large_short) == 500_000.0
         )

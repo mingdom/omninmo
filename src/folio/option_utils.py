@@ -52,9 +52,25 @@ class OptionPosition:
 
     @property
     def notional_value(self) -> float:
-        """Calculate notional value (strike * 100 * quantity)."""
+        """Calculate notional value (strike * 100 * abs(quantity)).
+
+        Note: This returns the absolute notional value (always positive) regardless of
+        whether the position is long or short. This is used for calculating the size
+        of the position, not its directional exposure.
+        """
         # Contract size is typically 100 shares per option contract
         return self.strike * 100 * abs(self.quantity)
+
+    @property
+    def signed_notional_value(self) -> float:
+        """Calculate signed notional value (strike * 100 * quantity).
+
+        Note: This returns a signed notional value that is positive for long positions
+        and negative for short positions. This is useful for calculating directional
+        exposure directly.
+        """
+        # Contract size is typically 100 shares per option contract
+        return self.strike * 100 * self.quantity
 
     @property
     def market_value(self) -> float:

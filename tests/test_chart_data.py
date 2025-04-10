@@ -186,19 +186,20 @@ class TestChartDataTransformations:
         value_dict = dict(zip(categories, values, strict=False))
 
         # Calculate the expected beta-adjusted net exposure
+        # Note: short_exposure is now stored as a negative value
         expected_beta_adjusted_net = (
             mock_portfolio_summary.long_exposure.total_beta_adjusted
-            - mock_portfolio_summary.short_exposure.total_beta_adjusted
+            + mock_portfolio_summary.short_exposure.total_beta_adjusted
         )
 
         # Verify that the net value matches the expected beta-adjusted net exposure
         assert value_dict["Net"] == expected_beta_adjusted_net
 
-        # Verify that the net value equals long minus short (since short is stored as positive)
-        assert value_dict["Net"] == value_dict["Long"] - value_dict["Short"]
+        # Verify that the net value equals long plus short (since short is stored as negative)
+        assert value_dict["Net"] == value_dict["Long"] + value_dict["Short"]
 
-        # Verify that the net value is not equal to long plus short (the previous incorrect calculation)
-        assert value_dict["Net"] != value_dict["Long"] + value_dict["Short"]
+        # Verify that the net value is not equal to long minus short (the previous incorrect calculation)
+        assert value_dict["Net"] != value_dict["Long"] - value_dict["Short"]
 
         # Verify that the net value is not equal to long minus short plus options
         # (the previous incorrect calculation in summary_cards.py)

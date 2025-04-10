@@ -308,7 +308,11 @@ class OptionPosition(Position):
 
 @dataclass
 class StockPosition:
-    """Details of a stock position"""
+    """Details of a stock position
+
+    A stock position represents a holding of shares in a particular security.
+    Negative quantity values represent short positions.
+    """
 
     ticker: str
     quantity: int

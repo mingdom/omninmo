@@ -258,7 +258,14 @@ def process_portfolio_data(
                 quantity = 0
             else:
                 try:
-                    quantity = int(float(row["Quantity"]))
+                    # Parse quantity, preserving negative values for short positions
+                    raw_quantity = row["Quantity"]
+                    # Check if this is a short position (indicated by negative value)
+                    quantity = float(raw_quantity)
+                    # Convert to int but preserve the sign
+                    quantity = int(quantity)
+
+                    logger.debug(f"Row {index}: {symbol} quantity parsed as {quantity}")
                 except (ValueError, TypeError):
                     logger.warning(
                         f"Row {index}: {symbol} has invalid quantity: '{row['Quantity']}'. Skipping."
@@ -518,10 +525,15 @@ def process_portfolio_data(
                         market_value = 0.0
 
                     # Notional value calculation moved inside OptionPosition dataclass in option_utils
-                    notional_value = parsed_option.notional_value
-                    delta_exposure = (
-                        delta * notional_value
-                    )  # Delta-adjusted notional exposure
+                    notional_value = (
+                        parsed_option.notional_value
+                    )  # Absolute notional value
+
+                    # Use the signed notional value for delta exposure calculation
+                    # This ensures the exposure correctly reflects the direction (long/short)
+                    # without double-counting the sign (delta already accounts for option type)
+                    delta_exposure = delta * parsed_option.signed_notional_value
+
                     beta_adjusted_exposure = (
                         delta_exposure * beta
                     )  # Factor in underlying's beta
@@ -748,8 +760,14 @@ def process_portfolio_data(
                         )
                         market_value = 0.0
 
-                    notional_value = parsed_option.notional_value
-                    delta_exposure = delta * notional_value
+                    notional_value = (
+                        parsed_option.notional_value
+                    )  # Absolute notional value
+
+                    # Use the signed notional value for delta exposure calculation
+                    # This ensures the exposure correctly reflects the direction (long/short)
+                    # without double-counting the sign (delta already accounts for option type)
+                    delta_exposure = delta * parsed_option.signed_notional_value
                     beta_adjusted_exposure = delta_exposure * beta
 
                     logger.info(f"Orphaned Option Added: {option_desc}")
@@ -991,15 +1009,16 @@ def calculate_portfolio_summary(
             # --- Process stock position ---
             if group.stock_position:
                 stock = group.stock_position
-                # Use abs() for short value calculation
+                # For stocks, market_exposure = quantity * price, so it's already negative for short positions
                 if stock.quantity >= 0:  # Treat quantity 0 as neutral/long for value
                     long_stocks["value"] += stock.market_exposure
                     long_stocks["beta_adjusted"] += stock.beta_adjusted_exposure
-                else:  # Negative quantity means short
-                    short_stocks["value"] += abs(stock.market_exposure)
-                    short_stocks["beta_adjusted"] += abs(
+                else:  # Negative quantity means short - store as negative value
+                    # No need for abs() - keep the negative sign for short positions
+                    short_stocks["value"] += stock.market_exposure  # Already negative
+                    short_stocks["beta_adjusted"] += (
                         stock.beta_adjusted_exposure
-                    )  # Beta exposure is also negative
+                    )  # Already negative
 
             # --- Process option positions ---
             for opt in group.option_positions:
@@ -1014,12 +1033,14 @@ def calculate_portfolio_summary(
                     long_options_delta["value"] += opt.delta_exposure
                     long_options_delta["beta_adjusted"] += opt.beta_adjusted_exposure
                 else:
-                    # Add the absolute value to short exposure
-                    short_options_delta["value"] += abs(opt.delta_exposure)
-                    # Beta-adjusted exposure is also negative, so add its absolute value
-                    short_options_delta["beta_adjusted"] += abs(
+                    # Store as negative value - no need for abs()
+                    short_options_delta["value"] += (
+                        opt.delta_exposure
+                    )  # Already negative
+                    # Beta-adjusted exposure is also negative
+                    short_options_delta["beta_adjusted"] += (
                         opt.beta_adjusted_exposure
-                    )
+                    )  # Already negative
 
         # Create exposure breakdown objects
         # 1. Long exposure (stocks + positive delta options)
@@ -1065,8 +1086,9 @@ def calculate_portfolio_summary(
         )
 
         # 3. Options exposure (net delta exposure from all options)
-        net_delta_exposure = long_option_value - short_option_value
-        net_option_beta_adj = long_option_beta_adj - short_option_beta_adj
+        # Since short_option_value is already negative, we can simply add them
+        net_delta_exposure = long_option_value + short_option_value
+        net_option_beta_adj = long_option_beta_adj + short_option_beta_adj
         options_exposure = ExposureBreakdown(
             stock_exposure=0,  # Options only view
             stock_beta_adjusted=0,
@@ -1075,7 +1097,7 @@ def calculate_portfolio_summary(
             total_exposure=net_delta_exposure,
             total_beta_adjusted=net_option_beta_adj,
             description="Net delta exposure from options",
-            formula="Long Options Delta - Short Options Delta",
+            formula="Long Options Delta + Short Options Delta (where Short is negative)",
             components={
                 "Long Options Delta Exp": long_option_value,
                 "Short Options Delta Exp": short_option_value,
@@ -1085,13 +1107,8 @@ def calculate_portfolio_summary(
 
         # Calculate portfolio metrics
         # 1. Market exposure metrics
-        # Note: short_exposure is already stored as a positive value, so we need to subtract it
+        # Note: short_exposure is now stored as a negative value, so we can simply add them
         net_market_exposure = (
-            long_exposure.total_exposure - short_exposure.total_exposure
-        )
-        # Calculate gross market exposure (long + short, excluding cash)
-        # This is used for percentage calculations
-        gross_market_exposure = (
             long_exposure.total_exposure + short_exposure.total_exposure
         )
 
@@ -1106,10 +1123,11 @@ def calculate_portfolio_summary(
         )
 
         # 3. Exposure percentages
-        # Calculate short percentage as a percentage of the gross market exposure
+        # Calculate short percentage as a percentage of the total long exposure
+        # This gives a more meaningful measure of how much the portfolio is hedged
         short_percentage = (
-            (short_exposure.total_exposure / gross_market_exposure) * 100
-            if gross_market_exposure > 0
+            (abs(short_exposure.total_exposure) / long_exposure.total_exposure) * 100
+            if long_exposure.total_exposure > 0
             else 0.0
         )
 
@@ -1368,18 +1386,19 @@ def calculate_beta_adjusted_net_exposure(
 ) -> float:
     """Calculate the beta-adjusted net exposure.
 
-    This function calculates the beta-adjusted net exposure by subtracting the
-    short beta-adjusted exposure from the long beta-adjusted exposure. This is
-    the single source of truth for this calculation throughout the application.
+    This function calculates the beta-adjusted net exposure by adding the
+    long and short beta-adjusted exposures. Short exposures should be
+    represented as negative values. This is the single source of truth
+    for this calculation throughout the application.
 
     Args:
-        long_beta_adjusted: The beta-adjusted exposure of long positions
-        short_beta_adjusted: The beta-adjusted exposure of short positions (as a positive value)
+        long_beta_adjusted: The beta-adjusted exposure of long positions (positive value)
+        short_beta_adjusted: The beta-adjusted exposure of short positions (negative value)
 
     Returns:
         The beta-adjusted net exposure
     """
-    return long_beta_adjusted - short_beta_adjusted
+    return long_beta_adjusted + short_beta_adjusted
 
 
 def calculate_position_metrics(group: PortfolioGroup) -> dict:

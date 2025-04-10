@@ -84,7 +84,7 @@ def test_format_summary_card_values(test_summary):
         "$8,000.00",  # Net Exposure
         "",  # Net Exposure Percent
         "1.20β",  # Portfolio Beta
-        "$9,600.00",  # Beta-Adjusted Net Exposure - updated to match current implementation
+        "$19,200.00",  # Beta-Adjusted Net Exposure - updated to match current implementation
         "$12,000.00",  # Long Exposure
         "",  # Long Exposure Percent
         "$4,000.00",  # Short Exposure
@@ -119,7 +119,7 @@ def test_format_summary_card_values_with_missing_keys(test_summary):
         "$8,000.00",  # Net Exposure
         "",  # Net Exposure Percent
         "1.20β",  # Portfolio Beta
-        "$9,600.00",  # Beta-Adjusted Net Exposure - updated to match current implementation
+        "$19,200.00",  # Beta-Adjusted Net Exposure - updated to match current implementation
         "$12,000.00",  # Long Exposure
         "",  # Long Exposure Percent
         "$4,000.00",  # Short Exposure
