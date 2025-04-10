@@ -28,7 +28,6 @@ help:
 	@echo "  lint        - Run type checker and linter"
 	@echo "               Options: --fix (auto-fix linting issues)"
 	@echo "  test        - Run all tests in the tests directory"
-	@echo "  integration-test - Run integration tests that require external API access"
 	@echo "  docker-build - Build the Docker image"
 	@echo "  docker-run   - Run the Docker container"
 	@echo "  docker-up    - Start the application with docker-compose"
@@ -177,8 +176,8 @@ stop-folio:
 		echo "No running folio processes found."; \
 	fi
 
-# Test targets
-.PHONY: test integration-test
+# Test target
+.PHONY: test
 test:
 	@echo "Running tests..."
 	@if [ ! -d "$(VENV_DIR)" ]; then \
@@ -191,20 +190,6 @@ test:
 	(source $(VENV_DIR)/bin/activate && \
 	PYTHONPATH=. pytest tests/ -v) 2>&1) | tee $(LOGS_DIR)/test_latest.log
 	@echo "Test log saved to: $(LOGS_DIR)/test_latest.log"
-
-# Integration test target
-integration-test:
-	@echo "Running integration tests..."
-	@if [ ! -d "$(VENV_DIR)" ]; then \
-		echo "Virtual environment not found. Please run 'make env' first."; \
-		exit 1; \
-	fi
-	@mkdir -p $(LOGS_DIR)
-	@(echo "=== Integration Test Run Log $(TIMESTAMP) ===" && \
-	echo "Starting integration tests at: $$(date)" && \
-	(source $(VENV_DIR)/bin/activate && \
-	PYTHONPATH=. pytest tests/integration/ -v) 2>&1) | tee $(LOGS_DIR)/integration_test_latest.log
-	@echo "Integration test log saved to: $(LOGS_DIR)/integration_test_latest.log"
 
 # Docker commands
 docker-build:
