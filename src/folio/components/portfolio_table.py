@@ -57,12 +57,23 @@ def create_position_row(group: PortfolioGroup, _metrics: dict) -> dbc.Row:
                 width=2,
             ),
             dbc.Col(
-                dbc.Button(
-                    "Details",
-                    id={"type": "position-details", "index": ticker},
-                    color="primary",
-                    size="sm",
-                    className="float-end",
+                html.Div(
+                    [
+                        dbc.Button(
+                            "P&L",
+                            id={"type": "position-pnl", "index": ticker},
+                            color="success",
+                            size="sm",
+                            className="me-2",
+                        ),
+                        dbc.Button(
+                            "Details",
+                            id={"type": "position-details", "index": ticker},
+                            color="primary",
+                            size="sm",
+                        ),
+                    ],
+                    className="d-flex justify-content-end",
                 ),
                 width=2,
             ),

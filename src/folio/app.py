@@ -1,6 +1,13 @@
+"""
+Main application module for the Folio app.
+
+This module contains the main application logic for the Folio app.
+"""
+
 import argparse
 import base64
 import io
+import json
 import os
 import sys
 from pathlib import Path
@@ -10,8 +17,6 @@ import dash_bootstrap_components as dbc
 import pandas as pd
 from dash import ALL, Input, Output, State, dcc, html
 
-# Import portfolio processing functions
-# Import utility functions
 from . import portfolio
 
 # Import AI utilities directly
@@ -19,6 +24,8 @@ from . import portfolio
 from .components import create_premium_chat_component, register_premium_chat_callbacks
 from .components.charts import create_dashboard_section
 from .components.charts import register_callbacks as register_chart_callbacks
+from .components.pnl_chart import create_pnl_modal
+from .components.pnl_chart import register_callbacks as register_pnl_callbacks
 from .components.portfolio_table import create_portfolio_table
 from .components.position_details import create_position_details
 from .components.summary_cards import create_summary_cards
@@ -321,6 +328,7 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
                 className="gradient-border",
             ),
             create_position_modal(),
+            create_pnl_modal(),
             # Empty state container (shown when no data is loaded)
             html.Div(id="empty-state-container"),
             # Add keyboard shortcut listener
@@ -643,6 +651,9 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
 
     register_callbacks(app)
 
+    # Register P&L chart callbacks
+    register_pnl_callbacks(app)
+
     @app.callback(
         Output("portfolio-table", "children"),
         [
@@ -885,7 +896,6 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
 
     def _get_row_from_button_click(_trigger_id, ctx, groups_data):
         """Helper function to extract row index from button click"""
-        import json
 
         button_idx = ctx.triggered[0]["prop_id"].split(".")[0]
 
@@ -1037,7 +1047,6 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
             return current_sort_state
 
         # Extract column name from trigger ID (in format {"type":"sort-header","column":"value"}.n_clicks)
-        import json
 
         column_data = json.loads(trigger_id.split(".")[0])
         clicked_column = column_data.get("column")
