@@ -105,10 +105,9 @@ class Position:
         quantity: float,
         beta: float,
         beta_adjusted_exposure: float,
-        market_exposure: float | None = None,
-        market_value: float | None = None,
+        market_exposure: float,
     ):
-        """Initialize a Position with backward compatibility for market_value.
+        """Initialize a Position.
 
         Args:
             ticker: Security ticker symbol
@@ -117,31 +116,15 @@ class Position:
             beta: Position beta
             beta_adjusted_exposure: Beta-adjusted market exposure
             market_exposure: Market exposure (quantity * price)
-            market_value: DEPRECATED - Use market_exposure instead
         """
-        from .logger import logger
 
         self.ticker = ticker
         self.position_type = position_type
         self.quantity = quantity
         self.beta = beta
         self.beta_adjusted_exposure = beta_adjusted_exposure
-
-        # Handle market_value for backward compatibility
-        if market_value is not None and market_exposure is None:
-            logger.warning(
-                f"DEPRECATED: Using market_value parameter for {self.__class__.__name__} {ticker}. "
-                f"Use market_exposure instead. This parameter will be removed in a future version."
-            )
-            self.market_exposure = market_value
-        elif market_value is not None and market_exposure is not None:
-            logger.warning(
-                f"Both market_value and market_exposure provided for {self.__class__.__name__} {ticker}. "
-                f"Using market_exposure and ignoring market_value."
-            )
-            self.market_exposure = market_exposure
-        else:
-            self.market_exposure = market_exposure
+        self.market_exposure = market_exposure
+        self.market_value = market_exposure  # Set market_value to market_exposure
 
     @property
     def market_value(self) -> float:
@@ -149,13 +132,14 @@ class Position:
 
         This property exists for backward compatibility and will be removed in a future version.
         """
-        from .logger import logger
-
-        logger.warning(
-            f"DEPRECATED: Accessing market_value on {self.__class__.__name__} for {self.ticker}. "
-            f"Use market_exposure instead. This property will be removed in a future version."
-        )
         return self.market_exposure
+
+    @market_value.setter
+    def market_value(self, value: float):
+        """Set market_value (also sets market_exposure)."""
+        # Update both market_value and market_exposure
+        self._market_value = value
+        self.market_exposure = value
 
     def to_dict(self) -> PositionDict:
         """Convert to a typed dictionary"""
@@ -217,12 +201,11 @@ class OptionPosition(Position):
         delta_exposure: float,
         notional_value: float,
         underlying_beta: float,
-        market_exposure: float | None = None,
-        market_value: float | None = None,
+        market_exposure: float,
         price: float = 0.0,
         cost_basis: float = 0.0,
     ):
-        """Initialize an OptionPosition with backward compatibility for market_value.
+        """Initialize an OptionPosition.
 
         Args:
             ticker: Security ticker symbol
@@ -238,11 +221,10 @@ class OptionPosition(Position):
             notional_value: Notional value of the option
             underlying_beta: Beta of the underlying security
             market_exposure: Market exposure (quantity * price)
-            market_value: DEPRECATED - Use market_exposure instead
             price: Price per contract
             cost_basis: Cost basis per contract (for P&L calculations)
         """
-        # Call the parent class constructor with market_value for backward compatibility
+        # Call the parent class constructor
         super().__init__(
             ticker=ticker,
             position_type=position_type,
@@ -250,7 +232,6 @@ class OptionPosition(Position):
             beta=beta,
             beta_adjusted_exposure=beta_adjusted_exposure,
             market_exposure=market_exposure,
-            market_value=market_value,
         )
 
         # Set option-specific fields
@@ -338,13 +319,12 @@ class StockPosition:
         quantity: int,
         beta: float,
         beta_adjusted_exposure: float,
-        market_exposure: float | None = None,
-        market_value: float | None = None,
-        price: float = 0.0,  # Added price parameter
-        position_type: str = "stock",  # Added position_type parameter
-        cost_basis: float = 0.0,  # Added cost_basis parameter
+        market_exposure: float,
+        price: float = 0.0,
+        position_type: str = "stock",
+        cost_basis: float = 0.0,
     ):
-        """Initialize a StockPosition with backward compatibility for market_value.
+        """Initialize a StockPosition.
 
         Args:
             ticker: Stock ticker symbol
@@ -352,36 +332,20 @@ class StockPosition:
             beta: Stock beta
             beta_adjusted_exposure: Beta-adjusted market exposure
             market_exposure: Market exposure (quantity * price)
-            market_value: DEPRECATED - Use market_exposure instead
             price: Price per share
             position_type: Type of position, always "stock" for StockPosition
             cost_basis: Cost basis per share (for P&L calculations)
         """
-        from .logger import logger
 
         self.ticker = ticker
         self.quantity = quantity
         self.beta = beta
         self.beta_adjusted_exposure = beta_adjusted_exposure
-        self.position_type = position_type  # Store the position_type
-        self.price = price  # Store the price
-        self.cost_basis = cost_basis  # Store the cost basis
-
-        # Handle market_value for backward compatibility
-        if market_value is not None and market_exposure is None:
-            logger.warning(
-                f"DEPRECATED: Using market_value parameter for StockPosition {ticker}. "
-                f"Use market_exposure instead. This parameter will be removed in a future version."
-            )
-            self.market_exposure = market_value
-        elif market_value is not None and market_exposure is not None:
-            logger.warning(
-                f"Both market_value and market_exposure provided for StockPosition {ticker}. "
-                f"Using market_exposure and ignoring market_value."
-            )
-            self.market_exposure = market_exposure
-        else:
-            self.market_exposure = market_exposure
+        self.position_type = position_type
+        self.price = price
+        self.cost_basis = cost_basis
+        self.market_exposure = market_exposure
+        self.market_value = market_exposure  # Set market_value to market_exposure
 
     @property
     def market_value(self) -> float:
@@ -389,13 +353,14 @@ class StockPosition:
 
         This property exists for backward compatibility and will be removed in a future version.
         """
-        from .logger import logger
-
-        logger.warning(
-            f"DEPRECATED: Accessing market_value on StockPosition for {self.ticker}. "
-            f"Use market_exposure instead. This property will be removed in a future version."
-        )
         return self.market_exposure
+
+    @market_value.setter
+    def market_value(self, value: float):
+        """Set market_value (also sets market_exposure)."""
+        # Update both market_value and market_exposure
+        self._market_value = value
+        self.market_exposure = value
 
     def to_dict(self) -> StockPositionDict:
         """Convert to a Dash-compatible dictionary"""
@@ -460,9 +425,8 @@ class PortfolioGroup:
         beta_adjusted_exposure: float,
         total_delta_exposure: float,
         options_delta_exposure: float,
-        total_value: float | None = None,  # Deprecated parameter
     ):
-        """Initialize a PortfolioGroup with backward compatibility for total_value.
+        """Initialize a PortfolioGroup.
 
         Args:
             ticker: Ticker symbol
@@ -473,9 +437,7 @@ class PortfolioGroup:
             beta_adjusted_exposure: Beta-adjusted exposure
             total_delta_exposure: Total delta exposure
             options_delta_exposure: Options delta exposure
-            total_value: DEPRECATED - Use net_exposure instead
         """
-        from .logger import logger
 
         self.ticker = ticker
         self.stock_position = stock_position
@@ -484,22 +446,7 @@ class PortfolioGroup:
         self.beta_adjusted_exposure = beta_adjusted_exposure
         self.total_delta_exposure = total_delta_exposure
         self.options_delta_exposure = options_delta_exposure
-
-        # Handle total_value for backward compatibility
-        if total_value is not None and net_exposure is None:
-            logger.warning(
-                f"DEPRECATED: Using total_value parameter for PortfolioGroup {ticker}. "
-                f"Use net_exposure instead. This parameter will be removed in a future version."
-            )
-            self.net_exposure = total_value
-        elif total_value is not None and net_exposure is not None:
-            logger.warning(
-                f"Both total_value and net_exposure provided for PortfolioGroup {ticker}. "
-                f"Using net_exposure and ignoring total_value."
-            )
-            self.net_exposure = net_exposure
-        else:
-            self.net_exposure = net_exposure
+        self.net_exposure = net_exposure
 
         # Calculate option counts
         self._calculate_option_counts()
@@ -510,13 +457,14 @@ class PortfolioGroup:
 
         This property exists for backward compatibility and will be removed in a future version.
         """
-        from .logger import logger
-
-        logger.warning(
-            f"DEPRECATED: Accessing total_value on PortfolioGroup for {self.ticker}. "
-            f"Use net_exposure instead. This property will be removed in a future version."
-        )
         return self.net_exposure
+
+    @total_value.setter
+    def total_value(self, value: float):
+        """Set total_value (also sets net_exposure)."""
+        # Update both total_value and net_exposure
+        self._total_value = value
+        self.net_exposure = value
 
     # net_option_value property removed as it's based on unreliable market values
 
@@ -655,12 +603,8 @@ class ExposureBreakdown:
         description: str | None = None,
         formula: str | None = None,
         components: dict[str, float] | None = None,
-        # Deprecated parameters
-        stock_value: float | None = None,
-        option_delta_value: float | None = None,
-        total_value: float | None = None,
     ):
-        """Initialize an ExposureBreakdown with backward compatibility for value-based fields.
+        """Initialize an ExposureBreakdown.
 
         Args:
             stock_exposure: Market exposure from stock positions
@@ -672,61 +616,11 @@ class ExposureBreakdown:
             description: Human-readable explanation
             formula: Calculation formula
             components: Detailed breakdown
-            stock_value: DEPRECATED - Use stock_exposure instead
-            option_delta_value: DEPRECATED - Use option_delta_exposure instead
-            total_value: DEPRECATED - Use total_exposure instead
         """
-        from .logger import logger
-
-        # Handle stock_value for backward compatibility
-        if stock_value is not None and stock_exposure is None:
-            logger.warning(
-                "DEPRECATED: Using stock_value parameter for ExposureBreakdown. "
-                "Use stock_exposure instead. This parameter will be removed in a future version."
-            )
-            self.stock_exposure = stock_value
-        elif stock_value is not None and stock_exposure is not None:
-            logger.warning(
-                "Both stock_value and stock_exposure provided for ExposureBreakdown. "
-                "Using stock_exposure and ignoring stock_value."
-            )
-            self.stock_exposure = stock_exposure
-        else:
-            self.stock_exposure = stock_exposure
-
-        # Handle option_delta_value for backward compatibility
-        if option_delta_value is not None and option_delta_exposure is None:
-            logger.warning(
-                "DEPRECATED: Using option_delta_value parameter for ExposureBreakdown. "
-                "Use option_delta_exposure instead. This parameter will be removed in a future version."
-            )
-            self.option_delta_exposure = option_delta_value
-        elif option_delta_value is not None and option_delta_exposure is not None:
-            logger.warning(
-                "Both option_delta_value and option_delta_exposure provided for ExposureBreakdown. "
-                "Using option_delta_exposure and ignoring option_delta_value."
-            )
-            self.option_delta_exposure = option_delta_exposure
-        else:
-            self.option_delta_exposure = option_delta_exposure
-
-        # Handle total_value for backward compatibility
-        if total_value is not None and total_exposure is None:
-            logger.warning(
-                "DEPRECATED: Using total_value parameter for ExposureBreakdown. "
-                "Use total_exposure instead. This parameter will be removed in a future version."
-            )
-            self.total_exposure = total_value
-        elif total_value is not None and total_exposure is not None:
-            logger.warning(
-                "Both total_value and total_exposure provided for ExposureBreakdown. "
-                "Using total_exposure and ignoring total_value."
-            )
-            self.total_exposure = total_exposure
-        else:
-            self.total_exposure = total_exposure
-
-        # Set other fields
+        # Set fields directly
+        self.stock_exposure = stock_exposure
+        self.option_delta_exposure = option_delta_exposure
+        self.total_exposure = total_exposure
         self.stock_beta_adjusted = stock_beta_adjusted
         self.option_beta_adjusted = option_beta_adjusted
         self.total_beta_adjusted = total_beta_adjusted
@@ -734,38 +628,43 @@ class ExposureBreakdown:
         self.formula = formula
         self.components = components
 
+        # Set backward compatibility properties
+        self._stock_value = stock_exposure
+        self._option_delta_value = option_delta_exposure
+        self._total_value = total_exposure
+
     @property
     def stock_value(self) -> float:
         """DEPRECATED: Use stock_exposure instead."""
-        from .logger import logger
-
-        logger.warning(
-            "DEPRECATED: Accessing stock_value on ExposureBreakdown. "
-            "Use stock_exposure instead. This property will be removed in a future version."
-        )
         return self.stock_exposure
+
+    @stock_value.setter
+    def stock_value(self, value: float):
+        """Set stock_value (also sets stock_exposure)."""
+        self._stock_value = value
+        self.stock_exposure = value
 
     @property
     def option_delta_value(self) -> float:
         """DEPRECATED: Use option_delta_exposure instead."""
-        from .logger import logger
-
-        logger.warning(
-            "DEPRECATED: Accessing option_delta_value on ExposureBreakdown. "
-            "Use option_delta_exposure instead. This property will be removed in a future version."
-        )
         return self.option_delta_exposure
+
+    @option_delta_value.setter
+    def option_delta_value(self, value: float):
+        """Set option_delta_value (also sets option_delta_exposure)."""
+        self._option_delta_value = value
+        self.option_delta_exposure = value
 
     @property
     def total_value(self) -> float:
         """DEPRECATED: Use total_exposure instead."""
-        from .logger import logger
-
-        logger.warning(
-            "DEPRECATED: Accessing total_value on ExposureBreakdown. "
-            "Use total_exposure instead. This property will be removed in a future version."
-        )
         return self.total_exposure
+
+    @total_value.setter
+    def total_value(self, value: float):
+        """Set total_value (also sets total_exposure)."""
+        self._total_value = value
+        self.total_exposure = value
 
     def to_dict(self) -> ExposureBreakdownDict:
         """Convert to a Dash-compatible dictionary"""
@@ -837,13 +736,13 @@ class PortfolioSummary:
 
         This property exists for backward compatibility and will be removed in a future version.
         """
-        from .logger import logger
-
-        logger.warning(
-            "DEPRECATED: Accessing total_exposure on PortfolioSummary. "
-            "Use net_market_exposure instead. This property will be removed in a future version."
-        )
         return self.net_market_exposure
+
+    @total_exposure.setter
+    def total_exposure(self, value: float):
+        """Set total_exposure (also sets net_market_exposure)."""
+        self._total_exposure = value
+        self.net_market_exposure = value
 
     # Cash metrics (separate from market exposure)
     cash_like_positions: list[StockPosition] = None  # List of cash positions

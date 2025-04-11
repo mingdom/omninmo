@@ -27,11 +27,9 @@ from .components.charts import register_callbacks as register_chart_callbacks
 from .components.pnl_chart import create_pnl_modal
 from .components.pnl_chart import register_callbacks as register_pnl_callbacks
 from .components.portfolio_table import create_portfolio_table
-from .components.position_details import create_position_details
 from .components.summary_cards import create_summary_cards
 from .data_model import OptionPosition, PortfolioGroup, StockPosition
 from .error_utils import handle_callback_error
-from .exceptions import StateError
 from .logger import logger
 from .security import sanitize_dataframe, validate_csv_upload
 
@@ -327,7 +325,6 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
                 ),
                 className="gradient-border",
             ),
-            create_position_modal(),
             create_pnl_modal(),
             # Empty state container (shown when no data is loaded)
             html.Div(id="empty-state-container"),
@@ -839,161 +836,7 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
                 )
             )
 
-    @app.callback(
-        Output("selected-position", "data"),
-        [
-            Input("portfolio-table-active-cell", "data"),
-            Input({"type": "position-details", "index": ALL}, "n_clicks"),
-        ],
-        [
-            State("portfolio-groups", "data"),
-            State("portfolio-table-active-cell", "data"),
-        ],
-    )
-    @handle_callback_error(
-        default_return=None, error_message="Error selecting position"
-    )
-    def store_selected_position(
-        active_cell, _btn_clicks, groups_data, prev_active_cell
-    ):
-        """Store selected position data when row is clicked or Details button is clicked"""
-        logger.debug("Storing selected position")
-        position_data = None
-
-        # Early return if no data available
-        if not groups_data:
-            logger.debug("No portfolio data available for selection")
-            return None
-
-        # Get trigger information
-        ctx = dash.callback_context
-        trigger_id = ctx.triggered[0]["prop_id"] if ctx.triggered else ""
-        logger.debug(f"Trigger ID: {trigger_id}")
-
-        # Handle different trigger types
-        row = None
-
-        if "position-details" in trigger_id:
-            # Button click - extract ticker from button ID
-            row = _get_row_from_button_click(trigger_id, ctx, groups_data)
-        elif active_cell and active_cell != prev_active_cell:
-            # Table cell click
-            row = active_cell["row"]
-            logger.debug(f"Table cell clicked at row {row}")
-
-        # Validate row and return data if valid
-        if row is not None:
-            if 0 <= row < len(groups_data):
-                position_data = groups_data[row]
-            else:
-                # Invalid row index - this is an actual error
-                raise StateError.invalid_row(row, len(groups_data))
-        else:
-            # No selection - this is normal during initialization
-            logger.debug("No row selected (normal during initialization)")
-
-        return position_data
-
-    def _get_row_from_button_click(_trigger_id, ctx, groups_data):
-        """Helper function to extract row index from button click"""
-
-        button_idx = ctx.triggered[0]["prop_id"].split(".")[0]
-
-        # Validate button index format
-        if not button_idx or not button_idx.startswith("{"):
-            raise ValueError(f"Invalid button index format: {button_idx}")
-
-        # Parse button data to extract ticker
-        button_data = json.loads(button_idx.replace("'", '"'))
-        ticker = button_data.get("index")
-
-        if not ticker:
-            raise ValueError("No ticker found in button data")
-
-        logger.debug(f"Button clicked for ticker: {ticker}")
-
-        # Find matching group by ticker
-        for i, group_data in enumerate(groups_data):
-            stock_ticker = (
-                group_data["stock_position"]["ticker"]
-                if group_data["stock_position"]
-                else None
-            )
-            option_tickers = [opt["ticker"] for opt in group_data["option_positions"]]
-
-            if stock_ticker == ticker or ticker in option_tickers:
-                logger.debug(f"Found matching position at row {i} for ticker {ticker}")
-                return i
-
-        # No matching ticker found
-        logger.warning(f"No matching position found for ticker {ticker}")
-        return None
-
-    @app.callback(
-        [
-            Output("position-modal", "is_open"),
-            Output("position-modal-body", "children"),
-        ],
-        [
-            Input("selected-position", "data"),
-            Input("position-modal", "is_open"),
-        ],
-        [
-            State("portfolio-table-active-cell", "data"),
-            State({"type": "position-details", "index": ALL}, "n_clicks"),
-        ],
-    )
-    @handle_callback_error(
-        default_return=(
-            False,
-            html.Div("Error loading position details", className="text-danger p-3"),
-        ),
-        error_message="Error toggling position modal",
-    )
-    def toggle_position_modal(position_data, is_open, active_cell, btn_clicks):
-        """Toggle position details modal"""
-        logger.debug("Toggling position modal")
-        ctx = dash.callback_context
-        trigger_id = ctx.triggered[0]["prop_id"] if ctx.triggered else ""
-        logger.debug(f"Modal toggle trigger: {trigger_id}")
-
-        # If modal is open and we click outside, close it
-        if is_open and "position-modal.is_open" in trigger_id:
-            return False, dash.no_update
-
-        # Only open modal if position data changed AND it was from a user action
-        if "selected-position" in trigger_id and position_data:
-            # Check if this was triggered by a user action (either button click or cell click)
-            was_button_click = any(n for n in btn_clicks if n)  # Any button was clicked
-            was_cell_click = active_cell is not None  # Cell was clicked
-
-            if not (was_button_click or was_cell_click):
-                logger.debug("Position data changed but not from user action")
-                return False, dash.no_update
-
-            logger.debug(
-                f"Position data received: {position_data.keys() if position_data else None}"
-            )
-
-            # Convert data back to PortfolioGroup
-            if not position_data:
-                logger.warning("Position data is None")
-                return False, html.Div(
-                    "No position data available", className="text-danger p-3"
-                )
-
-            # Create PortfolioGroup from position data
-            group = _create_portfolio_group_from_data(position_data)
-            logger.debug("Successfully created PortfolioGroup from position data")
-
-            # Create position details
-            details = create_position_details(group)
-            logger.debug("Successfully created position details")
-            return True, details
-
-        # Keep modal state unchanged for all other cases
-        logger.debug(f"No action needed, keeping modal state: {is_open}")
-        return is_open, dash.no_update
+    # Position details modal callbacks removed - functionality integrated into P&L modal
 
     def _create_portfolio_group_from_data(position_data):
         """Helper function to create a PortfolioGroup from position data"""

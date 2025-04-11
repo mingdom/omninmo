@@ -19,7 +19,7 @@ class TestAIIntegration:
         stock_position = StockPosition(
             ticker="AAPL",
             quantity=100,
-            market_value=15000.0,
+            market_exposure=15000.0,
             beta=1.2,
             beta_adjusted_exposure=18000.0,
         )
@@ -28,7 +28,7 @@ class TestAIIntegration:
             ticker="AAPL",
             position_type="option",
             quantity=10,
-            market_value=1500.0,  # Using market_value for backward compatibility
+            market_exposure=1500.0,
             beta=1.2,
             beta_adjusted_exposure=1800.0,
             strike=150.0,
@@ -45,7 +45,6 @@ class TestAIIntegration:
             ticker="AAPL",
             stock_position=stock_position,
             option_positions=[option_position],
-            total_value=16500.0,
             net_exposure=16500.0,
             beta=1.2,
             beta_adjusted_exposure=19800.0,
@@ -55,11 +54,11 @@ class TestAIIntegration:
 
         # Create test exposure breakdowns
         exposure = ExposureBreakdown(
-            stock_value=15000.0,
+            stock_exposure=15000.0,
             stock_beta_adjusted=18000.0,
-            option_delta_value=1050.0,
+            option_delta_exposure=1050.0,
             option_beta_adjusted=1260.0,
-            total_value=16050.0,
+            total_exposure=16050.0,
             total_beta_adjusted=19260.0,
             description="Test Exposure",
             formula="Stock + Options",
@@ -118,7 +117,7 @@ class TestAIIntegration:
         stock_position = StockPosition(
             ticker="AAPL",
             quantity=100,
-            market_value=15000.0,
+            market_exposure=15000.0,
             beta=1.2,
             beta_adjusted_exposure=18000.0,
         )
@@ -127,7 +126,7 @@ class TestAIIntegration:
             ticker="AAPL",
             position_type="option",
             quantity=10,
-            market_value=1500.0,  # Using market_value for backward compatibility
+            market_exposure=1500.0,
             beta=1.2,
             beta_adjusted_exposure=1800.0,
             strike=150.0,
@@ -144,7 +143,6 @@ class TestAIIntegration:
             ticker="AAPL",
             stock_position=stock_position,
             option_positions=[option_position],
-            total_value=16500.0,
             net_exposure=16500.0,
             beta=1.2,
             beta_adjusted_exposure=19800.0,
@@ -154,11 +152,11 @@ class TestAIIntegration:
 
         # Create test exposure breakdowns
         exposure = ExposureBreakdown(
-            stock_value=15000.0,
+            stock_exposure=15000.0,
             stock_beta_adjusted=18000.0,
-            option_delta_value=1050.0,
+            option_delta_exposure=1050.0,
             option_beta_adjusted=1260.0,
-            total_value=16050.0,
+            total_exposure=16050.0,
             total_beta_adjusted=19260.0,
             description="Test Exposure",
             formula="Stock + Options",

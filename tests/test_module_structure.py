@@ -96,7 +96,9 @@ class TestModuleStructure:
             # Verify key components are imported in app
             assert hasattr(app, "create_dashboard_section")
             assert hasattr(app, "create_portfolio_table")
-            assert hasattr(app, "create_position_details")
+            assert hasattr(
+                app, "create_pnl_modal"
+            )  # Updated to use the new PnL modal instead of position details
             assert hasattr(app, "create_summary_cards")
 
         except ImportError as e:

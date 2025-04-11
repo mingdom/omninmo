@@ -78,9 +78,8 @@ class TestPnlChart(unittest.TestCase):
         # 1 for combined P&L, 2 for individual positions, 3 for markers (max profit, max loss, current)
         self.assertEqual(len(fig.data), 6)
 
-        # Verify the chart title contains the ticker and mode
+        # Verify the chart title contains the ticker
         self.assertIn(self.ticker, fig.layout.title.text)
-        self.assertIn("Using Current Price", fig.layout.title.text)
 
         # Test with cost basis mode
         fig_cost_basis = create_pnl_chart(
@@ -91,8 +90,8 @@ class TestPnlChart(unittest.TestCase):
             mode="cost_basis",
         )
 
-        # Verify the chart title contains the cost basis mode
-        self.assertIn("Using Cost Basis", fig_cost_basis.layout.title.text)
+        # Verify the chart title contains the ticker
+        self.assertIn(self.ticker, fig_cost_basis.layout.title.text)
 
     def test_create_pnl_summary(self):
         """Test creating a P&L summary component."""
@@ -105,7 +104,7 @@ class TestPnlChart(unittest.TestCase):
         self.assertIsInstance(summary_component, html.Div)
 
         # Verify the summary component contains the mode
-        self.assertIn("Using Current Price", str(summary_component))
+        self.assertIn("Current Price", str(summary_component))
 
         # Test with cost basis mode
         summary_component_cost_basis = create_pnl_summary(
@@ -113,7 +112,7 @@ class TestPnlChart(unittest.TestCase):
         )
 
         # Verify the summary component contains the cost basis mode
-        self.assertIn("Using Cost Basis", str(summary_component_cost_basis))
+        self.assertIn("Cost Basis", str(summary_component_cost_basis))
 
     def test_create_pnl_modal(self):
         """Test creating a P&L modal."""

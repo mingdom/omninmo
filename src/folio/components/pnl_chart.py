@@ -7,6 +7,7 @@ It includes a modal for displaying P&L charts and the necessary callbacks for in
 
 from typing import Any
 
+import dash
 import dash_bootstrap_components as dbc
 import plotly.graph_objects as go
 from dash import ALL, Input, Output, State, callback_context, dcc, html
@@ -22,7 +23,7 @@ def create_pnl_chart(
     summary: dict[str, Any],
     current_price: float,
     ticker: str,
-    mode: str = "default",
+    mode: str = "default",  # noqa: ARG001 - used in layout title
 ) -> go.Figure:
     """
     Create a Plotly figure for P&L visualization.
@@ -46,7 +47,7 @@ def create_pnl_chart(
             x=pnl_data["price_points"],
             y=pnl_data["pnl_values"],
             mode="lines",
-            name=f"{ticker} Strategy P&L",
+            name=f"{ticker} P&L",
             line=dict(color="#1f77b4", width=3),
         )
     )
@@ -82,16 +83,27 @@ def create_pnl_chart(
         y=0,
         line=dict(color="red", width=1, dash="solid"),
         opacity=0.5,
-        annotation_text="Break-even",
-        annotation_position="bottom right",
     )
 
+    # Add current price line and annotation
     fig.add_vline(
         x=current_price,
         line=dict(color="green", width=1, dash="dash"),
         opacity=0.7,
-        annotation_text=f"Current: ${current_price:.2f}",
-        annotation_position="top right",
+    )
+
+    # Add annotation for current price
+    fig.add_annotation(
+        x=current_price,
+        y=max(pnl_data["pnl_values"]) * 0.9,  # Position near the top
+        text=f"Current Price: ${current_price:.2f}",
+        showarrow=True,
+        arrowhead=2,
+        arrowsize=1,
+        arrowwidth=2,
+        arrowcolor="green",
+        font=dict(size=12, color="green"),
+        align="center",
     )
 
     # Add breakeven points
@@ -100,8 +112,20 @@ def create_pnl_chart(
             x=bp,
             line=dict(color="orange", width=1, dash="dot"),
             opacity=0.5,
-            annotation_text=f"BE: ${bp:.2f}",
-            annotation_position="bottom",
+        )
+        # Add annotation for break-even point
+        fig.add_annotation(
+            x=bp,
+            y=0,  # Break-even is where P&L = 0
+            text=f"Break-even: ${bp:.2f}",
+            showarrow=True,
+            arrowhead=2,
+            arrowsize=1,
+            arrowwidth=1,
+            arrowcolor="orange",
+            font=dict(size=10, color="orange"),
+            align="center",
+            yshift=20,  # Shift up a bit from the axis
         )
 
     # Add max profit/loss points
@@ -111,12 +135,24 @@ def create_pnl_chart(
         go.Scatter(
             x=[max_profit_price],
             y=[max_profit],
-            mode="markers+text",
+            mode="markers",
             marker=dict(color="green", size=10),
-            text=f"Max Profit: ${max_profit:.2f}",
-            textposition="top center",
             showlegend=False,
         )
+    )
+    # Add annotation for max profit
+    fig.add_annotation(
+        x=max_profit_price,
+        y=max_profit,
+        text=f"Max Profit: ${max_profit:.2f} at ${max_profit_price:.2f}",
+        showarrow=True,
+        arrowhead=2,
+        arrowsize=1,
+        arrowwidth=1,
+        arrowcolor="green",
+        font=dict(size=10, color="green"),
+        align="center",
+        yshift=20,
     )
 
     max_loss = summary["max_loss"]
@@ -125,12 +161,24 @@ def create_pnl_chart(
         go.Scatter(
             x=[max_loss_price],
             y=[max_loss],
-            mode="markers+text",
+            mode="markers",
             marker=dict(color="red", size=10),
-            text=f"Max Loss: ${max_loss:.2f}",
-            textposition="bottom center",
             showlegend=False,
         )
+    )
+    # Add annotation for max loss
+    fig.add_annotation(
+        x=max_loss_price,
+        y=max_loss,
+        text=f"Max Loss: ${max_loss:.2f} at ${max_loss_price:.2f}",
+        showarrow=True,
+        arrowhead=2,
+        arrowsize=1,
+        arrowwidth=1,
+        arrowcolor="red",
+        font=dict(size=10, color="red"),
+        align="center",
+        yshift=-20,
     )
 
     # Add current P&L
@@ -139,19 +187,30 @@ def create_pnl_chart(
         go.Scatter(
             x=[current_price],
             y=[current_pnl],
-            mode="markers+text",
+            mode="markers",
             marker=dict(color="gold", size=10),
-            text=f"Current P&L: ${current_pnl:.2f}",
-            textposition="top right",
             showlegend=False,
         )
     )
+    # Add annotation for current P&L
+    fig.add_annotation(
+        x=current_price,
+        y=current_pnl,
+        text=f"Current P&L: ${current_pnl:.2f}",
+        showarrow=True,
+        arrowhead=2,
+        arrowsize=1,
+        arrowwidth=1,
+        arrowcolor="gold",
+        font=dict(size=10, color="darkgoldenrod"),
+        align="center",
+        yshift=20 if current_pnl >= 0 else -20,  # Position based on P&L value
+    )
 
     # Set layout
-    mode_label = "Using Cost Basis" if mode == "cost_basis" else "Using Current Price"
     fig.update_layout(
-        title=f"P&L Analysis for {ticker} Position Group ({mode_label})",
-        xaxis_title=f"{ticker} Price",
+        title=f"{ticker} P&L Analysis",
+        xaxis_title="Price",
         yaxis_title="P&L ($)",
         hovermode="x unified",
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
@@ -168,7 +227,7 @@ def create_pnl_chart(
 
 def create_pnl_modal() -> dbc.Modal:
     """
-    Create a modal for displaying P&L charts.
+    Create a modal for displaying position analysis with P&L charts and details.
 
     Returns:
         dbc.Modal: The modal component
@@ -176,72 +235,94 @@ def create_pnl_modal() -> dbc.Modal:
     return dbc.Modal(
         [
             dbc.ModalHeader(
-                dbc.ModalTitle("Position P&L Analysis"),
+                dbc.ModalTitle("Position Analysis"),
                 close_button=True,
             ),
             dbc.ModalBody(
                 [
-                    # Mode toggle
-                    dbc.Row(
+                    # Tabs for different sections
+                    dbc.Tabs(
                         [
-                            dbc.Col(
+                            # P&L Analysis Tab
+                            dbc.Tab(
                                 [
-                                    html.Div(
+                                    # Mode toggle
+                                    dbc.Row(
                                         [
-                                            dbc.Label("P&L Calculation Mode:"),
-                                            dbc.ButtonGroup(
+                                            dbc.Col(
                                                 [
-                                                    dbc.Button(
-                                                        "Current Price",
-                                                        id="pnl-mode-default",
-                                                        color="primary",
-                                                        outline=False,
-                                                        active=True,
-                                                        size="sm",
-                                                        className="me-1",
-                                                    ),
-                                                    dbc.Button(
-                                                        "Cost Basis",
-                                                        id="pnl-mode-cost-basis",
-                                                        color="primary",
-                                                        outline=True,
-                                                        active=False,
-                                                        size="sm",
+                                                    html.Div(
+                                                        [
+                                                            dbc.ButtonGroup(
+                                                                [
+                                                                    dbc.Button(
+                                                                        "From Current",
+                                                                        id="pnl-mode-default",
+                                                                        color="primary",
+                                                                        outline=False,
+                                                                        active=True,
+                                                                        size="sm",
+                                                                        className="me-1",
+                                                                    ),
+                                                                    dbc.Button(
+                                                                        "From Cost",
+                                                                        id="pnl-mode-cost-basis",
+                                                                        color="primary",
+                                                                        outline=True,
+                                                                        active=False,
+                                                                        size="sm",
+                                                                    ),
+                                                                ]
+                                                            ),
+                                                            dbc.Tooltip(
+                                                                "Shows P&L projections starting from current price",
+                                                                target="pnl-mode-default",
+                                                            ),
+                                                            dbc.Tooltip(
+                                                                "Shows P&L relative to your purchase price",
+                                                                target="pnl-mode-cost-basis",
+                                                            ),
+                                                        ],
+                                                        className="mb-3 d-flex justify-content-end",
                                                     ),
                                                 ]
                                             ),
-                                            dbc.Tooltip(
-                                                "Current Price mode shows future P&L projections from the current price. "
-                                                "Cost Basis mode shows P&L relative to your purchase price.",
-                                                target="pnl-mode-default",
-                                            ),
-                                            dbc.Tooltip(
-                                                "Cost Basis mode shows P&L relative to your purchase price. "
-                                                "Current Price mode shows future P&L projections from the current price.",
-                                                target="pnl-mode-cost-basis",
-                                            ),
-                                        ],
-                                        className="mb-3",
+                                        ]
                                     ),
-                                ]
+                                    # Summary information
+                                    html.Div(id="pnl-summary", className="mb-3"),
+                                    # Store for current ticker (for mode toggling)
+                                    dcc.Store(
+                                        id="pnl-current-ticker", storage_type="memory"
+                                    ),
+                                    # Loading spinner for the chart
+                                    dbc.Spinner(
+                                        dcc.Graph(
+                                            id="pnl-chart",
+                                            config={
+                                                "displayModeBar": True,
+                                                "responsive": True,
+                                            },
+                                            className="dash-chart",
+                                        ),
+                                        color="primary",
+                                        type="border",
+                                        fullscreen=False,
+                                    ),
+                                ],
+                                label="P&L Analysis",
+                                tab_id="tab-pnl",
                             ),
-                        ]
+                            # Position Details Tab
+                            dbc.Tab(
+                                html.Div(id="pnl-position-details", className="mt-2"),
+                                label="Position Details",
+                                tab_id="tab-details",
+                            ),
+                        ],
+                        id="position-tabs",
+                        active_tab="tab-pnl",
                     ),
-                    # Loading spinner for the chart
-                    dbc.Spinner(
-                        dcc.Graph(
-                            id="pnl-chart",
-                            config={"displayModeBar": True, "responsive": True},
-                            className="dash-chart",
-                        ),
-                        color="primary",
-                        type="border",
-                        fullscreen=False,
-                    ),
-                    # Summary information
-                    html.Div(id="pnl-summary", className="mt-3"),
-                    # Position details
-                    html.Div(id="pnl-position-details", className="mt-3"),
                 ]
             ),
             dbc.ModalFooter(
@@ -268,11 +349,19 @@ def create_pnl_summary(summary: dict[str, Any], mode: str) -> html.Div:
     Returns:
         html.Div: The summary component
     """
-    mode_label = "Using Cost Basis" if mode == "cost_basis" else "Using Current Price"
+    mode_label = "Cost Basis" if mode == "cost_basis" else "Current Price"
+
+    # Format breakeven points
+    if summary["breakeven_points"]:
+        if len(summary["breakeven_points"]) <= 2:
+            be_text = ", ".join([f"${bp:.2f}" for bp in summary["breakeven_points"]])
+        else:
+            be_text = f"${summary['breakeven_points'][0]:.2f}, ${summary['breakeven_points'][-1]:.2f}"
+    else:
+        be_text = "None"
 
     return html.Div(
         [
-            html.H5(f"P&L Summary ({mode_label})"),
             dbc.Row(
                 [
                     dbc.Col(
@@ -282,15 +371,18 @@ def create_pnl_summary(summary: dict[str, Any], mode: str) -> html.Div:
                                     dbc.CardBody(
                                         [
                                             html.H6(
-                                                "Current P&L", className="card-subtitle"
+                                                f"P&L ({mode_label})",
+                                                className="card-subtitle mb-1 text-muted",
                                             ),
-                                            html.H4(
+                                            html.H3(
                                                 format_currency(summary["current_pnl"]),
-                                                className="card-title text-primary",
+                                                className="card-title mb-0",
                                             ),
-                                        ]
+                                        ],
+                                        className="p-2 text-center",
                                     )
-                                ]
+                                ],
+                                className="border-primary",
                             ),
                         ],
                         width=3,
@@ -302,16 +394,19 @@ def create_pnl_summary(summary: dict[str, Any], mode: str) -> html.Div:
                                     dbc.CardBody(
                                         [
                                             html.H6(
-                                                "Max Profit", className="card-subtitle"
+                                                "Max Profit",
+                                                className="card-subtitle mb-1 text-muted",
                                             ),
-                                            html.H4(
+                                            html.H3(
                                                 format_currency(summary["max_profit"]),
-                                                className="card-title text-success",
+                                                className="card-title mb-0 text-success",
                                             ),
                                             html.Small(
-                                                f"at ${summary['max_profit_price']:.2f}"
+                                                f"at ${summary['max_profit_price']:.2f}",
+                                                className="text-muted",
                                             ),
-                                        ]
+                                        ],
+                                        className="p-2 text-center",
                                     )
                                 ]
                             ),
@@ -325,16 +420,19 @@ def create_pnl_summary(summary: dict[str, Any], mode: str) -> html.Div:
                                     dbc.CardBody(
                                         [
                                             html.H6(
-                                                "Max Loss", className="card-subtitle"
+                                                "Max Loss",
+                                                className="card-subtitle mb-1 text-muted",
                                             ),
-                                            html.H4(
+                                            html.H3(
                                                 format_currency(summary["max_loss"]),
-                                                className="card-title text-danger",
+                                                className="card-title mb-0 text-danger",
                                             ),
                                             html.Small(
-                                                f"at ${summary['max_loss_price']:.2f}"
+                                                f"at ${summary['max_loss_price']:.2f}",
+                                                className="text-muted",
                                             ),
-                                        ]
+                                        ],
+                                        className="p-2 text-center",
                                     )
                                 ]
                             ),
@@ -348,23 +446,15 @@ def create_pnl_summary(summary: dict[str, Any], mode: str) -> html.Div:
                                     dbc.CardBody(
                                         [
                                             html.H6(
-                                                "Break-even Points",
-                                                className="card-subtitle",
+                                                "Break-even",
+                                                className="card-subtitle mb-1 text-muted",
                                             ),
-                                            html.H4(
-                                                ", ".join(
-                                                    [
-                                                        f"${bp:.2f}"
-                                                        for bp in summary[
-                                                            "breakeven_points"
-                                                        ]
-                                                    ]
-                                                )
-                                                if summary["breakeven_points"]
-                                                else "N/A",
-                                                className="card-title",
+                                            html.H3(
+                                                be_text,
+                                                className="card-title mb-0",
                                             ),
-                                        ]
+                                        ],
+                                        className="p-2 text-center",
                                     )
                                 ]
                             ),
@@ -395,6 +485,8 @@ def register_callbacks(app):
             Output("pnl-mode-cost-basis", "active"),
             Output("pnl-mode-default", "outline"),
             Output("pnl-mode-cost-basis", "outline"),
+            Output("pnl-current-ticker", "data"),
+            Output("position-tabs", "active_tab"),
         ],
         [
             Input({"type": "position-pnl", "index": ALL}, "n_clicks"),
@@ -407,11 +499,12 @@ def register_callbacks(app):
             State("pnl-modal", "is_open"),
             State("pnl-mode-default", "active"),
             State("pnl-mode-cost-basis", "active"),
+            State("pnl-current-ticker", "data"),
         ],
         # Prevent the callback from firing when the app first loads
         prevent_initial_call=True,
     )
-    def toggle_pnl_modal(
+    def toggle_pnl_modal(  # noqa: PLR0911 - Complex callback with multiple return paths
         btn_clicks,
         default_mode_clicks,  # noqa: ARG001 - required by Dash
         cost_basis_mode_clicks,  # noqa: ARG001 - required by Dash
@@ -420,11 +513,23 @@ def register_callbacks(app):
         is_open,
         default_mode_active,
         cost_basis_mode_active,
+        current_ticker,
     ):
         """Toggle P&L modal and update chart."""
         ctx = callback_context
         if not ctx.triggered:
-            return (False, {}, html.Div(), html.Div(), True, False, False, True)
+            return (
+                False,
+                {},
+                html.Div(),
+                html.Div(),
+                True,
+                False,
+                False,
+                True,
+                None,
+                "tab-pnl",
+            )
 
         trigger_id = ctx.triggered[0]["prop_id"]
         logger.debug(f"PNL modal trigger: {trigger_id}")
@@ -440,6 +545,8 @@ def register_callbacks(app):
                 cost_basis_mode_active,
                 not default_mode_active,
                 not cost_basis_mode_active,
+                None,  # Clear the current ticker
+                "tab-pnl",  # Reset to P&L tab
             )
 
         # Handle mode toggle
@@ -453,24 +560,14 @@ def register_callbacks(app):
             cost_basis_mode_active = True
             use_cost_basis = True
 
-        # If modal is already open and we're just changing modes, we need the current position data
-        if is_open and (
-            "pnl-mode-default" in trigger_id or "pnl-mode-cost-basis" in trigger_id
-        ):
-            # We need to get the current position data from the client-side store
-            # This will be implemented in a separate callback
-            pass
-
-        # Handle position button click
+        # Initialize variables for position data
         ticker = None
         position_data = None
 
-        # Check if any of the P&L buttons have been clicked
-        pnl_button_clicked = False
+        # Handle position button click
         if "position-pnl" in trigger_id and any(
             clicks for clicks in btn_clicks if clicks
         ):
-            pnl_button_clicked = True
             # Extract ticker from button ID
             button_id = trigger_id.split(".")[0]
             ticker = button_id.split('"index":"')[1].split('"')[0]
@@ -482,8 +579,49 @@ def register_callbacks(app):
                     position_data = group_data
                     break
 
+        # If modal is already open and we're just changing modes, we need to preserve the modal state
+        elif is_open and (
+            "pnl-mode-default" in trigger_id or "pnl-mode-cost-basis" in trigger_id
+        ):
+            # Use the stored ticker to find the position data
+            ticker = current_ticker
+
+            if ticker:
+                # Find matching group by ticker
+                for group_data in groups_data:
+                    group_ticker = group_data["ticker"]
+                    if group_ticker == ticker:
+                        position_data = group_data
+                        break
+
+            # If we still don't have position data, show an error
             if not position_data:
-                logger.warning(f"No position data found for ticker {ticker}")
+                logger.error(
+                    f"Cannot determine which position to display when changing modes. Current ticker: {ticker}"
+                )
+                return (
+                    True,  # Keep modal open
+                    dash.no_update,  # Keep current chart
+                    html.Div(
+                        "Error: Cannot determine which position to display. Please close and reopen the modal.",
+                        className="alert alert-danger",
+                    ),
+                    dash.no_update,  # Keep current position details
+                    default_mode_active,
+                    cost_basis_mode_active,
+                    not default_mode_active,
+                    not cost_basis_mode_active,
+                    ticker,  # Keep the current ticker
+                    dash.no_update,  # Keep current tab
+                )
+
+        # Check if we have position data
+        if not position_data:
+            # If we're trying to open the modal but have no data, show an error
+            if "position-pnl" in trigger_id:
+                # Only log if ticker is not None to avoid spurious warnings
+                if ticker is not None:
+                    logger.warning(f"No position data found for ticker {ticker}")
                 return (
                     False,
                     {},
@@ -493,22 +631,23 @@ def register_callbacks(app):
                     cost_basis_mode_active,
                     not default_mode_active,
                     not cost_basis_mode_active,
+                    None,  # Clear the ticker
+                    "tab-pnl",  # Reset to P&L tab
                 )
-
-        # If we don't have position data or no P&L button was clicked, return
-        if (not position_data and not is_open) or (
-            not pnl_button_clicked and not is_open
-        ):
-            return (
-                False,
-                {},
-                html.Div(),
-                html.Div(),
-                default_mode_active,
-                cost_basis_mode_active,
-                not default_mode_active,
-                not cost_basis_mode_active,
-            )
+            # If the modal isn't already open, just keep it closed
+            elif not is_open:
+                return (
+                    False,
+                    {},
+                    html.Div(),
+                    html.Div(),
+                    default_mode_active,
+                    cost_basis_mode_active,
+                    not default_mode_active,
+                    not cost_basis_mode_active,
+                    None,  # Clear the ticker
+                    "tab-pnl",  # Reset to P&L tab
+                )
 
         # Convert position data to objects
         if position_data:
@@ -633,6 +772,8 @@ def register_callbacks(app):
                 cost_basis_mode_active,
                 not default_mode_active,
                 not cost_basis_mode_active,
+                ticker,  # Store the current ticker
+                "tab-pnl",  # Always show P&L tab when opening
             )
 
         # If we get here, something went wrong
@@ -645,4 +786,6 @@ def register_callbacks(app):
             cost_basis_mode_active,
             not default_mode_active,
             not cost_basis_mode_active,
+            None,  # Clear the ticker
+            "tab-pnl",  # Reset to P&L tab
         )

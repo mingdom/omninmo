@@ -25,6 +25,9 @@ def create_position_row(group: PortfolioGroup, _metrics: dict) -> dbc.Row:
         Dash Bootstrap Components Row for the portfolio table
     """
     ticker = get_group_ticker(group)
+
+    # We decided not to show price in the table as it's confusing with mixed stock/option positions
+
     return dbc.Row(
         [
             dbc.Col(html.Strong(ticker), width=2),
@@ -60,15 +63,8 @@ def create_position_row(group: PortfolioGroup, _metrics: dict) -> dbc.Row:
                 html.Div(
                     [
                         dbc.Button(
-                            "P&L",
+                            "Analysis",
                             id={"type": "position-pnl", "index": ticker},
-                            color="success",
-                            size="sm",
-                            className="me-2",
-                        ),
-                        dbc.Button(
-                            "Details",
-                            id={"type": "position-details", "index": ticker},
                             color="primary",
                             size="sm",
                         ),
@@ -155,6 +151,7 @@ def create_portfolio_table(
             key=lambda x: x.beta_adjusted_exposure,
             reverse=sort_direction == "desc",
         )
+    # Price sorting removed as we don't show price in the table
     elif sort_key == "ticker":
         groups.sort(
             key=lambda x: get_group_ticker(x).lower(), reverse=sort_direction == "desc"
