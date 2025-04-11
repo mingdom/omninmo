@@ -18,6 +18,7 @@ class StockPositionDict(PositionDict):
     """Type definition for stock position dictionary"""
 
     price: float
+    cost_basis: float
 
 
 class OptionPositionDict(PositionDict):
@@ -34,6 +35,7 @@ class OptionPositionDict(PositionDict):
     delta_exposure: float  # Delta * Notional Value * sign(Quantity)
     notional_value: float  # 100 * Underlying Price * |Quantity|
     underlying_beta: float
+    cost_basis: float
 
 
 class ExposureBreakdownDict(TypedDict):
@@ -199,6 +201,7 @@ class OptionPosition(Position):
     notional_value: float  # 100 * Underlying Price * |Quantity|
     underlying_beta: float
     price: float = 0.0  # Price per contract
+    cost_basis: float = 0.0  # Cost basis per contract
 
     def __init__(
         self,
@@ -217,6 +220,7 @@ class OptionPosition(Position):
         market_exposure: float | None = None,
         market_value: float | None = None,
         price: float = 0.0,
+        cost_basis: float = 0.0,
     ):
         """Initialize an OptionPosition with backward compatibility for market_value.
 
@@ -236,6 +240,7 @@ class OptionPosition(Position):
             market_exposure: Market exposure (quantity * price)
             market_value: DEPRECATED - Use market_exposure instead
             price: Price per contract
+            cost_basis: Cost basis per contract (for P&L calculations)
         """
         # Call the parent class constructor with market_value for backward compatibility
         super().__init__(
@@ -257,6 +262,7 @@ class OptionPosition(Position):
         self.notional_value = notional_value
         self.underlying_beta = underlying_beta
         self.price = price
+        self.cost_basis = cost_basis
 
         # Ensure position_type is always "option"
         self.position_type = "option"
@@ -273,6 +279,7 @@ class OptionPosition(Position):
             "notional_value": self.notional_value,
             "underlying_beta": self.underlying_beta,
             "price": self.price,
+            "cost_basis": self.cost_basis,
         }
 
     @classmethod
@@ -285,8 +292,9 @@ class OptionPosition(Position):
         Returns:
             A new OptionPosition instance
         """
-        # Handle price if it exists in the data
+        # Handle price and cost_basis if they exist in the data
         price = data.get("price", 0.0)
+        cost_basis = data.get("cost_basis", 0.0)
 
         return cls(
             ticker=data["ticker"],
@@ -303,6 +311,7 @@ class OptionPosition(Position):
             notional_value=data["notional_value"],
             underlying_beta=data["underlying_beta"],
             price=price,
+            cost_basis=cost_basis,
         )
 
 
@@ -321,6 +330,7 @@ class StockPosition:
     beta_adjusted_exposure: float  # Market Exposure * Beta
     price: float = 0.0  # Price per share
     position_type: str = "stock"  # Always "stock" for StockPosition
+    cost_basis: float = 0.0  # Cost basis per share
 
     def __init__(
         self,
@@ -332,6 +342,7 @@ class StockPosition:
         market_value: float | None = None,
         price: float = 0.0,  # Added price parameter
         position_type: str = "stock",  # Added position_type parameter
+        cost_basis: float = 0.0,  # Added cost_basis parameter
     ):
         """Initialize a StockPosition with backward compatibility for market_value.
 
@@ -344,6 +355,7 @@ class StockPosition:
             market_value: DEPRECATED - Use market_exposure instead
             price: Price per share
             position_type: Type of position, always "stock" for StockPosition
+            cost_basis: Cost basis per share (for P&L calculations)
         """
         from .logger import logger
 
@@ -353,6 +365,7 @@ class StockPosition:
         self.beta_adjusted_exposure = beta_adjusted_exposure
         self.position_type = position_type  # Store the position_type
         self.price = price  # Store the price
+        self.cost_basis = cost_basis  # Store the cost basis
 
         # Handle market_value for backward compatibility
         if market_value is not None and market_exposure is None:
@@ -394,6 +407,7 @@ class StockPosition:
             "beta_adjusted_exposure": self.beta_adjusted_exposure,
             "price": self.price,
             "position_type": "stock",
+            "cost_basis": self.cost_basis,
         }
 
     @classmethod
@@ -417,6 +431,7 @@ class StockPosition:
             beta_adjusted_exposure=data["beta_adjusted_exposure"],
             price=price,
             position_type=data.get("position_type", "stock"),  # Pass position_type
+            cost_basis=data.get("cost_basis", 0.0),  # Get cost_basis if it exists
         )
 
 
@@ -1043,6 +1058,7 @@ def create_portfolio_group(
             market_exposure=stock_data["market_exposure"],
             beta_adjusted_exposure=stock_data["beta_adjusted_exposure"],
             price=price,
+            cost_basis=stock_data.get("cost_basis", 0.0),  # Get cost_basis if it exists
         )
 
     # Create option positions if data exists
@@ -1070,6 +1086,9 @@ def create_portfolio_group(
                     notional_value=opt["notional_value"],
                     underlying_beta=opt["beta"],  # Use same beta for underlying
                     price=price,
+                    cost_basis=opt.get(
+                        "cost_basis", price
+                    ),  # Use price as default cost basis
                 )
             )
 

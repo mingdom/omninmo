@@ -44,6 +44,7 @@ class OptionContract:
         option_type (str): The type of the option, either 'CALL' or 'PUT'.
         quantity (int): The number of contracts held. Positive for long positions, negative for short positions.
         current_price (float): The current market price per contract of the option.
+        cost_basis (float): The cost basis per contract of the option.
         description (str): The original description string from the data source (e.g., "AAPL APR 17 2025 $220 CALL").
 
     Properties:
@@ -65,6 +66,7 @@ class OptionContract:
     quantity: int
     current_price: float
     description: str
+    cost_basis: float = 0.0
 
     @property
     def notional_value(self) -> float:
@@ -311,7 +313,10 @@ def calculate_implied_volatility(
 
 
 def parse_option_description(
-    description: str, quantity: int = 1, current_price: float = 0.0
+    description: str,
+    quantity: int = 1,
+    current_price: float = 0.0,
+    cost_basis: float = 0.0,
 ) -> dict | OptionContract:
     """
     Parse option description string.
@@ -322,6 +327,7 @@ def parse_option_description(
         description: The option description string to parse
         quantity: The number of contracts (positive for long, negative for short)
         current_price: The current market price per contract
+        cost_basis: The cost basis per contract (for P&L calculations)
 
     Returns:
         If called with just description, returns a dictionary with parsed components.
@@ -370,7 +376,12 @@ def parse_option_description(
     expiry = datetime.datetime(year, month, day)
 
     # If only description is provided, return a dictionary
-    if quantity == 1 and current_price == 0.0 and len(description.strip().split()) == 6:
+    if (
+        quantity == 1
+        and current_price == 0.0
+        and cost_basis == 0.0
+        and len(description.strip().split()) == 6
+    ):
         return {
             "underlying": underlying,
             "expiry": expiry,
@@ -389,6 +400,7 @@ def parse_option_description(
             current_price
         ),  # Ensure price is positive; directionality is handled by quantity
         description=description,
+        cost_basis=abs(cost_basis),  # Ensure cost basis is positive
     )
 
 
@@ -597,7 +609,12 @@ def process_options(
         try:
             # Parse option description
             parsed_option = parse_option_description(
-                opt_data["description"], opt_data["quantity"], opt_data["price"]
+                opt_data["description"],
+                opt_data["quantity"],
+                opt_data["price"],
+                opt_data.get(
+                    "cost_basis", opt_data["price"]
+                ),  # Use price as default cost basis
             )
 
             # Get underlying price and beta
@@ -625,6 +642,9 @@ def process_options(
                 "expiry": parsed_option.expiry.strftime("%Y-%m-%d"),
                 "option_type": parsed_option.option_type,
                 "price": parsed_option.current_price,
+                "cost_basis": opt_data.get(
+                    "cost_basis", parsed_option.current_price
+                ),  # Use current price as default cost basis
                 "delta": exposures["delta"],
                 "delta_exposure": exposures["delta_exposure"],
                 "beta_adjusted_exposure": exposures["beta_adjusted_exposure"],
