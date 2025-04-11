@@ -8,7 +8,7 @@ from datetime import datetime
 
 import pytest
 
-from src.folio.quantlib_utils import OptionContract, calculate_option_delta
+from src.folio.options import OptionContract, calculate_option_delta
 
 
 @pytest.fixture
@@ -358,8 +358,8 @@ def test_portfolio_level_exposure():
 
 def test_calculate_option_exposure(option_fixtures):
     """Test the calculate_option_exposure function."""
-    # Update imports at the top of the file to include calculate_option_exposure
-    from src.folio.quantlib_utils import calculate_option_exposure
+    # Import calculate_option_exposure from options module
+    from src.folio.options import calculate_option_exposure
 
     underlying_price = 100.0
     beta = 1.2
@@ -428,8 +428,8 @@ def test_calculate_option_exposure(option_fixtures):
 
 def test_process_options():
     """Test the process_options function."""
-    # Update imports at the top of the file to include process_options
-    from src.folio.quantlib_utils import process_options
+    # Import process_options from options module
+    from src.folio.options import process_options
 
     # Create test data
     options_data = [
@@ -511,8 +511,8 @@ def test_process_options():
 
 def test_process_options_with_missing_price():
     """Test process_options with a missing price."""
-    # Update imports at the top of the file to include process_options
-    from src.folio.quantlib_utils import process_options
+    # Import process_options from options module
+    from src.folio.options import process_options
 
     options_data = [
         {
@@ -539,8 +539,8 @@ def test_process_options_with_missing_price():
 
 def test_process_options_with_error():
     """Test process_options with an error in the option data."""
-    # Update imports at the top of the file to include process_options
-    from src.folio.quantlib_utils import process_options
+    # Import process_options from options module
+    from src.folio.options import process_options
 
     options_data = [
         {

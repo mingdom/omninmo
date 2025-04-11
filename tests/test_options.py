@@ -1,12 +1,12 @@
 """
-Tests for quantlib_utils.py
+Tests for options.py
 """
 
 import datetime
 
 import pytest
 
-from src.folio.quantlib_utils import (
+from src.folio.options import (
     OptionContract,
     calculate_black_scholes_delta,
     calculate_bs_price,

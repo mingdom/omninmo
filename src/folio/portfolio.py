@@ -431,7 +431,7 @@ def process_portfolio_data(
             )
 
             # Import the necessary functions
-            from .quantlib_utils import process_options
+            from .options import process_options
             from .validation import extract_option_data
 
             # Extract and validate option data using our utility function
@@ -576,7 +576,7 @@ def process_portfolio_data(
             )
 
             # Import the necessary functions
-            from .quantlib_utils import process_options
+            from .options import process_options
             from .validation import extract_option_data
 
             # Extract option data for the specified indices

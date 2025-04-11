@@ -1,6 +1,6 @@
 """
-QuantLib implementation of option calculations.
-Direct replacement for option_utils.py
+Options calculation module.
+Uses QuantLib for option pricing and Greeks calculations.
 Uses American-style options for US stocks.
 """
 
@@ -29,7 +29,8 @@ with warnings.catch_warnings():
 
 from dataclasses import dataclass
 
-# datetime is already imported at the top
+# Configure module logger
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -47,11 +48,11 @@ class OptionContract:
 
     Properties:
         notional_value (float): The absolute value controlled by the option contract(s), calculated as
-                                `strike * 100 * abs(quantity)`. Always positive regardless of position direction.
+                              `strike * 100 * abs(quantity)`. Always positive regardless of position direction.
         signed_notional_value (float): The signed value controlled by the option contract(s), calculated as
-                                      `strike * 100 * quantity`. Positive for long positions, negative for short.
+                                    `strike * 100 * quantity`. Positive for long positions, negative for short.
         market_value (float): The current market value of the option position(s), calculated as
-                             `current_price * 100 * quantity`. Positive for long positions, negative for short.
+                           `current_price * 100 * quantity`. Positive for long positions, negative for short.
 
     Note:
         A position is considered short if quantity < 0, and long if quantity > 0.
@@ -94,10 +95,6 @@ class OptionContract:
         return self.current_price * 100 * self.quantity
 
 
-# Configure module logger
-logger = logging.getLogger(__name__)
-
-
 def calculate_black_scholes_delta(
     option_position: OptionContract,
     underlying_price: float,
@@ -106,7 +103,6 @@ def calculate_black_scholes_delta(
 ) -> float:
     """
     Calculate option delta using QuantLib.
-    Direct replacement for option_utils.calculate_black_scholes_delta.
     Uses American-style options.
     """
     # Use provided volatility or default
@@ -168,7 +164,6 @@ def calculate_bs_price(
 ) -> float:
     """
     Calculate option price using QuantLib.
-    Direct replacement for option_utils.calculate_bs_price.
     Uses American-style options.
     """
     # Use provided volatility or default
@@ -230,7 +225,6 @@ def calculate_implied_volatility(
 ) -> float:
     """
     Calculate implied volatility using QuantLib.
-    Direct replacement for option_utils.calculate_implied_volatility.
     Uses American-style options.
     """
     # Use provided option price or the option's current_price
@@ -321,7 +315,6 @@ def parse_option_description(
 ) -> dict | OptionContract:
     """
     Parse option description string.
-    Direct replacement for option_utils.parse_option_description.
 
     This function doesn't use QuantLib, but is included for completeness.
 
