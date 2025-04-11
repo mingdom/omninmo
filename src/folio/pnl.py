@@ -256,7 +256,7 @@ def calculate_breakeven_points(pnl_data: dict[str, Any]) -> list[float]:
     return breakeven_points
 
 
-def calculate_max_profit_loss(pnl_data: dict[str, Any]) -> dict[str, float]:
+def calculate_max_profit_loss(pnl_data: dict[str, Any]) -> dict[str, Any]:
     """
     Calculate maximum profit and loss from P&L data.
 
@@ -264,7 +264,8 @@ def calculate_max_profit_loss(pnl_data: dict[str, Any]) -> dict[str, float]:
         pnl_data: P&L data from calculate_strategy_pnl
 
     Returns:
-        Dictionary with max_profit, max_loss, and their corresponding prices
+        Dictionary with max_profit, max_loss, and their corresponding prices,
+        plus flags indicating if profit or loss might be unbounded
     """
     price_points = pnl_data["price_points"]
     pnl_values = pnl_data["pnl_values"]
@@ -275,21 +276,60 @@ def calculate_max_profit_loss(pnl_data: dict[str, Any]) -> dict[str, float]:
             "max_profit_price": 0,
             "max_loss": 0,
             "max_loss_price": 0,
+            "unbounded_profit": False,
+            "unbounded_loss": False,
         }
 
+    # Find max profit and its price
     max_profit = max(pnl_values)
     max_profit_idx = pnl_values.index(max_profit)
     max_profit_price = price_points[max_profit_idx]
 
+    # Find max loss and its price
     max_loss = min(pnl_values)
     max_loss_idx = pnl_values.index(max_loss)
     max_loss_price = price_points[max_loss_idx]
+
+    # Check if profit might be unbounded (max profit at the edge of the range)
+    unbounded_profit = max_profit_idx == 0 or max_profit_idx == len(price_points) - 1
+
+    # Check if loss might be unbounded (max loss at the edge of the range)
+    unbounded_loss = max_loss_idx == 0 or max_loss_idx == len(price_points) - 1
+
+    # If we have position data, we can be more precise about unbounded profit/loss
+    if "positions" in pnl_data:
+        positions = pnl_data["positions"]
+
+        # Check for positions that can have unbounded profit/loss
+        has_short_call = any(
+            p.get("position_type") == "option"
+            and p.get("option_type") == "CALL"
+            and p.get("quantity", 0) < 0
+            for p in positions
+        )
+
+        has_long_call = any(
+            p.get("position_type") == "option"
+            and p.get("option_type") == "CALL"
+            and p.get("quantity", 0) > 0
+            for p in positions
+        )
+
+        # Short calls have unbounded loss on the upside
+        if has_short_call and max_loss_idx == len(price_points) - 1:
+            unbounded_loss = True
+
+        # Long calls have unbounded profit on the upside
+        if has_long_call and max_profit_idx == len(price_points) - 1:
+            unbounded_profit = True
 
     return {
         "max_profit": max_profit,
         "max_profit_price": max_profit_price,
         "max_loss": max_loss,
         "max_loss_price": max_loss_price,
+        "unbounded_profit": unbounded_profit,
+        "unbounded_loss": unbounded_loss,
     }
 
 
@@ -367,6 +407,8 @@ def summarize_strategy_pnl(
         "max_profit_price": max_pl["max_profit_price"],
         "max_loss": max_pl["max_loss"],
         "max_loss_price": max_pl["max_loss_price"],
+        "unbounded_profit": max_pl.get("unbounded_profit", False),
+        "unbounded_loss": max_pl.get("unbounded_loss", False),
         "current_pnl": current_pnl,
         "profitable_ranges": profitable_ranges,
     }

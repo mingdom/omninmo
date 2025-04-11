@@ -103,16 +103,18 @@ class TestPnlChart(unittest.TestCase):
 
         self.assertIsInstance(summary_component, html.Div)
 
-        # Verify the summary component contains the mode
-        self.assertIn("Current Price", str(summary_component))
+        # Verify the summary component contains the expected elements
+        self.assertIn("Max Profit", str(summary_component))
+        self.assertIn("Max Loss", str(summary_component))
+        self.assertIn("Break-even", str(summary_component))
 
-        # Test with cost basis mode
+        # Test with cost basis mode (should be the same as default now)
         summary_component_cost_basis = create_pnl_summary(
             self.summary, mode="cost_basis"
         )
 
-        # Verify the summary component contains the cost basis mode
-        self.assertIn("Cost Basis", str(summary_component_cost_basis))
+        # Verify the summary component contains the same elements
+        self.assertIn("Max Profit", str(summary_component_cost_basis))
 
     def test_create_pnl_modal(self):
         """Test creating a P&L modal."""
@@ -121,10 +123,6 @@ class TestPnlChart(unittest.TestCase):
 
         # Verify the modal has the correct ID
         self.assertEqual(modal.id, "pnl-modal")
-
-        # Verify the modal contains the mode toggle buttons
-        self.assertIn("pnl-mode-default", str(modal))
-        self.assertIn("pnl-mode-cost-basis", str(modal))
 
         # Verify the modal contains the chart
         self.assertIn("pnl-chart", str(modal))
