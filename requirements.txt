@@ -2,7 +2,7 @@
 # Note: Developer Dependencies in requirements-dev.txt
 pandas==2.2.1
 numpy==1.26.4
-scipy==1.11.3  # For option calculations
+# scipy removed - no longer needed after migrating to QuantLib
 QuantLib>=1.30  # For option calculations
 
 # Utilities
