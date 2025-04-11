@@ -588,11 +588,26 @@ def process_portfolio_data(
             # Get beta for the underlying
             try:
                 beta = get_beta(underlying)
+            except ValueError as beta_err:
+                # Only handle specific ValueError cases that we know how to handle
+                if "No historical data available" in str(beta_err):
+                    logger.warning(
+                        f"No historical data for {underlying}: {beta_err}. Cannot calculate beta."
+                    )
+                    # Re-raise with more context to be handled by the caller
+                    raise ValueError(
+                        f"Cannot process orphaned options for {underlying} without beta data"
+                    ) from beta_err
+                else:
+                    # Re-raise other ValueError cases
+                    raise
             except Exception as beta_err:
+                # Log unexpected errors and re-raise
                 logger.error(
-                    f"Error getting beta for {underlying}: {beta_err}. Using beta=1.0."
+                    f"Unexpected error getting beta for {underlying}: {beta_err}",
+                    exc_info=True,
                 )
-                beta = 1.0  # Use a default beta of 1.0 for the market index
+                raise
 
             # Get the latest price for the underlying
             try:
@@ -600,30 +615,34 @@ def process_portfolio_data(
                 price_data = data_fetcher.fetch_data(underlying, period="1d")
                 if price_data is not None and not price_data.empty:
                     underlying_price = price_data.iloc[-1]["Close"]
+                    if underlying_price <= 0:
+                        # If we get an invalid price, we can't process the options
+                        logger.error(
+                            f"Invalid price for {underlying}: {underlying_price}"
+                        )
+                        raise ValueError(
+                            f"Cannot process options for {underlying} with invalid price: {underlying_price}"
+                        )
                 else:
-                    # If we can't get the price data, use a fallback
-                    logger.warning(
-                        f"Could not fetch price data for {underlying}. Using strike price as fallback."
+                    # If we can't get the price data, we can't process the options
+                    logger.error(f"Could not fetch price data for {underlying}")
+                    raise ValueError(
+                        f"Cannot process options for {underlying} without price data"
                     )
-                    # We'll use the strike price of the first option as a fallback
-                    # Extract the strike price from the first option description
-                    first_option_desc = options_data[0]["description"]
-                    parts = first_option_desc.strip().split()
-                    if len(parts) >= 5 and parts[4].startswith("$"):
-                        try:
-                            strike_price = float(
-                                parts[4][1:]
-                            )  # Remove the $ and convert to float
-                            underlying_price = strike_price
-                        except (ValueError, IndexError):
-                            underlying_price = 200.0  # Default fallback
-                    else:
-                        underlying_price = 200.0  # Default fallback
+            except (pd.errors.EmptyDataError, KeyError) as data_err:
+                # Handle specific data errors
+                logger.error(f"Data error for {underlying}: {data_err}", exc_info=True)
+                raise ValueError(
+                    f"Cannot process options for {underlying} due to data error"
+                ) from data_err
             except Exception as price_err:
+                # Log unexpected errors and re-raise
                 logger.error(
-                    f"Error fetching price for {underlying}: {price_err}. Using fallback."
+                    f"Error fetching price for {underlying}: {price_err}", exc_info=True
                 )
-                underlying_price = 200.0  # Default fallback
+                raise ValueError(
+                    f"Cannot process options for {underlying} without price data"
+                ) from price_err
 
             # Process all options at once using our new function
             prices = {underlying: underlying_price}

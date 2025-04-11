@@ -87,10 +87,17 @@ def test_option_processing(
 ):
     """Test that option processing works correctly."""
     # Mock the data fetcher to return stock prices
-    mock_data_fetcher.get_current_price.side_effect = lambda symbol: {
-        "SPY": 100.0,
-        "AAPL": 200.0,
-    }.get(symbol, 100.0)
+    # Create a mock DataFrame with the expected structure
+    mock_df = pd.DataFrame({"Close": [100.0]}, index=[pd.Timestamp("2025-01-01")])
+    mock_aapl_df = pd.DataFrame({"Close": [200.0]}, index=[pd.Timestamp("2025-01-01")])
+
+    # Set up the fetch_data method to return the mock DataFrame
+    mock_data_fetcher.fetch_data.side_effect = (
+        lambda symbol, period=None, interval=None: {
+            "SPY": mock_df,
+            "AAPL": mock_aapl_df,
+        }.get(symbol, mock_df)
+    )
 
     # Mock the beta function to return a fixed beta
     mock_get_beta.return_value = 1.0
@@ -222,10 +229,17 @@ def test_option_processing_with_errors(
     )
 
     # Mock the data fetcher to return stock prices
-    mock_data_fetcher.get_current_price.side_effect = lambda symbol: {
-        "SPY": 100.0,
-        "AAPL": 200.0,
-    }.get(symbol, 100.0)
+    # Create a mock DataFrame with the expected structure
+    mock_df = pd.DataFrame({"Close": [100.0]}, index=[pd.Timestamp("2025-01-01")])
+    mock_aapl_df = pd.DataFrame({"Close": [200.0]}, index=[pd.Timestamp("2025-01-01")])
+
+    # Set up the fetch_data method to return the mock DataFrame
+    mock_data_fetcher.fetch_data.side_effect = (
+        lambda symbol, period=None, interval=None: {
+            "SPY": mock_df,
+            "AAPL": mock_aapl_df,
+        }.get(symbol, mock_df)
+    )
 
     # Mock the beta function to return a fixed beta
     mock_get_beta.return_value = 1.0

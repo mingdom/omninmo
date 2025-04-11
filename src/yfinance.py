@@ -7,7 +7,6 @@ of the DataFetcher class in src/v2/data_fetcher.py but uses yfinance as the data
 
 import logging
 import os
-import time
 
 import pandas as pd
 
@@ -62,18 +61,20 @@ class YFinanceDataFetcher(DataFetcherInterface):
         # Check cache first
         cache_path = self._get_cache_path(ticker, period, interval)
 
-        if os.path.exists(cache_path):
-            # Check if cache is still valid
-            cache_age = time.time() - os.path.getmtime(cache_path)
-            if cache_age < self.cache_ttl:
-                logger.info(f"Loading {ticker} data from cache")
-                try:
-                    return pd.read_csv(cache_path, index_col=0, parse_dates=True)
-                except Exception as e:
-                    logger.warning(f"Error reading cache for {ticker}: {e}")
-                    # Continue to fetch from API
-            else:
-                logger.info(f"Cache for {ticker} is expired")
+        # Use the centralized cache validation logic
+        from src.stockdata import should_use_cache
+
+        should_use, reason = should_use_cache(cache_path, self.cache_ttl)
+
+        if should_use:
+            logger.info(f"Loading {ticker} data from cache: {reason}")
+            try:
+                return pd.read_csv(cache_path, index_col=0, parse_dates=True)
+            except Exception as e:
+                logger.warning(f"Error reading cache for {ticker}: {e}")
+                # Continue to fetch from API
+        else:
+            logger.info(f"Cache for {ticker} is not valid: {reason}")
 
         # Fetch from yfinance
         try:
@@ -84,18 +85,32 @@ class YFinanceDataFetcher(DataFetcherInterface):
             df.to_csv(cache_path)
 
             return df
-        except Exception as e:
-            logger.error(f"Error fetching data for {ticker}: {e}")
+        except (ValueError, pd.errors.EmptyDataError) as e:
+            # These are expected errors that can happen with valid inputs
+            # For example, a valid ticker that has no data available
+            logger.warning(f"Data fetch error for {ticker}: {e}")
 
-            # Try to use expired cache as fallback
+            # Only use expired cache for expected data errors, not for programming errors
             if os.path.exists(cache_path):
                 logger.warning(f"Using expired cache for {ticker} as fallback")
                 try:
                     return pd.read_csv(cache_path, index_col=0, parse_dates=True)
-                except Exception as cache_e:
+                except (pd.errors.ParserError, pd.errors.EmptyDataError) as cache_e:
                     logger.error(f"Error reading cache for {ticker}: {cache_e}")
+                    # Re-raise the original error since cache fallback failed
+                    raise e from cache_e
 
-            # Re-raise the original exception
+            # Re-raise the original exception if no cache fallback
+            raise
+        except (ImportError, NameError, AttributeError, TypeError, SyntaxError) as e:
+            # These are programming errors that should never be caught silently
+            logger.critical(f"Critical error in data fetcher: {e}", exc_info=True)
+            raise
+        except Exception as e:
+            # For other unexpected errors, log and re-raise
+            logger.error(
+                f"Unexpected error fetching data for {ticker}: {e}", exc_info=True
+            )
             raise
 
     def fetch_market_data(self, market_index="SPY", period=None, interval="1d"):
