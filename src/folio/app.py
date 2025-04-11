@@ -611,10 +611,31 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
 
             return portfolio_data, summary_data, groups_data, "", status, None
 
-        except Exception as e:
-            logger.error(f"Error updating portfolio data: {e}", exc_info=True)
+        except (ValueError, pd.errors.ParserError, pd.errors.EmptyDataError) as e:
+            # Handle expected data errors with user-friendly messages
+            logger.error(f"Data error loading portfolio: {e}", exc_info=True)
             error_msg = f"Error loading portfolio: {e!s}"
             error_div = html.Div(error_msg, className="text-danger")
+            return [], {}, [], error_msg, error_div, None
+        except (ImportError, NameError, AttributeError, TypeError) as e:
+            # These are programming errors that should be fixed, not handled
+            logger.critical(f"Critical programming error: {e}", exc_info=True)
+            error_msg = f"A critical error occurred. Please report this issue: {e!s}"
+            error_div = html.Div(error_msg, className="text-danger")
+            # Re-raise for development environments to see the full traceback
+            if app.debug:
+                raise
+            return [], {}, [], error_msg, error_div, None
+        except Exception as e:
+            # Unexpected errors should be logged and reported
+            logger.critical(
+                f"Unexpected error updating portfolio data: {e}", exc_info=True
+            )
+            error_msg = f"An unexpected error occurred: {e!s}"
+            error_div = html.Div(error_msg, className="text-danger")
+            # Re-raise for development environments to see the full traceback
+            if app.debug:
+                raise
             return [], {}, [], error_msg, error_div, None
 
     # Register summary cards callbacks
@@ -766,11 +787,42 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
             # Create table with sorting applied
             return create_portfolio_table(filtered_groups, search, sort_by)
 
-        except Exception as e:
-            logger.error(f"Error updating portfolio table: {e}", exc_info=True)
+        except (ValueError, KeyError) as e:
+            # Handle expected data errors
+            logger.error(f"Data error updating portfolio table: {e}", exc_info=True)
             return html.Tr(
                 html.Td(
-                    "Error loading portfolio data",
+                    f"Error loading portfolio data: {e!s}",
+                    colSpan=6,
+                    className="text-center text-danger",
+                )
+            )
+        except (ImportError, NameError, AttributeError, TypeError) as e:
+            # These are programming errors that should be fixed, not handled
+            logger.critical(
+                f"Critical programming error in table update: {e}", exc_info=True
+            )
+            # Re-raise for development environments to see the full traceback
+            if app.debug:
+                raise
+            return html.Tr(
+                html.Td(
+                    f"A critical error occurred. Please report this issue: {e!s}",
+                    colSpan=6,
+                    className="text-center text-danger",
+                )
+            )
+        except Exception as e:
+            # Unexpected errors should be logged and reported
+            logger.critical(
+                f"Unexpected error updating portfolio table: {e}", exc_info=True
+            )
+            # Re-raise for development environments to see the full traceback
+            if app.debug:
+                raise
+            return html.Tr(
+                html.Td(
+                    f"An unexpected error occurred: {e!s}",
                     colSpan=6,
                     className="text-center text-danger",
                 )

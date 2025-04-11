@@ -4,7 +4,6 @@ Data fetcher for stock data using Financial Modeling Prep API
 
 import logging
 import os
-import time
 from datetime import datetime, timedelta
 
 import pandas as pd
@@ -35,18 +34,24 @@ class DataFetcher(DataFetcherInterface):
         if not self.api_key:
             try:
                 from src.v2.config import config
+
                 self.api_key = config.get("data.fmp.api_key")
             except ImportError:
-                logger.warning("Could not import config from src.v2.config, will rely on environment variable")
+                logger.warning(
+                    "Could not import config from src.v2.config, will rely on environment variable"
+                )
 
         self.cache_ttl = 86400  # Default to 1 day
 
         # Try to get cache TTL from config if available
         try:
             from src.v2.config import config
+
             self.cache_ttl = config.get("app.cache.ttl", 86400)
         except ImportError:
-            logger.warning("Could not import config from src.v2.config, using default cache TTL")
+            logger.warning(
+                "Could not import config from src.v2.config, using default cache TTL"
+            )
 
         # Create cache directory if it doesn't exist
         os.makedirs(cache_dir, exist_ok=True)
@@ -76,22 +81,16 @@ class DataFetcher(DataFetcherInterface):
         # Check cache first
         cache_file = os.path.join(self.cache_dir, f"{ticker}_{period}_{interval}.csv")
 
-        # Check if cache exists and is still valid
-        if os.path.exists(cache_file):
-            # Get file modification time
-            file_mtime = os.path.getmtime(cache_file)
-            cache_age = time.time() - file_mtime
+        # Use the centralized cache validation logic
+        from src.stockdata import should_use_cache
 
-            # If cache is still valid, use it
-            if cache_age < self.cache_ttl:
-                logger.debug(
-                    f"Loading cached data for {ticker} (age: {cache_age:.0f}s)"
-                )
-                return pd.read_csv(cache_file, index_col=0, parse_dates=True)
-            else:
-                logger.debug(
-                    f"Cache expired for {ticker} (age: {cache_age:.0f}s > TTL: {self.cache_ttl}s)"
-                )
+        should_use, reason = should_use_cache(cache_file, self.cache_ttl)
+
+        if should_use:
+            logger.debug(f"Loading cached data for {ticker}: {reason}")
+            return pd.read_csv(cache_file, index_col=0, parse_dates=True)
+        else:
+            logger.debug(f"Cache for {ticker} is not valid: {reason}")
 
         # Try to fetch from API
         try:
@@ -103,22 +102,44 @@ class DataFetcher(DataFetcherInterface):
                 df.to_csv(cache_file)
                 return df
             else:
-                # Return empty DataFrame with expected columns instead of raising an error
-                logger.warning(f"No data returned from API for {ticker}. Returning empty DataFrame.")
-                return pd.DataFrame(columns=["Open", "High", "Low", "Close", "Volume"])
-        except Exception as e:
-            logger.error(f"Error fetching data for {ticker}: {e}")
+                # This is a valid case - API returned no data for a valid ticker
+                logger.warning(f"No data returned from API for {ticker}")
+                # Raise a specific error instead of returning an empty DataFrame
+                raise ValueError(f"No historical data found for {ticker}")
+        except (ValueError, requests.exceptions.RequestException) as e:
+            # These are expected errors that can happen with valid inputs
+            # For example, a valid ticker that has no data available or network issues
+            logger.warning(f"Data fetch error for {ticker}: {e}")
 
-            # If cache exists but is expired, use it as fallback
+            # Only use expired cache for expected data errors, not for programming errors
             if os.path.exists(cache_file):
-                logger.warning(f"Using expired cache as fallback for {ticker}")
-                return pd.read_csv(cache_file, index_col=0, parse_dates=True)
+                logger.warning(f"Using expired cache for {ticker} as fallback")
+                try:
+                    return pd.read_csv(cache_file, index_col=0, parse_dates=True)
+                except (pd.errors.ParserError, pd.errors.EmptyDataError) as cache_e:
+                    logger.error(f"Error reading cache for {ticker}: {cache_e}")
+                    # If we can't read the cache, re-raise the original error
+                    raise e from cache_e
 
-            # For 'No historical data found' errors, return empty DataFrame
+            # If this is a "No historical data" error and we have no cache,
+            # it's reasonable to return an empty DataFrame with the expected structure
             if "No historical data found" in str(e):
-                logger.warning(f"No historical data found for {ticker}. Returning empty DataFrame.")
+                logger.warning(
+                    f"No historical data found for {ticker} and no cache available"
+                )
                 return pd.DataFrame(columns=["Open", "High", "Low", "Close", "Volume"])
 
+            # For other data errors with no cache, re-raise
+            raise
+        except (ImportError, NameError, AttributeError, TypeError, SyntaxError) as e:
+            # These are programming errors that should never be caught silently
+            logger.critical(f"Critical error in data fetcher: {e}", exc_info=True)
+            raise
+        except Exception as e:
+            # For other unexpected errors, log and re-raise
+            logger.error(
+                f"Unexpected error fetching data for {ticker}: {e}", exc_info=True
+            )
             raise
 
     def fetch_market_data(self, market_index="SPY", period=None, interval="1d"):
