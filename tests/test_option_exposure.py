@@ -8,7 +8,7 @@ from datetime import datetime
 
 import pytest
 
-from src.folio.option_utils import OptionPosition, calculate_option_delta
+from src.folio.quantlib_utils import OptionContract, calculate_option_delta
 
 
 @pytest.fixture
@@ -20,7 +20,7 @@ def option_fixtures():
     # Create options with different types and positions
     return {
         # Call options
-        "long_call_atm": OptionPosition(
+        "long_call_atm": OptionContract(
             underlying="SPY",
             expiry=expiry_date,
             strike=100.0,
@@ -29,7 +29,7 @@ def option_fixtures():
             current_price=5.0,
             description="SPY JUN 15 2025 $100 CALL",
         ),
-        "short_call_atm": OptionPosition(
+        "short_call_atm": OptionContract(
             underlying="SPY",
             expiry=expiry_date,
             strike=100.0,
@@ -39,7 +39,7 @@ def option_fixtures():
             description="SPY JUN 15 2025 $100 CALL",
         ),
         # Put options
-        "long_put_atm": OptionPosition(
+        "long_put_atm": OptionContract(
             underlying="SPY",
             expiry=expiry_date,
             strike=100.0,
@@ -48,7 +48,7 @@ def option_fixtures():
             current_price=5.0,
             description="SPY JUN 15 2025 $100 PUT",
         ),
-        "short_put_atm": OptionPosition(
+        "short_put_atm": OptionContract(
             underlying="SPY",
             expiry=expiry_date,
             strike=100.0,
@@ -58,7 +58,7 @@ def option_fixtures():
             description="SPY JUN 15 2025 $100 PUT",
         ),
         # Different quantities
-        "long_call_multiple": OptionPosition(
+        "long_call_multiple": OptionContract(
             underlying="SPY",
             expiry=expiry_date,
             strike=100.0,
@@ -67,7 +67,7 @@ def option_fixtures():
             current_price=5.0,
             description="SPY JUN 15 2025 $100 CALL",
         ),
-        "short_put_multiple": OptionPosition(
+        "short_put_multiple": OptionContract(
             underlying="SPY",
             expiry=expiry_date,
             strike=100.0,
@@ -77,7 +77,7 @@ def option_fixtures():
             description="SPY JUN 15 2025 $100 PUT",
         ),
         # Different moneyness levels
-        "long_call_itm": OptionPosition(
+        "long_call_itm": OptionContract(
             underlying="SPY",
             expiry=expiry_date,
             strike=90.0,  # In-the-money
@@ -86,7 +86,7 @@ def option_fixtures():
             current_price=15.0,
             description="SPY JUN 15 2025 $90 CALL",
         ),
-        "long_call_otm": OptionPosition(
+        "long_call_otm": OptionContract(
             underlying="SPY",
             expiry=expiry_date,
             strike=110.0,  # Out-of-the-money
@@ -95,7 +95,7 @@ def option_fixtures():
             current_price=2.0,
             description="SPY JUN 15 2025 $110 CALL",
         ),
-        "long_put_itm": OptionPosition(
+        "long_put_itm": OptionContract(
             underlying="SPY",
             expiry=expiry_date,
             strike=110.0,  # In-the-money
@@ -104,7 +104,7 @@ def option_fixtures():
             current_price=15.0,
             description="SPY JUN 15 2025 $110 PUT",
         ),
-        "long_put_otm": OptionPosition(
+        "long_put_otm": OptionContract(
             underlying="SPY",
             expiry=expiry_date,
             strike=90.0,  # Out-of-the-money
@@ -268,7 +268,7 @@ def test_portfolio_level_exposure():
 
     portfolio = [
         # Long call - positive exposure
-        OptionPosition(
+        OptionContract(
             underlying="SPY",
             expiry=expiry_date,
             strike=100.0,
@@ -278,7 +278,7 @@ def test_portfolio_level_exposure():
             description="SPY JUN 15 2025 $100 CALL",
         ),
         # Short call - negative exposure
-        OptionPosition(
+        OptionContract(
             underlying="SPY",
             expiry=expiry_date,
             strike=110.0,
@@ -288,7 +288,7 @@ def test_portfolio_level_exposure():
             description="SPY JUN 15 2025 $110 CALL",
         ),
         # Long put - negative exposure
-        OptionPosition(
+        OptionContract(
             underlying="SPY",
             expiry=expiry_date,
             strike=90.0,
@@ -298,7 +298,7 @@ def test_portfolio_level_exposure():
             description="SPY JUN 15 2025 $90 PUT",
         ),
         # Short put - positive exposure
-        OptionPosition(
+        OptionContract(
             underlying="SPY",
             expiry=expiry_date,
             strike=80.0,
@@ -359,7 +359,7 @@ def test_portfolio_level_exposure():
 def test_calculate_option_exposure(option_fixtures):
     """Test the calculate_option_exposure function."""
     # Update imports at the top of the file to include calculate_option_exposure
-    from src.folio.option_utils import calculate_option_exposure
+    from src.folio.quantlib_utils import calculate_option_exposure
 
     underlying_price = 100.0
     beta = 1.2
@@ -429,7 +429,7 @@ def test_calculate_option_exposure(option_fixtures):
 def test_process_options():
     """Test the process_options function."""
     # Update imports at the top of the file to include process_options
-    from src.folio.option_utils import process_options
+    from src.folio.quantlib_utils import process_options
 
     # Create test data
     options_data = [
@@ -512,7 +512,7 @@ def test_process_options():
 def test_process_options_with_missing_price():
     """Test process_options with a missing price."""
     # Update imports at the top of the file to include process_options
-    from src.folio.option_utils import process_options
+    from src.folio.quantlib_utils import process_options
 
     options_data = [
         {
@@ -540,7 +540,7 @@ def test_process_options_with_missing_price():
 def test_process_options_with_error():
     """Test process_options with an error in the option data."""
     # Update imports at the top of the file to include process_options
-    from src.folio.option_utils import process_options
+    from src.folio.quantlib_utils import process_options
 
     options_data = [
         {

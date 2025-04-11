@@ -3,6 +3,7 @@
 pandas==2.2.1
 numpy==1.26.4
 scipy==1.11.3  # For option calculations
+QuantLib>=1.30  # For option calculations
 
 # Utilities
 requests>=2.32.0
