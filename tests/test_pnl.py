@@ -32,6 +32,7 @@ class TestPnLCalculations(unittest.TestCase):
             beta_adjusted_exposure=45000.0,
             market_exposure=45000.0,  # 100 shares * $450
             price=450.0,  # $450 per share
+            cost_basis=400.0,  # $400 per share cost basis
         )
 
         # Create a sample call option position
@@ -52,6 +53,7 @@ class TestPnLCalculations(unittest.TestCase):
             notional_value=45000.0,  # 100 * $450 * 1
             underlying_beta=1.0,
             price=10.0,  # $10 per contract
+            cost_basis=8.0,  # $8 per contract cost basis
         )
 
         # Create a sample put option position
@@ -70,6 +72,7 @@ class TestPnLCalculations(unittest.TestCase):
             notional_value=90000.0,  # 100 * $450 * 2
             underlying_beta=1.0,
             price=5.0,  # $5 per contract
+            cost_basis=6.0,  # $6 per contract cost basis
         )
 
     def test_determine_price_range(self):
@@ -92,11 +95,12 @@ class TestPnLCalculations(unittest.TestCase):
     @patch("src.folio.pnl.calculate_bs_price")
     def test_calculate_position_pnl_stock(self, mock_calculate_bs_price):
         """Test P&L calculation for a stock position."""
-        # Calculate P&L for stock position
+        # Calculate P&L for stock position using current price as entry price (default)
         pnl_data = calculate_position_pnl(
             self.stock_position,
             price_range=(400.0, 500.0),
             num_points=11,  # 400, 410, 420, ..., 500
+            use_cost_basis=False,  # Use current price as entry price
         )
 
         # Verify the structure of the result
@@ -117,17 +121,43 @@ class TestPnLCalculations(unittest.TestCase):
         # Verify mock wasn't called for stock position
         mock_calculate_bs_price.assert_not_called()
 
+        # Reset mock for the next test
+        mock_calculate_bs_price.reset_mock()
+
+        # Calculate P&L for stock position using cost basis as entry price
+        pnl_data_cost_basis = calculate_position_pnl(
+            self.stock_position,
+            price_range=(400.0, 500.0),
+            num_points=11,  # 400, 410, 420, ..., 500
+            use_cost_basis=True,  # Use cost basis as entry price
+        )
+
+        # Verify P&L calculations for stock using cost basis
+        # P&L = (price - cost_basis) * quantity
+        # Cost basis is $400 per share
+        expected_pnls_cost_basis = [
+            (price - 400.0) * 100 for price in np.linspace(400.0, 500.0, 11)
+        ]
+        for i, expected_pnl in enumerate(expected_pnls_cost_basis):
+            self.assertAlmostEqual(
+                pnl_data_cost_basis["pnl_values"][i], expected_pnl, places=2
+            )
+
+        # Verify mock wasn't called for stock position
+        mock_calculate_bs_price.assert_not_called()
+
     @patch("src.folio.pnl.calculate_bs_price")
     def test_calculate_position_pnl_option(self, mock_calculate_bs_price):
         """Test P&L calculation for an option position."""
-        # Mock the option pricing function
+        # Mock the option pricing function for default mode
         mock_calculate_bs_price.side_effect = [5.0, 10.0, 15.0, 20.0, 25.0]
 
-        # Calculate P&L for call option position
+        # Calculate P&L for call option position using current price as entry price (default)
         pnl_data = calculate_position_pnl(
             self.call_option,
             price_range=(440.0, 480.0),
             num_points=5,  # 440, 450, 460, 470, 480
+            use_cost_basis=False,  # Use current price as entry price
         )
 
         # Verify the structure of the result
@@ -151,10 +181,37 @@ class TestPnLCalculations(unittest.TestCase):
         # Verify mock was called for option position
         self.assertEqual(mock_calculate_bs_price.call_count, 5)
 
+        # Reset mock and set new side effect for cost basis mode
+        mock_calculate_bs_price.reset_mock()
+        mock_calculate_bs_price.side_effect = [5.0, 10.0, 15.0, 20.0, 25.0]
+
+        # Calculate P&L for call option position using cost basis as entry price
+        pnl_data_cost_basis = calculate_position_pnl(
+            self.call_option,
+            price_range=(440.0, 480.0),
+            num_points=5,  # 440, 450, 460, 470, 480
+            use_cost_basis=True,  # Use cost basis as entry price
+        )
+
+        # Verify P&L calculations for option using cost basis
+        # P&L = (theo_price - cost_basis) * quantity * contract_multiplier
+        # Cost basis is $8 per contract, quantity is 1
+        expected_pnls_cost_basis = [
+            (price - 8.0) * 1 * contract_multiplier
+            for price in [5.0, 10.0, 15.0, 20.0, 25.0]
+        ]
+        for i, expected_pnl in enumerate(expected_pnls_cost_basis):
+            self.assertAlmostEqual(
+                pnl_data_cost_basis["pnl_values"][i], expected_pnl, places=2
+            )
+
+        # Verify mock was called for option position
+        self.assertEqual(mock_calculate_bs_price.call_count, 5)
+
     @patch("src.folio.pnl.calculate_position_pnl")
     def test_calculate_strategy_pnl(self, mock_calculate_position_pnl):
         """Test P&L calculation for a strategy (multiple positions)."""
-        # Mock the position P&L calculations
+        # Mock the position P&L calculations for default mode
         mock_calculate_position_pnl.side_effect = [
             {
                 "price_points": [400.0, 450.0, 500.0],
@@ -173,10 +230,10 @@ class TestPnLCalculations(unittest.TestCase):
             },
         ]
 
-        # Calculate P&L for a strategy with all positions
+        # Calculate P&L for a strategy with all positions using current price as entry price (default)
         positions = [self.stock_position, self.call_option, self.put_option]
         pnl_data = calculate_strategy_pnl(
-            positions, price_range=(400.0, 500.0), num_points=3
+            positions, price_range=(400.0, 500.0), num_points=3, use_cost_basis=False
         )
 
         # Verify the structure of the result
@@ -192,6 +249,55 @@ class TestPnLCalculations(unittest.TestCase):
         expected_combined_pnls = [-2500.0, 1200.0, 4900.0]
         for i, expected_pnl in enumerate(expected_combined_pnls):
             self.assertAlmostEqual(pnl_data["pnl_values"][i], expected_pnl, places=2)
+
+        # Verify mock was called for each position
+        self.assertEqual(mock_calculate_position_pnl.call_count, 3)
+
+        # Reset mock for cost basis mode
+        mock_calculate_position_pnl.reset_mock()
+
+        # Mock the position P&L calculations for cost basis mode
+        mock_calculate_position_pnl.side_effect = [
+            {
+                "price_points": [400.0, 450.0, 500.0],
+                "pnl_values": [
+                    -3000.0,
+                    2000.0,
+                    7000.0,
+                ],  # Different values for cost basis
+                "position": {},
+            },
+            {
+                "price_points": [400.0, 450.0, 500.0],
+                "pnl_values": [700.0, 400.0, 100.0],  # Different values for cost basis
+                "position": {},
+            },
+            {
+                "price_points": [400.0, 450.0, 500.0],
+                "pnl_values": [
+                    800.0,
+                    -200.0,
+                    -1200.0,
+                ],  # Different values for cost basis
+                "position": {},
+            },
+        ]
+
+        # Calculate P&L for a strategy with all positions using cost basis as entry price
+        pnl_data_cost_basis = calculate_strategy_pnl(
+            positions, price_range=(400.0, 500.0), num_points=3, use_cost_basis=True
+        )
+
+        # Verify combined P&L calculations for cost basis mode
+        expected_combined_pnls_cost_basis = [
+            -1500.0,
+            2200.0,
+            5900.0,
+        ]  # Different values for cost basis
+        for i, expected_pnl in enumerate(expected_combined_pnls_cost_basis):
+            self.assertAlmostEqual(
+                pnl_data_cost_basis["pnl_values"][i], expected_pnl, places=2
+            )
 
         # Verify mock was called for each position
         self.assertEqual(mock_calculate_position_pnl.call_count, 3)

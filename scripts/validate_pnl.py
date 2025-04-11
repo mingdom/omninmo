@@ -39,28 +39,15 @@ def print_position_details(positions):
     Args:
         positions: List of positions
     """
-    print("\nPosition Details:")
-    print("-" * 80)
 
-    for i, pos in enumerate(positions):
+    for _i, pos in enumerate(positions):
         position_type = getattr(pos, "position_type", "unknown")
         if position_type == "stock":
-            print(
-                f"{i + 1}. STOCK: {pos.ticker} - {pos.quantity} shares @ ${pos.price:.2f}"
-            )
-            print(f"   Market Exposure: ${pos.market_exposure:.2f}")
-            print(f"   Beta: {pos.beta:.2f}")
+            pass
         elif position_type == "option":
-            print(f"{i + 1}. OPTION: {pos.ticker} {pos.option_type} {pos.strike}")
-            print(f"   Expiry: {pos.expiry}")
-            print(f"   Quantity: {pos.quantity}, Price: ${pos.price:.2f}")
-            print(f"   Market Exposure: ${pos.market_exposure:.2f}")
-            print(
-                f"   Delta: {pos.delta:.4f}, Delta Exposure: ${pos.delta_exposure:.2f}"
-            )
+            pass
         else:
-            print(f"{i + 1}. UNKNOWN: {type(pos)}")
-        print()
+            pass
 
 
 def validate_pnl_for_group(group):
@@ -317,25 +304,12 @@ def main():
                 pnl_data, summary = pnl_results["default"]
 
                 # Print P&L data structure validation
-                print("\nP&L Data Structure Validation:")
-                print("-" * 80)
-                print(
-                    f"Price points: {len(pnl_data['price_points'])} points from "
-                    f"${pnl_data['price_points'][0]:.2f} to ${pnl_data['price_points'][-1]:.2f}"
-                )
-                print(f"P&L values: {len(pnl_data['pnl_values'])} values")
-                print(f"Min P&L: ${min(pnl_data['pnl_values']):.2f}")
-                print(f"Max P&L: ${max(pnl_data['pnl_values']):.2f}")
 
                 # Check if pnl_data has the expected structure
-                print("\nP&L Data Structure:")
-                print("-" * 80)
                 for key in pnl_data.keys():
-                    print(f"Key: {key}")
                     if key == "individual_pnls":
-                        print(f"  Number of individual P&Ls: {len(pnl_data[key])}")
-                        for i, pos_pnl in enumerate(pnl_data[key]):
-                            print(f"  Position {i + 1} keys: {pos_pnl.keys()}")
+                        for _i, _pos_pnl in enumerate(pnl_data[key]):
+                            pass
 
                 # Print individual position contributions at max profit price
                 max_profit_price = summary["max_profit_price"]
@@ -345,10 +319,6 @@ def main():
                         max_profit_idx = i
                         break
 
-                print("\nIndividual Position Contributions at Max Profit Price:")
-                print("-" * 80)
-                print(f"Max Profit Price: ${max_profit_price:.2f}")
-
                 total_pnl = 0
                 for i, pos_pnl in enumerate(pnl_data["individual_pnls"]):
                     pos_desc = pos_pnl.get("position", {}).get(
@@ -357,7 +327,7 @@ def main():
                     pos_type = pos_pnl.get("position", {}).get(
                         "position_type", "unknown"
                     )
-                    pos_quantity = pos_pnl.get("position", {}).get("quantity", 0)
+                    pos_pnl.get("position", {}).get("quantity", 0)
 
                     if pos_type == "option":
                         option_type = pos_pnl.get("position", {}).get("option_type", "")
@@ -366,21 +336,11 @@ def main():
 
                     pnl_at_max = pos_pnl["pnl_values"][max_profit_idx]
                     total_pnl += pnl_at_max
-                    print(
-                        f"{i + 1}. {pos_desc} (Qty: {pos_quantity}): ${pnl_at_max:.2f}"
-                    )
-
-                print(f"Total P&L at max profit price: ${total_pnl:.2f}")
-                print(f"Reported max profit: ${summary['max_profit']:.2f}")
 
                 # Also check at current price
                 # Find the closest price point to current price
                 price_points = np.array(pnl_data["price_points"])
                 current_idx = np.abs(price_points - current_price).argmin()
-
-                print("\nIndividual Position Contributions at Current Price:")
-                print("-" * 80)
-                print(f"Current Price: ${current_price:.2f}")
 
                 total_current_pnl = 0
                 for i, pos_pnl in enumerate(pnl_data["individual_pnls"]):
@@ -390,7 +350,7 @@ def main():
                     pos_type = pos_pnl.get("position", {}).get(
                         "position_type", "unknown"
                     )
-                    pos_quantity = pos_pnl.get("position", {}).get("quantity", 0)
+                    pos_pnl.get("position", {}).get("quantity", 0)
 
                     if pos_type == "option":
                         option_type = pos_pnl.get("position", {}).get("option_type", "")
@@ -399,46 +359,34 @@ def main():
 
                     pnl_at_current = pos_pnl["pnl_values"][current_idx]
                     total_current_pnl += pnl_at_current
-                    print(
-                        f"{i + 1}. {pos_desc} (Qty: {pos_quantity}): ${pnl_at_current:.2f}"
-                    )
-
-                print(f"Total P&L at current price: ${total_current_pnl:.2f}")
-                print(f"Reported current P&L: ${summary['current_pnl']:.2f}")
 
                 # Debug the current P&L calculation
-                print("\nDebugging Current P&L Calculation:")
-                print("-" * 80)
-                print(f"Current price: ${current_price:.2f}")
-                print(f"Current price index: {current_idx}")
-                print(
-                    f"Price point at index: ${pnl_data['price_points'][current_idx]:.2f}"
-                )
-                print(f"P&L value at index: ${pnl_data['pnl_values'][current_idx]:.2f}")
-                print(f"Summary current P&L: ${summary['current_pnl']:.2f}")
+
+                # Get the cost basis summary
+                pnl_data_cost_basis, summary_cost_basis = pnl_results["cost_basis"]
+
+                # Print individual position P&Ls at current price
+                for i, pos_pnl in enumerate(pnl_data["individual_pnls"]):
+                    pos_desc = pos_pnl.get("position", {}).get(
+                        "ticker", f"Position {i + 1}"
+                    )
+                    pos_type = pos_pnl.get("position", {}).get(
+                        "position_type", "unknown"
+                    )
+
+                    if pos_type == "option":
+                        option_type = pos_pnl.get("position", {}).get("option_type", "")
+                        strike = pos_pnl.get("position", {}).get("strike", 0)
+                        pos_desc = f"{pos_desc} {option_type} {strike}"
+
+                    pnl_at_current = pos_pnl["pnl_values"][current_idx]
 
                 # Print summary
-                print("\nP&L Summary:")
-                print("-" * 80)
-                print(
-                    f"Breakeven points: {[f'${bp:.2f}' for bp in summary['breakeven_points']]}"
-                )
-                print(
-                    f"Max profit: ${summary['max_profit']:.2f} at ${summary['max_profit_price']:.2f}"
-                )
-                print(
-                    f"Max loss: ${summary['max_loss']:.2f} at ${summary['max_loss_price']:.2f}"
-                )
-                print(f"Current P&L: ${summary['current_pnl']:.2f}")
-                print(
-                    f"Profitable ranges: {[(f'${start:.2f}', f'${end:.2f}') for start, end in summary['profitable_ranges']]}"
-                )
 
                 # Plot P&L for default mode
                 plot_pnl(pnl_data, summary, current_price, ticker, mode="default")
 
-                # Process cost basis mode
-                pnl_data_cost_basis, summary_cost_basis = pnl_results["cost_basis"]
+                # We already got the cost basis data above
 
                 # Plot P&L for cost basis mode
                 plot_pnl(

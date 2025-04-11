@@ -22,7 +22,7 @@ def calculate_position_pnl(
     position: StockPosition | OptionPosition,
     price_range: tuple[float, float] | None = None,
     num_points: int = 50,
-    evaluation_date: datetime.datetime | None = None,
+    evaluation_date: datetime.datetime | None = None,  # noqa: ARG001 - kept for API compatibility
     use_cost_basis: bool = False,
 ) -> dict[str, Any]:
     """

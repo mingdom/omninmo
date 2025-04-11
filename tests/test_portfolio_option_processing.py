@@ -25,6 +25,7 @@ def sample_portfolio_with_options():
             "Current Value": "1000.00",
             "Percent Of Account": "10.00",
             "Type": "Cash",
+            "Average Cost Basis": "95.00",
         },
         # Long call option
         {
@@ -35,6 +36,7 @@ def sample_portfolio_with_options():
             "Current Value": "1000.00",
             "Percent Of Account": "10.00",
             "Type": "Cash",
+            "Average Cost Basis": "4.50",
         },
         # Short call option
         {
@@ -45,6 +47,7 @@ def sample_portfolio_with_options():
             "Current Value": "-200.00",
             "Percent Of Account": "-2.00",
             "Type": "Cash",
+            "Average Cost Basis": "1.80",
         },
         # Long put option
         {
@@ -55,6 +58,7 @@ def sample_portfolio_with_options():
             "Current Value": "200.00",
             "Percent Of Account": "2.00",
             "Type": "Cash",
+            "Average Cost Basis": "1.90",
         },
         # Short put option
         {
@@ -65,6 +69,7 @@ def sample_portfolio_with_options():
             "Current Value": "-200.00",
             "Percent Of Account": "-2.00",
             "Type": "Cash",
+            "Average Cost Basis": "0.90",
         },
         # Orphaned option (no corresponding stock)
         {
@@ -75,6 +80,7 @@ def sample_portfolio_with_options():
             "Current Value": "1000.00",
             "Percent Of Account": "10.00",
             "Type": "Cash",
+            "Average Cost Basis": "9.50",
         },
     ]
     return pd.DataFrame(data)
