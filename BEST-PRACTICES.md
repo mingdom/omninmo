@@ -38,6 +38,9 @@ Follow consistent development practices to maintain code quality and developer p
   - **NEVER CREATE PRs WITHOUT BEING ASKED**: Do not create pull requests unless explicitly requested by the user
   - **Preserve Git History**: Never modify Git history without explicit user consent and understanding of the consequences
   - **Transparent Operations**: All version control suggestions must be explicit, visible, and explained clearly
+  - **Preferred Diff Tool**: Use `git aidiff` for code reviews with AI agents - this outputs complete diffs without requiring scrolling
+    - If not available, set up with: `git config --global alias.aidiff "!git --no-pager diff --unified=3 --color=never"`
+    - This produces AI-friendly output that shows the entire diff at once
 
 - **Commit Messages**:
   - **Delivery Format**: When asked to write a commit message, provide it directly as a markdown code block (```...```) in the chat, not as a separate file

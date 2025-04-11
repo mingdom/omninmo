@@ -135,11 +135,6 @@ def calculate_exposure(option, underlying_price, iv=0.3):
     exposure = delta * option.notional_value
 
     # Print detailed information for debugging
-    print(f"Option: {option.description}")
-    print(f"  Quantity: {option.quantity}")
-    print(f"  Delta: {delta:.4f}")
-    print(f"  Notional Value: {option.notional_value:.2f}")
-    print(f"  Exposure: {exposure:.2f}")
 
     return delta, exposure
 
@@ -431,7 +426,7 @@ def test_calculate_option_exposure(option_fixtures):
     )
 
 
-def test_process_options(option_fixtures):
+def test_process_options():
     """Test the process_options function."""
     # Update imports at the top of the file to include process_options
     from src.folio.option_utils import process_options
