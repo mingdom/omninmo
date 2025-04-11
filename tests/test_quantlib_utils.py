@@ -6,8 +6,8 @@ import datetime
 
 import pytest
 
-from src.folio.option_utils import OptionPosition
 from src.folio.quantlib_utils import (
+    OptionContract,
     calculate_black_scholes_delta,
     calculate_bs_price,
     calculate_implied_volatility,
@@ -23,7 +23,7 @@ def create_test_option(
 ):
     """Create a test option position."""
     expiry = datetime.datetime.now() + datetime.timedelta(days=days_to_expiry)
-    return OptionPosition(
+    return OptionContract(
         underlying="TEST",
         expiry=expiry,
         strike=strike,
