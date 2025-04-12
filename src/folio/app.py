@@ -16,11 +16,9 @@ import dash
 import dash_bootstrap_components as dbc
 import pandas as pd
 from dash import ALL, Input, Output, State, dcc, html
+from dash_bootstrap_templates import load_figure_template
 
 from . import portfolio
-
-# Import AI utilities directly
-# Import components
 from .components import create_premium_chat_component, register_premium_chat_callbacks
 from .components.charts import create_dashboard_section
 from .components.charts import register_callbacks as register_chart_callbacks
@@ -32,6 +30,9 @@ from .data_model import OptionPosition, PortfolioGroup, StockPosition
 from .error_utils import handle_callback_error
 from .logger import logger
 from .security import sanitize_dataframe, validate_csv_upload
+
+# Load the Bootstrap template for Plotly figures
+load_figure_template("bootstrap")
 
 
 def create_header() -> dbc.Card:
@@ -84,7 +85,7 @@ def create_upload_section() -> dbc.Card:
                 dbc.Button(
                     [
                         html.I(className="fas fa-upload me-2"),
-                        "Upload Portfolio",
+                        html.Span("Upload Portfolio"),
                         html.I(
                             className="fas fa-chevron-down ms-2", id="collapse-icon"
                         ),
@@ -228,9 +229,10 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
         suppress_callback_exceptions=True,
     )
 
-    # Enhanced UI CSS and royal purple theme are automatically loaded from the assets folder
+    # CSS files are automatically loaded from the assets folder
+    # main.css imports all other CSS files and applies the theme
 
-    # Define custom CSS
+    # Use a simpler index_string without inline styles
     app.index_string = """
     <!DOCTYPE html>
     <html>
@@ -239,27 +241,6 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
             <title>{%title%}</title>
             {%favicon%}
             {%css%}
-            <style>
-                .sort-header:hover {
-                    background-color: rgba(0,0,0,0.05);
-                }
-                .sort-header {
-                    transition: background-color 0.2s;
-                    padding: 8px 4px;
-                    border-radius: 4px;
-                }
-                kbd {
-                    display: inline-block;
-                    padding: 0.2em 0.4em;
-                    font-size: 0.85em;
-                    font-weight: 700;
-                    line-height: 1;
-                    color: #fff;
-                    background-color: #212529;
-                    border-radius: 0.2rem;
-                    box-shadow: 0 2px 0 rgba(0,0,0,0.2);
-                }
-            </style>
         </head>
         <body>
             {%app_entry%}
@@ -303,7 +284,7 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
                                                     html.I(
                                                         className="fas fa-table me-2"
                                                     ),
-                                                    "Portfolio Positions",
+                                                    html.Span("Portfolio Positions"),
                                                     html.I(
                                                         className="fas fa-chevron-down ms-2",
                                                         id="positions-collapse-icon",

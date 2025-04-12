@@ -11,6 +11,21 @@ from .logger import logger
 from .portfolio import calculate_beta_adjusted_net_exposure
 from .utils import format_currency
 
+
+class ChartColors:
+    """Chart color constants for consistent visualization.
+
+    This class defines the color palette used across all charts in the application.
+    Use these constants instead of hardcoded hex values to ensure consistency.
+    """
+
+    # Position colors
+    LONG = "#1A5D38"  # Dark green for long positions
+    SHORT = "#2F3136"  # Dark gray for short positions
+    OPTIONS = "#9B59B6"  # Purple for options
+    NET = "#3498DB"  # Blue for net values
+
+
 # transform_for_asset_allocation function has been removed in favor of the more accurate Exposure Chart
 
 
@@ -54,8 +69,13 @@ def transform_for_exposure_chart(
     # Format values for display
     text_values = [format_currency(value) for value in values]
 
-    # Colors for the bars - modern financial palette
-    colors = ["#27AE60", "#E74C3C", "#9B59B6", "#3498DB"]  # Green, Red, Purple, Blue
+    # Colors for the bars - using ChartColors constants
+    colors = [
+        ChartColors.LONG,
+        ChartColors.SHORT,
+        ChartColors.OPTIONS,
+        ChartColors.NET,
+    ]
 
     # Create the chart data
     chart_data = {
@@ -76,6 +96,8 @@ def transform_for_exposure_chart(
                 "text": "Market Exposure"
                 + (" (Beta-Adjusted)" if use_beta_adjusted else ""),
                 "font": {"size": 16, "color": "#2C3E50"},
+                "x": 0.5,  # Center the title
+                "xanchor": "center",
             },
             "xaxis": {
                 "title": "Exposure Type",
@@ -166,10 +188,8 @@ def transform_for_treemap(
         values.append(abs(exposure))  # Use absolute exposure for sizing
         texts.append(f"{ticker}: {format_currency(exposure)}")
 
-        # Color based on long/short - using modern financial colors
-        color = (
-            "#27AE60" if exposure > 0 else "#E74C3C"
-        )  # Modern green for long, modern red for short
+        # Color based on long/short - using ChartColors constants
+        color = ChartColors.LONG if exposure > 0 else ChartColors.SHORT
         colors.append(color)
 
     # We don't need to add individual positions anymore - just show the ticker level
@@ -201,6 +221,8 @@ def transform_for_treemap(
             "title": {
                 "text": "Position Size by Exposure",
                 "font": {"size": 16, "color": "#2C3E50"},
+                "x": 0.5,  # Center the title
+                "xanchor": "center",
             },
             "margin": {"l": 0, "r": 0, "t": 50, "b": 0, "pad": 4},
             "autosize": True,  # Allow the chart to resize with its container

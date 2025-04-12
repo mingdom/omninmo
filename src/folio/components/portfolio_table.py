@@ -30,7 +30,12 @@ def create_position_row(group: PortfolioGroup, _metrics: dict) -> dbc.Row:
 
     return dbc.Row(
         [
-            dbc.Col(html.Strong(ticker), width=2),
+            dbc.Col(
+                html.Strong(ticker),
+                width=2,
+                className="text-truncate text-center",
+                style={"padding": "0.5rem"},
+            ),
             dbc.Col(
                 [
                     html.Div(
@@ -45,8 +50,13 @@ def create_position_row(group: PortfolioGroup, _metrics: dict) -> dbc.Row:
                     )
                 ],
                 width=2,
+                className="text-truncate text-center",
             ),
-            dbc.Col(format_currency(group.net_exposure), width=2),
+            dbc.Col(
+                format_currency(group.net_exposure),
+                width=2,
+                className="text-truncate text-center",
+            ),
             dbc.Col(
                 format_beta(
                     group.beta_adjusted_exposure / group.net_exposure
@@ -54,22 +64,30 @@ def create_position_row(group: PortfolioGroup, _metrics: dict) -> dbc.Row:
                     else 0
                 ),
                 width=2,
+                className="text-truncate text-center",
             ),
             dbc.Col(
                 format_currency(group.beta_adjusted_exposure),
                 width=2,
+                className="text-truncate text-center",
             ),
             dbc.Col(
                 html.Div(
                     [
                         dbc.Button(
-                            "Analysis",
+                            html.I(className="fas fa-chart-line"),
                             id={"type": "position-pnl", "index": ticker},
                             color="primary",
                             size="sm",
+                            className="btn-icon",
+                        ),
+                        dbc.Tooltip(
+                            "View position analysis and P&L chart",
+                            target={"type": "position-pnl", "index": ticker},
+                            placement="left",
                         ),
                     ],
-                    className="d-flex justify-content-end",
+                    className="d-flex justify-content-center",
                 ),
                 width=2,
             ),
@@ -109,8 +127,7 @@ def create_sortable_header(label: str, column_id: str, current_sort: str) -> htm
     return html.Div(
         [html.Strong(label), indicator],
         id={"type": "sort-header", "column": column_id},
-        className="d-flex align-items-center justify-content-between sort-header",
-        style={"cursor": "pointer"},
+        className="d-flex align-items-center justify-content-center sort-header",
     )
 
 
@@ -166,16 +183,39 @@ def create_portfolio_table(
     # Create table header with proper thead structure
     header_row = dbc.Row(
         [
-            dbc.Col(create_sortable_header("Ticker", "ticker", sort_by), width=2),
-            dbc.Col(create_sortable_header("Type", "type", sort_by), width=2),
-            dbc.Col(create_sortable_header("Exposure", "value", sort_by), width=2),
-            dbc.Col(create_sortable_header("Beta", "beta", sort_by), width=2),
             dbc.Col(
-                create_sortable_header("Beta-Adj Exp", "exposure", sort_by), width=2
+                create_sortable_header("Ticker", "ticker", sort_by),
+                width=2,
+                className="text-truncate text-center",
+                style={"padding": "0.5rem"},
             ),
-            dbc.Col("", width=2),
+            dbc.Col(
+                create_sortable_header("Type", "type", sort_by),
+                width=2,
+                className="text-truncate text-center",
+                style={"padding": "0.5rem"},
+            ),
+            dbc.Col(
+                create_sortable_header("Exposure", "value", sort_by),
+                width=2,
+                className="text-truncate text-center",
+                style={"padding": "0.5rem"},
+            ),
+            dbc.Col(
+                create_sortable_header("Beta", "beta", sort_by),
+                width=2,
+                className="text-truncate text-center",
+                style={"padding": "0.5rem"},
+            ),
+            dbc.Col(
+                create_sortable_header("Beta-Adj Exp", "exposure", sort_by),
+                width=2,
+                className="text-truncate text-center",
+                style={"padding": "0.5rem"},
+            ),
+            dbc.Col("", width=2, className="text-center", style={"padding": "0.5rem"}),
         ],
-        className="g-0 border-bottom py-2 bg-light",
+        className="g-0 border-bottom py-2 bg-light header-row",
     )
 
     # Create table rows
@@ -190,8 +230,10 @@ def create_portfolio_table(
                     html.Thead(header_row),  # Wrap header in thead
                     html.Tbody(rows),  # Wrap rows in tbody
                 ],
-                className="portfolio-table",
+                className="portfolio-table table-hover table-borderless w-100",
                 responsive=True,
+                bordered=False,
+                striped=False,
             )
         ],
         className="portfolio-table-container",

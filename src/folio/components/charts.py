@@ -112,7 +112,7 @@ def create_dashboard_section():
                 dbc.Button(
                     [
                         html.I(className="fas fa-chart-bar me-2"),
-                        "Portfolio Visualizations",
+                        html.Span("Portfolio Visualizations"),
                         html.I(
                             className="fas fa-chevron-down ms-2",
                             id="charts-collapse-icon",
@@ -130,9 +130,6 @@ def create_dashboard_section():
                         # Market Exposure Chart (in its own card)
                         dbc.Card(
                             [
-                                dbc.CardHeader(
-                                    html.H5("Market Exposure", className="m-0"),
-                                ),
                                 dbc.CardBody(
                                     [
                                         create_exposure_chart(),
@@ -144,11 +141,6 @@ def create_dashboard_section():
                         # Position Treemap (in its own card)
                         dbc.Card(
                             [
-                                dbc.CardHeader(
-                                    html.H5(
-                                        "Position Size by Exposure", className="m-0"
-                                    ),
-                                ),
                                 dbc.CardBody(
                                     [
                                         create_position_treemap(),
@@ -253,7 +245,7 @@ def register_callbacks(app):
         """Update the exposure chart based on user selection."""
         if not summary_data:
             # Return empty figure if no data
-            return {"data": [], "layout": {"height": 300}}, True, False
+            return ({"data": [], "layout": {"height": 300}}, True, False)
 
         try:
             # Determine which view to use based on button clicks

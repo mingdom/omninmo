@@ -14,6 +14,34 @@ Folio's design is guided by the following core principles:
 4. **Usability**: Create intuitive interfaces that require minimal learning
 5. **Sophistication**: Present a professional, refined appearance appropriate for a financial application
 
+## Styling Principles
+
+### CSS-First Approach
+
+When implementing UI changes, follow these principles:
+
+1. **Use CSS Overrides**: Always prefer CSS overrides over code changes when styling components
+2. **Target Component Structure**: Use CSS selectors that target the component structure rather than adding custom classes
+3. **Centralize Styles**: Keep all styles in the appropriate CSS files rather than inline styles
+4. **Specificity**: Use specific selectors (like IDs) for one-off styling needs and more general selectors for common patterns
+
+Example of the CSS-first approach:
+
+```css
+/* Instead of adding a custom class to center text */
+#summary-card .card-body > h4 {
+  text-align: center;
+}
+
+/* Instead of adding a custom class to all collapsible headers */
+.card .card-header button span {
+  font-size: 1.5rem;
+  font-weight: 500;
+}
+```
+
+This approach ensures consistency, reduces code complexity, and makes styling changes easier to maintain.
+
 ## Color Palette
 
 ### Primary Colors
@@ -34,6 +62,19 @@ Folio's design is guided by the following core principles:
 | Danger Red | #DC3545 | Negative values, errors, warnings |
 | Info Blue | #17A2B8 | Informational elements |
 | Warning Yellow | #FFC107 | Caution states |
+
+### Chart Colors
+
+Chart colors are defined in the `ChartColors` class in `src/folio/chart_data.py`:
+
+| Color Name | Hex Code | Constant | Usage |
+|------------|----------|----------|-------|
+| Dark Green | #1A5D38 | `ChartColors.LONG` | Long positions in charts |
+| Dark Gray | #2F3136 | `ChartColors.SHORT` | Short positions in charts |
+| Purple | #9B59B6 | `ChartColors.OPTIONS` | Options in charts |
+| Blue | #3498DB | `ChartColors.NET` | Net values in charts |
+
+Always use these constants instead of hardcoded hex values to ensure consistency across charts.
 
 ### Gradients
 
@@ -118,6 +159,48 @@ transition: transform 0.2s, box-shadow 0.2s;
 ```
 
 Card headers should use a subtle gradient or solid color to distinguish them from the body.
+
+### Collapsible Sections
+
+Collapsible sections are used throughout the application to organize content and allow users to focus on specific areas. Following our CSS-first approach, the styling for collapsible sections is automatically applied through CSS targeting the Dash Bootstrap Components structure.
+
+To create a collapsible section, use the standard Dash Bootstrap Components pattern:
+
+```python
+dbc.Card([
+    dbc.CardHeader(
+        dbc.Button(
+            [
+                html.I(className="fas fa-chart-bar me-2"),  # Icon before title
+                html.Span("Section Title"),               # Section title
+                html.I(className="fas fa-chevron-down ms-2", id="section-collapse-icon"),  # Chevron icon
+            ],
+            id="section-collapse-button",
+            color="link",
+            className="text-decoration-none text-dark p-0 d-flex align-items-center w-100 justify-content-between",
+        ),
+    ),
+    dbc.Collapse(
+        dbc.CardBody(your_content),
+        id="section-collapse",
+        is_open=True,
+    ),
+], className="mb-3")
+```
+
+The styling is automatically applied through CSS selectors in `src/folio/assets/components/cards.css`:
+
+```css
+/* Collapsible section headers */
+.card .card-header button span {
+  font-size: 1.5rem;
+  font-weight: 500;
+  margin-bottom: 0;
+  line-height: 1.2;
+}
+```
+
+This ensures consistent appearance across all collapsible sections without requiring any special classes or utility functions. When you need to make styling changes, update the CSS rather than modifying the component code.
 
 ### Tables
 
@@ -278,18 +361,49 @@ fig = px.line(df, x="date", y="value", template="bootstrap")
 - Use consistent naming conventions (BEM or similar)
 - Document complex components
 - Keep selectors as simple as possible
+- Follow the CSS-first approach for styling components
+- Centralize styles in appropriate CSS files rather than using inline styles
+- Use CSS selectors that target component structure rather than adding custom classes
+- Update CSS files when making styling changes rather than modifying component code
 - Avoid !important declarations
 - Use comments to explain non-obvious styling decisions
 
-## Implementation Plan
+## Implementation Status
 
-To improve the current styling approach:
+The styling system has been implemented with the following structure:
 
-1. **Consolidate CSS Files**: Merge the multiple CSS files into a more organized structure
-2. **Implement CSS Variables**: Convert hard-coded color values to CSS variables
-3. **Create a Theme System**: Implement a proper theme system using CSS variables
-4. **Standardize Component Styling**: Ensure all components follow the design guidelines
-5. **Document Components**: Create a simple component library for reference
+### CSS Organization
+
+CSS is organized in a modular, maintainable way using CSS variables and component-specific files:
+
+1. **Theme Variables**: All design tokens (colors, spacing, etc.) are defined as CSS variables in `theme.css`
+2. **Component Files**: Each component type has its own CSS file in the `components/` directory
+3. **Layout Styles**: Layout-specific styles are in `layout.css`
+4. **Main CSS**: All CSS files are imported in `main.css`
+
+### File Structure
+
+```
+src/folio/assets/
+├── theme.css           # CSS variables for colors, spacing, etc.
+├── layout.css          # Layout-specific styles
+├── main.css            # Main CSS file that imports all other CSS files
+└── components/
+    ├── buttons.css     # Button styles
+    ├── cards.css       # Card styles
+    ├── tables.css      # Table styles
+    ├── forms.css       # Form styles
+    ├── modals.css      # Modal styles
+    └── charts.css      # Chart styles
+```
+
+This implementation:
+
+1. ✅ **Consolidates CSS Files**: Organized CSS into a logical structure
+2. ✅ **Implements CSS Variables**: All design tokens are CSS variables
+3. ✅ **Creates a Theme System**: Theme variables in a central location
+4. ✅ **Standardizes Component Styling**: All components follow the design guidelines
+5. ✅ **Documents Components**: This document serves as the reference
 
 ## Conclusion
 
