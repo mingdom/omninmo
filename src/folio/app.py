@@ -42,6 +42,12 @@ def create_header() -> dbc.Card:
 
 def create_empty_state() -> html.Div:
     """Create the empty state with instructions"""
+    # Check if private portfolio exists
+    private_path = Path(os.getcwd()) / "private-data" / "portfolio-private.csv"
+    button_label = (
+        "Load Private Portfolio" if private_path.exists() else "Load Sample Portfolio"
+    )
+
     return html.Div(
         [
             html.H4("Welcome to Folio", className="text-center mb-3"),
@@ -59,7 +65,7 @@ def create_empty_state() -> html.Div:
                 className="text-center mt-3",
             ),
             dbc.Button(
-                "Load Sample Portfolio",
+                button_label,
                 id="load-sample",
                 color="primary",
                 className="mx-auto d-block",
@@ -222,7 +228,7 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
         suppress_callback_exceptions=True,
     )
 
-    # Enhanced UI CSS is automatically loaded from the assets folder
+    # Enhanced UI CSS and royal purple theme are automatically loaded from the assets folder
 
     # Define custom CSS
     app.index_string = """
@@ -475,33 +481,40 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
         if n_clicks:
             logger.info("LOAD_SAMPLE_PORTFOLIO: Processing sample portfolio")
             try:
-                # Path to sample portfolio in assets directory
+                # First check if private portfolio exists for local debugging
+                private_path = (
+                    Path(os.getcwd()) / "private-data" / "portfolio-private.csv"
+                )
                 sample_path = Path(__file__).parent / "assets" / "sample-portfolio.csv"
-                logger.info(f"Looking for sample portfolio at: {sample_path}")
 
-                if not sample_path.exists():
-                    logger.warning(f"Sample portfolio not found at {sample_path}")
+                # Determine which file to use
+                if private_path.exists():
+                    logger.info(f"Found private portfolio at: {private_path}")
+                    portfolio_path = private_path
+                    filename = "portfolio-private.csv"
+                elif sample_path.exists():
+                    logger.info(f"Using sample portfolio at: {sample_path}")
+                    portfolio_path = sample_path
+                    filename = "sample-portfolio.csv"
+                else:
+                    logger.warning("Neither private nor sample portfolio found")
                     return None, None
 
-                logger.info(f"Sample portfolio found at: {sample_path}")
+                logger.info(f"Loading portfolio from: {portfolio_path}")
 
                 # Debug the file content
-                with open(sample_path) as f:
+                with open(portfolio_path) as f:
                     content = f.read()
-                    logger.info(
-                        f"Sample portfolio content (first 100 chars): {content[:100]}"
-                    )
+                    logger.info(f"Portfolio content (first 100 chars): {content[:100]}")
 
-                # Read the sample portfolio file
-                with open(sample_path, "rb") as f:
+                # Read the portfolio file
+                with open(portfolio_path, "rb") as f:
                     file_content = f.read()
-                    logger.info(
-                        f"Read {len(file_content)} bytes from sample portfolio file"
-                    )
+                    logger.info(f"Read {len(file_content)} bytes from portfolio file")
 
-                # Validate the sample file content
+                # Validate the file content
                 # We'll sanitize it during the normal processing flow
-                df = pd.read_csv(sample_path)
+                df = pd.read_csv(portfolio_path)
 
                 # Check for any potentially dangerous content
                 df = sanitize_dataframe(df)
@@ -520,7 +533,7 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
                 # Return both the contents and the filename
                 return (
                     f"data:{content_type};base64,{content_string}",
-                    "sample-portfolio.csv",
+                    filename,
                 )
             except Exception as e:
                 logger.error(f"Error loading sample portfolio: {e}", exc_info=True)
