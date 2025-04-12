@@ -7,15 +7,13 @@ of underlying prices. It supports both stock and option positions.
 """
 
 import datetime
-import logging
 from typing import Any
 
 import numpy as np
 
 from .data_model import OptionPosition, StockPosition
+from .logger import logger
 from .options import OptionContract, calculate_bs_price
-
-logger = logging.getLogger(__name__)
 
 
 def calculate_position_pnl(
@@ -256,6 +254,258 @@ def calculate_breakeven_points(pnl_data: dict[str, Any]) -> list[float]:
     return breakeven_points
 
 
+def analyze_asymptotic_behavior(positions: list) -> dict[str, bool]:
+    """
+    Analyze whether profit/loss is unbounded as price approaches extreme values.
+
+    Uses the effective delta at very high and very low prices to determine
+    if the P&L is bounded or unbounded in either direction.
+
+    Args:
+        positions: List of stock and option positions
+
+    Returns:
+        Dict with unbounded_profit and unbounded_loss flags
+    """
+    # Check if this is a SPY position for debugging
+    is_spy_position = any(p.get("ticker", "") == "SPY" for p in positions)
+    if is_spy_position:
+        logger.info(f"SPY position detected with {len(positions)} positions")
+        for i, pos in enumerate(positions):
+            logger.info(
+                f"Position {i}: {pos.get('ticker')} {pos.get('position_type')} {pos.get('option_type', '')} {pos.get('quantity')}"
+            )
+
+    # Use fixed extreme price points to approximate infinity and zero
+    # This removes dependency on current_price and provides consistent behavior
+    high_price = 1_000_000  # $1 million per share
+    low_price = 0.01  # 1 cent per share
+
+    # Calculate the total "effective delta" at these extreme prices
+    high_price_delta = 0
+    low_price_delta = 0
+
+    # For debugging, track individual position deltas
+    position_deltas = []
+
+    for position in positions:
+        # For options, use their delta calculation
+        if position.get("position_type") == "option":
+            # Create an OptionContract for delta calculation
+            import datetime
+
+            from src.folio.options import OptionContract
+
+            # Parse expiry date from string format (assuming YYYY-MM-DD)
+            expiry_str = position.get("expiration", "2025-01-01")
+            if isinstance(expiry_str, str):
+                try:
+                    year, month, day = map(int, expiry_str.split("-"))
+                    expiry = datetime.datetime(year, month, day)
+                except (ValueError, AttributeError):
+                    # Default to 1 year from now if parsing fails
+                    expiry = datetime.datetime.now() + datetime.timedelta(days=365)
+            elif isinstance(expiry_str, datetime.date):
+                expiry = datetime.datetime.combine(
+                    expiry_str, datetime.datetime.min.time()
+                )
+            else:
+                # Default to 1 year from now
+                expiry = datetime.datetime.now() + datetime.timedelta(days=365)
+
+            option_contract = OptionContract(
+                underlying=position.get("ticker", ""),
+                expiry=expiry,
+                strike=position.get("strike", 0),
+                option_type=position.get("option_type", "CALL"),
+                quantity=position.get("quantity", 0),
+                current_price=position.get("price", 0),
+                cost_basis=position.get("cost_basis", 0),
+                description=position.get("description", ""),
+            )
+
+            # Get option type and quantity for delta calculation
+            option_type = position.get("option_type", "")
+            quantity = position.get("quantity", 0)
+
+            # Calculate delta at extreme prices
+            from src.folio.options import calculate_black_scholes_delta
+
+            try:
+                delta_at_high_price = calculate_black_scholes_delta(
+                    option_contract, high_price
+                )
+                delta_at_low_price = calculate_black_scholes_delta(
+                    option_contract, low_price
+                )
+
+                # Scale by position size (100 shares per contract)
+                contract_multiplier = 100
+                position_high_delta = (
+                    delta_at_high_price * quantity * contract_multiplier
+                )
+                position_low_delta = delta_at_low_price * quantity * contract_multiplier
+                high_price_delta += position_high_delta
+                low_price_delta += position_low_delta
+
+                # Track individual position deltas for debugging
+                position_deltas.append(
+                    {
+                        "type": "option",
+                        "option_type": position.get("option_type", ""),
+                        "strike": position.get("strike", 0),
+                        "quantity": quantity,
+                        "high_delta": position_high_delta,
+                        "low_delta": position_low_delta,
+                    }
+                )
+            except Exception:
+                # If delta calculation fails, use simplified approach based on option type
+                if option_type == "CALL":
+                    # For calls: delta approaches 1 at high prices, 0 at low prices
+                    position_high_delta = 1 * quantity * 100
+                    position_low_delta = 0
+                    high_price_delta += position_high_delta
+                    # No contribution at low prices (delta approaches 0)
+
+                    # Track individual position deltas for debugging
+                    position_deltas.append(
+                        {
+                            "type": "option (fallback)",
+                            "option_type": "CALL",
+                            "strike": position.get("strike", 0),
+                            "quantity": quantity,
+                            "high_delta": position_high_delta,
+                            "low_delta": position_low_delta,
+                        }
+                    )
+                elif option_type == "PUT":
+                    # For puts: delta approaches 0 at high prices, -1 at low prices
+                    position_high_delta = 0
+                    position_low_delta = -1 * quantity * 100
+                    low_price_delta += position_low_delta
+                    # No contribution at high prices (delta approaches 0)
+
+                    # Track individual position deltas for debugging
+                    position_deltas.append(
+                        {
+                            "type": "option (fallback)",
+                            "option_type": "PUT",
+                            "strike": position.get("strike", 0),
+                            "quantity": quantity,
+                            "high_delta": position_high_delta,
+                            "low_delta": position_low_delta,
+                        }
+                    )
+
+        # For stocks, delta is always 1 (or -1 for short positions)
+        elif position.get("position_type") == "stock":
+            quantity = position.get("quantity", 0)
+            position_high_delta = quantity
+            position_low_delta = quantity
+            high_price_delta += position_high_delta
+            low_price_delta += position_low_delta
+
+            # Track individual position deltas for debugging
+            position_deltas.append(
+                {
+                    "type": "stock",
+                    "ticker": position.get("ticker", ""),
+                    "quantity": quantity,
+                    "high_delta": position_high_delta,
+                    "low_delta": position_low_delta,
+                }
+            )
+
+        # Skip unknown position types
+        else:
+            continue
+
+    # Threshold for considering delta significant
+    delta_threshold = 2.0  # Higher threshold to avoid false positives
+
+    # Log delta values and position details for debugging
+    logger.info(
+        f"Delta values: high_price_delta={high_price_delta}, low_price_delta={low_price_delta}"
+    )
+    logger.info(f"Using delta_threshold={delta_threshold}")
+
+    # Log individual position deltas
+    logger.info("Individual position deltas:")
+    for pos in position_deltas:
+        logger.info(
+            f"  {pos['type']} {pos.get('option_type', '')} {pos.get('strike', '')} qty={pos['quantity']}: high_delta={pos['high_delta']:.2f}, low_delta={pos['low_delta']:.2f}"
+        )
+
+    # Determine unbounded profit/loss based on delta
+    unbounded_profit_high = high_price_delta > delta_threshold
+    unbounded_loss_high = high_price_delta < -delta_threshold
+    unbounded_profit_low = low_price_delta < -delta_threshold
+    unbounded_loss_low = low_price_delta > delta_threshold
+
+    # Log the final determination
+    logger.info(
+        f"Final determination: unbounded_profit_high={unbounded_profit_high}, unbounded_loss_high={unbounded_loss_high}, unbounded_profit_low={unbounded_profit_low}, unbounded_loss_low={unbounded_loss_low}"
+    )
+
+    return {
+        "unbounded_profit_high": unbounded_profit_high,
+        "unbounded_loss_high": unbounded_loss_high,
+        "unbounded_profit_low": unbounded_profit_low,
+        "unbounded_loss_low": unbounded_loss_low,
+    }
+
+
+def determine_boundedness(
+    pnl_data: dict[str, Any], max_profit_idx: int, max_loss_idx: int, price_points: list
+) -> tuple[bool, bool]:
+    """
+    Determine if profit/loss is unbounded based on position data or edge detection.
+
+    Args:
+        pnl_data: P&L data from calculate_strategy_pnl
+        max_profit_idx: Index of maximum profit in pnl_values
+        max_loss_idx: Index of maximum loss in pnl_values
+        price_points: List of price points used for P&L calculation
+
+    Returns:
+        Tuple of (unbounded_profit, unbounded_loss) flags
+    """
+    # Use asymptotic analysis if we have position data
+    if "positions" in pnl_data:
+        # Log SPY positions for debugging
+        is_spy = any(p.get("ticker", "") == "SPY" for p in pnl_data["positions"])
+        if is_spy:
+            logger.info(
+                f"SPY position detected with {len(pnl_data['positions'])} positions"
+            )
+
+        # Get asymptotic behavior
+        results = analyze_asymptotic_behavior(pnl_data["positions"])
+
+        # Combine high/low results
+        unbounded_profit = (
+            results["unbounded_profit_high"] or results["unbounded_profit_low"]
+        )
+        unbounded_loss = results["unbounded_loss_high"] or results["unbounded_loss_low"]
+
+        if is_spy:
+            logger.info(f"SPY asymptotic results: {results}")
+            logger.info(
+                f"Final SPY determination: profit={unbounded_profit}, loss={unbounded_loss}"
+            )
+
+        return unbounded_profit, unbounded_loss
+
+    # Fallback to edge detection if no position data
+    # Profit is unbounded if max profit is at edge of price range
+    unbounded_profit = max_profit_idx == 0 or max_profit_idx == len(price_points) - 1
+    # Loss is unbounded if max loss is at edge of price range
+    unbounded_loss = max_loss_idx == 0 or max_loss_idx == len(price_points) - 1
+
+    return unbounded_profit, unbounded_loss
+
+
 def calculate_max_profit_loss(pnl_data: dict[str, Any]) -> dict[str, Any]:
     """
     Calculate maximum profit and loss from P&L data.
@@ -267,6 +517,10 @@ def calculate_max_profit_loss(pnl_data: dict[str, Any]) -> dict[str, Any]:
         Dictionary with max_profit, max_loss, and their corresponding prices,
         plus flags indicating if profit or loss might be unbounded
     """
+    # Log that we're calculating max profit/loss
+    logger.info("Calculating max profit/loss")
+    logger.info(f"pnl_data keys: {pnl_data.keys()}")
+
     price_points = pnl_data["price_points"]
     pnl_values = pnl_data["pnl_values"]
 
@@ -290,38 +544,14 @@ def calculate_max_profit_loss(pnl_data: dict[str, Any]) -> dict[str, Any]:
     max_loss_idx = pnl_values.index(max_loss)
     max_loss_price = price_points[max_loss_idx]
 
-    # Check if profit might be unbounded (max profit at the edge of the range)
-    unbounded_profit = max_profit_idx == 0 or max_profit_idx == len(price_points) - 1
+    # Initialize unbounded flags
+    unbounded_profit = False
+    unbounded_loss = False
 
-    # Check if loss might be unbounded (max loss at the edge of the range)
-    unbounded_loss = max_loss_idx == 0 or max_loss_idx == len(price_points) - 1
-
-    # If we have position data, we can be more precise about unbounded profit/loss
-    if "positions" in pnl_data:
-        positions = pnl_data["positions"]
-
-        # Check for positions that can have unbounded profit/loss
-        has_short_call = any(
-            p.get("position_type") == "option"
-            and p.get("option_type") == "CALL"
-            and p.get("quantity", 0) < 0
-            for p in positions
-        )
-
-        has_long_call = any(
-            p.get("position_type") == "option"
-            and p.get("option_type") == "CALL"
-            and p.get("quantity", 0) > 0
-            for p in positions
-        )
-
-        # Short calls have unbounded loss on the upside
-        if has_short_call and max_loss_idx == len(price_points) - 1:
-            unbounded_loss = True
-
-        # Long calls have unbounded profit on the upside
-        if has_long_call and max_profit_idx == len(price_points) - 1:
-            unbounded_profit = True
+    # Determine if profit/loss is unbounded
+    unbounded_profit, unbounded_loss = determine_boundedness(
+        pnl_data, max_profit_idx, max_loss_idx, price_points
+    )
 
     return {
         "max_profit": max_profit,
