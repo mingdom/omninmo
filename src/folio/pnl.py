@@ -456,52 +456,45 @@ def analyze_asymptotic_behavior(positions: list) -> dict[str, bool]:
     }
 
 
-def determine_boundedness(
-    pnl_data: dict[str, Any], max_profit_idx: int, max_loss_idx: int, price_points: list
-) -> tuple[bool, bool]:
+def determine_boundedness(pnl_data: dict[str, Any]) -> tuple[bool, bool]:
     """
-    Determine if profit/loss is unbounded based on position data or edge detection.
+    Determine if profit/loss is unbounded based on position data.
 
     Args:
-        pnl_data: P&L data from calculate_strategy_pnl
-        max_profit_idx: Index of maximum profit in pnl_values
-        max_loss_idx: Index of maximum loss in pnl_values
-        price_points: List of price points used for P&L calculation
+        pnl_data: P&L data from calculate_strategy_pnl containing positions
 
     Returns:
         Tuple of (unbounded_profit, unbounded_loss) flags
+
+    Raises:
+        ValueError: If positions data is not available in pnl_data
     """
-    # Use asymptotic analysis if we have position data
-    if "positions" in pnl_data:
-        # Log SPY positions for debugging
-        is_spy = any(p.get("ticker", "") == "SPY" for p in pnl_data["positions"])
-        if is_spy:
-            logger.info(
-                f"SPY position detected with {len(pnl_data['positions'])} positions"
-            )
+    # Validate input - positions data must be available
+    if "positions" not in pnl_data:
+        logger.warning("No position data available for asymptotic analysis")
+        raise ValueError("Position data is required for boundedness determination")
 
-        # Get asymptotic behavior
-        results = analyze_asymptotic_behavior(pnl_data["positions"])
-
-        # Combine high/low results
-        unbounded_profit = (
-            results["unbounded_profit_high"] or results["unbounded_profit_low"]
+    # Log SPY positions for debugging
+    is_spy = any(p.get("ticker", "") == "SPY" for p in pnl_data["positions"])
+    if is_spy:
+        logger.info(
+            f"SPY position detected with {len(pnl_data['positions'])} positions"
         )
-        unbounded_loss = results["unbounded_loss_high"] or results["unbounded_loss_low"]
 
-        if is_spy:
-            logger.info(f"SPY asymptotic results: {results}")
-            logger.info(
-                f"Final SPY determination: profit={unbounded_profit}, loss={unbounded_loss}"
-            )
+    # Get asymptotic behavior
+    results = analyze_asymptotic_behavior(pnl_data["positions"])
 
-        return unbounded_profit, unbounded_loss
+    # Combine high/low results
+    unbounded_profit = (
+        results["unbounded_profit_high"] or results["unbounded_profit_low"]
+    )
+    unbounded_loss = results["unbounded_loss_high"] or results["unbounded_loss_low"]
 
-    # Fallback to edge detection if no position data
-    # Profit is unbounded if max profit is at edge of price range
-    unbounded_profit = max_profit_idx == 0 or max_profit_idx == len(price_points) - 1
-    # Loss is unbounded if max loss is at edge of price range
-    unbounded_loss = max_loss_idx == 0 or max_loss_idx == len(price_points) - 1
+    if is_spy:
+        logger.info(f"SPY asymptotic results: {results}")
+        logger.info(
+            f"Final SPY determination: profit={unbounded_profit}, loss={unbounded_loss}"
+        )
 
     return unbounded_profit, unbounded_loss
 
@@ -549,9 +542,17 @@ def calculate_max_profit_loss(pnl_data: dict[str, Any]) -> dict[str, Any]:
     unbounded_loss = False
 
     # Determine if profit/loss is unbounded
-    unbounded_profit, unbounded_loss = determine_boundedness(
-        pnl_data, max_profit_idx, max_loss_idx, price_points
-    )
+    try:
+        unbounded_profit, unbounded_loss = determine_boundedness(pnl_data)
+    except ValueError:
+        # Fallback to edge detection if no position data
+        logger.warning("Falling back to edge detection for boundedness determination")
+        # Profit is unbounded if max profit is at edge of price range
+        unbounded_profit = (
+            max_profit_idx == 0 or max_profit_idx == len(price_points) - 1
+        )
+        # Loss is unbounded if max loss is at edge of price range
+        unbounded_loss = max_loss_idx == 0 or max_loss_idx == len(price_points) - 1
 
     return {
         "max_profit": max_profit,
