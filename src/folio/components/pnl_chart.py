@@ -52,7 +52,7 @@ def create_pnl_chart(
         )
     )
 
-    # Plot individual position P&Ls
+    # Plot individual position P&Ls (hidden by default)
     if "individual_pnls" in pnl_data:
         for i, pos_pnl in enumerate(pnl_data["individual_pnls"]):
             position_data = pos_pnl.get("position", {})
@@ -75,6 +75,7 @@ def create_pnl_chart(
                     name=pos_desc,
                     line=dict(dash="dash", width=1.5),
                     opacity=0.7,
+                    visible="legendonly",  # Hidden by default, can be toggled in legend
                 )
             )
 
@@ -92,40 +93,14 @@ def create_pnl_chart(
         opacity=0.7,
     )
 
-    # Add annotation for current price
-    fig.add_annotation(
-        x=current_price,
-        y=max(pnl_data["pnl_values"]) * 0.9,  # Position near the top
-        text=f"Current Price: ${current_price:.2f}",
-        showarrow=True,
-        arrowhead=2,
-        arrowsize=1,
-        arrowwidth=2,
-        arrowcolor="green",
-        font=dict(size=12, color="green"),
-        align="center",
-    )
+    # Add vertical line for current price without text label
 
-    # Add breakeven points
+    # Add breakeven points (vertical lines only, no text)
     for bp in summary["breakeven_points"]:
         fig.add_vline(
             x=bp,
             line=dict(color="orange", width=1, dash="dot"),
             opacity=0.5,
-        )
-        # Add annotation for break-even point
-        fig.add_annotation(
-            x=bp,
-            y=0,  # Break-even is where P&L = 0
-            text=f"Break-even: ${bp:.2f}",
-            showarrow=True,
-            arrowhead=2,
-            arrowsize=1,
-            arrowwidth=1,
-            arrowcolor="orange",
-            font=dict(size=10, color="orange"),
-            align="center",
-            yshift=20,  # Shift up a bit from the axis
         )
 
     # Add max profit/loss points
@@ -137,29 +112,25 @@ def create_pnl_chart(
             y=[max_profit],
             mode="markers",
             marker=dict(color="green", size=10),
+            name="Max Profit",
             showlegend=False,
         )
     )
-    # Add annotation for max profit
+    # Add marker for max profit with infinity symbol if unbounded
     unbounded_profit = summary.get("unbounded_profit", False)
-    if unbounded_profit:
-        profit_text = "Profit is unlimited (continues beyond chart)"
-    else:
-        profit_text = f"Max Profit: ${max_profit:.2f} at ${max_profit_price:.2f}"
 
-    fig.add_annotation(
-        x=max_profit_price,
-        y=max_profit,
-        text=profit_text,
-        showarrow=True,
-        arrowhead=2,
-        arrowsize=1,
-        arrowwidth=1,
-        arrowcolor="green",
-        font=dict(size=10, color="green"),
-        align="center",
-        yshift=20,
-    )
+    # If profit is unbounded, add an infinity arrow pointing up/right
+    if unbounded_profit:
+        # Add arrow pointing to infinity
+        fig.add_annotation(
+            x=max_profit_price,
+            y=max_profit,
+            text="↗∞",  # Up-right arrow with infinity symbol
+            showarrow=False,
+            font=dict(size=16, color="green"),
+            align="center",
+        )
+    # Otherwise, just show the marker without text
 
     max_loss = summary["max_loss"]
     max_loss_price = summary["max_loss_price"]
@@ -169,29 +140,25 @@ def create_pnl_chart(
             y=[max_loss],
             mode="markers",
             marker=dict(color="red", size=10),
+            name="Max Loss",
             showlegend=False,
         )
     )
-    # Add annotation for max loss
+    # Add marker for max loss with infinity symbol if unbounded
     unbounded_loss = summary.get("unbounded_loss", False)
-    if unbounded_loss:
-        loss_text = "Loss is unlimited (continues beyond chart)"
-    else:
-        loss_text = f"Max Loss: ${max_loss:.2f} at ${max_loss_price:.2f}"
 
-    fig.add_annotation(
-        x=max_loss_price,
-        y=max_loss,
-        text=loss_text,
-        showarrow=True,
-        arrowhead=2,
-        arrowsize=1,
-        arrowwidth=1,
-        arrowcolor="red",
-        font=dict(size=10, color="red"),
-        align="center",
-        yshift=-20,
-    )
+    # If loss is unbounded, add an infinity arrow pointing down/right
+    if unbounded_loss:
+        # Add arrow pointing to infinity
+        fig.add_annotation(
+            x=max_loss_price,
+            y=max_loss,
+            text="↘∞",  # Down-right arrow with infinity symbol
+            showarrow=False,
+            font=dict(size=16, color="red"),
+            align="center",
+        )
+    # Otherwise, just show the marker without text
 
     # Add current P&L
     current_pnl = summary["current_pnl"]
@@ -201,23 +168,11 @@ def create_pnl_chart(
             y=[current_pnl],
             mode="markers",
             marker=dict(color="gold", size=10),
+            name="Current Price",
             showlegend=False,
         )
     )
-    # Add annotation for current P&L
-    fig.add_annotation(
-        x=current_price,
-        y=current_pnl,
-        text=f"Current P&L: ${current_pnl:.2f}",
-        showarrow=True,
-        arrowhead=2,
-        arrowsize=1,
-        arrowwidth=1,
-        arrowcolor="gold",
-        font=dict(size=10, color="darkgoldenrod"),
-        align="center",
-        yshift=20 if current_pnl >= 0 else -20,  # Position based on P&L value
-    )
+    # No text annotation for current P&L, just the marker
 
     # Set layout
     fig.update_layout(
