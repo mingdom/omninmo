@@ -359,6 +359,19 @@ def process_portfolio_data(
 
                 # Sector determination removed - will be implemented in a separate task
 
+                # Get cost basis if available
+                cost_basis = 0.0
+                if (
+                    pd.notna(row["Average Cost Basis"])
+                    and row["Average Cost Basis"] != "--"
+                ):
+                    try:
+                        cost_basis = clean_currency_value(row["Average Cost Basis"])
+                    except (ValueError, TypeError):
+                        logger.warning(
+                            f"Row {index}: {symbol} has invalid cost basis: '{row['Average Cost Basis']}'. Using 0.0."
+                        )
+
                 stock_positions[symbol] = {
                     "price": price,
                     "quantity": quantity,
@@ -367,6 +380,7 @@ def process_portfolio_data(
                     "percent_of_account": percent_of_account,
                     "account_type": row["Type"],
                     "description": description,
+                    "cost_basis": cost_basis,
                 }
 
         except (ValueError, TypeError) as e:
@@ -416,6 +430,7 @@ def process_portfolio_data(
                 "beta_adjusted_exposure": value * beta,
                 "description": stock_info.get("description", ""),
                 "price": stock_info["price"],  # Store the price
+                "cost_basis": stock_info.get("cost_basis", 0.0),  # Store the cost basis
             }
 
             # Find and process related options from the filtered option_df
@@ -500,6 +515,9 @@ def process_portfolio_data(
                             "delta_exposure": opt["delta_exposure"],
                             "notional_value": opt["notional_value"],
                             "price": opt["price"],
+                            "cost_basis": opt.get(
+                                "cost_basis", opt["price"]
+                            ),  # Use price as default cost basis
                         }
                     )
             except Exception as e:
@@ -696,6 +714,9 @@ def process_portfolio_data(
                             "delta_exposure": opt["delta_exposure"],
                             "notional_value": opt["notional_value"],
                             "price": opt["price"],
+                            "cost_basis": opt.get(
+                                "cost_basis", opt["price"]
+                            ),  # Use price as default cost basis
                         }
                     )
             except Exception as e:
@@ -1046,6 +1067,7 @@ def calculate_portfolio_summary(
                 ],  # Cash has no market exposure, but we store the value
                 beta_adjusted_exposure=pos["beta_adjusted_exposure"],
                 price=pos.get("price", 0.0),  # Get price if it exists
+                cost_basis=pos.get("price", 0.0),  # For cash, use price as cost basis
             )
             for pos in cash_like_positions
         ]

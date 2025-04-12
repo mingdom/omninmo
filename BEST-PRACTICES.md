@@ -194,6 +194,24 @@ Thorough testing prevents bugs and ensures code behaves as expected in all scena
   - **Simple Tests**: Keep tests simple and focused on specific behaviors
   - **Avoid Implementation Details**: Don't test implementation details like DOM structure that might change
 
+### 🤖 Agent Interactions
+*Supports PRECISION and USABILITY*
+Effective communication with AI agents ensures efficient development and accurate implementation.
+
+- **Question Handling**:
+  - **Direct Answers**: When asked a question, answer directly and honestly without writing code
+  - **Critical Thinking**: Be critical of assumptions or leading questions in the prompt
+  - **Concise Responses**: Provide straightforward responses without unnecessary elaboration
+  - **No Automatic Implementation**: Don't jump into implementation unless specifically requested
+  - **Clarify Ambiguity**: Ask for clarification when the question is unclear rather than making assumptions
+  - **Honest Assessment**: Provide honest feedback about technical feasibility and potential issues
+
+- **Implementation Requests**:
+  - **Confirm Understanding**: Verify understanding of the request before implementing
+  - **Plan First**: Create a detailed plan before making changes
+  - **Focused Changes**: Make only the changes requested, not additional "improvements"
+  - **Test Verification**: Always suggest testing after implementation
+
 ### 📝 Documentation
 *Supports USABILITY and RELIABILITY*
 Clear, accurate documentation helps onboard new developers and maintain institutional knowledge.
