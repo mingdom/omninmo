@@ -220,6 +220,9 @@ def determine_price_range(
             min_price = min(min_price, strike * 0.8)
             max_price = max(max_price, strike * 1.2)
 
+    # Ensure min_price is never exactly zero to avoid division issues
+    min_price = max(min_price, 0.0001)  # Use a small positive number instead of zero
+
     return (min_price, max_price)
 
 
@@ -276,10 +279,10 @@ def analyze_asymptotic_behavior(positions: list) -> dict[str, bool]:
                 f"Position {i}: {pos.get('ticker')} {pos.get('position_type')} {pos.get('option_type', '')} {pos.get('quantity')}"
             )
 
-    # Use fixed extreme price points to approximate infinity and zero
+    # Use fixed extreme price points to approximate infinity and near-zero
     # This removes dependency on current_price and provides consistent behavior
     high_price = 1_000_000  # $1 million per share
-    low_price = 0.01  # 1 cent per share
+    low_price = 0.0001  # A tenth of a cent per share - small but not zero to avoid division issues
 
     # Calculate the total "effective delta" at these extreme prices
     high_price_delta = 0
