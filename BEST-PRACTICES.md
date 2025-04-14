@@ -100,6 +100,14 @@ Write code that is clear, maintainable, and robust against edge cases.
   - **Avoid Duplicate Registration**: Be careful about registering callbacks multiple times, which can cause conflicts
   - **Component Documentation**: Document the relationship between components and their callbacks
 
+- **Dependency Management**:
+  - **Update Requirements**: ALWAYS update `requirements.txt` when adding new imports or dependencies
+  - **Deployment Verification**: Test deployments after adding new dependencies to ensure they work in all environments
+  - **Minimal Dependencies**: Only add dependencies that are absolutely necessary
+  - **Version Pinning**: Pin versions for stability (`==`) or use minimum version constraints (`>=`) as appropriate
+  - **Document Dependencies**: Add comments explaining what each dependency is used for
+  - **Check Imports**: Regularly audit imports to ensure all are properly listed in requirements
+
 ### 🛡️ Error Handling and Logging
 *Supports RELIABILITY and PRECISION*
 Handle errors gracefully and log information that helps diagnose issues quickly.
