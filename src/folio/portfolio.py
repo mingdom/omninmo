@@ -153,6 +153,20 @@ def process_portfolio_data(
     df["Type"] = df["Type"].fillna("")  # Ensure Type is never NaN
     df["Description"] = df["Description"].fillna("")  # Ensure Description is never NaN
 
+    # Capture Pending Activity value before filtering it out
+    pending_activity_value = 0.0
+    pending_activity_rows = df[df["Symbol"] == "Pending Activity"]
+    if not pending_activity_rows.empty:
+        for _, row in pending_activity_rows.iterrows():
+            if pd.notna(row["Current Value"]):
+                try:
+                    pending_activity_value += clean_currency_value(row["Current Value"])
+                    logger.info(
+                        f"Found Pending Activity with value: {format_currency(pending_activity_value)}"
+                    )
+                except (ValueError, TypeError) as e:
+                    logger.warning(f"Error parsing Pending Activity value: {e}")
+
     # Filter out invalid entries like "Pending Activity" which aren't actual positions
     invalid_symbols = ["Pending Activity", "021ESC017"]
     valid_rows = ~df["Symbol"].isin(invalid_symbols)
@@ -821,14 +835,22 @@ def process_portfolio_data(
                 cash_like_value=0.0,
                 cash_like_count=0,
                 cash_percentage=0.0,
-                portfolio_estimate_value=0.0,
+                stock_value=0.0,
+                option_value=0.0,
+                portfolio_estimate_value=pending_activity_value,  # Include pending activity value
             )
             return [], empty_summary, []
 
     # Calculate portfolio summary using the final list of groups
     logger.info("Calculating final portfolio summary...")
     try:
-        summary = calculate_portfolio_summary(groups, cash_like_positions)
+        summary = calculate_portfolio_summary(
+            groups, cash_like_positions, pending_activity_value
+        )
+        if pending_activity_value > 0:
+            logger.info(
+                f"Including Pending Activity value: {format_currency(pending_activity_value)}"
+            )
         logger.info("Portfolio summary calculated successfully.")
     except Exception as summary_err:
         logger.error(
@@ -846,6 +868,7 @@ def process_portfolio_data(
 def calculate_portfolio_summary(
     groups: list[PortfolioGroup],
     cash_like_positions: list[dict] | None = None,
+    pending_activity_value: float = 0.0,
 ) -> PortfolioSummary:
     """Calculate comprehensive summary metrics for the entire portfolio.
 
@@ -887,7 +910,7 @@ def calculate_portfolio_summary(
     if cash_like_positions is None:
         cash_like_positions = []
 
-    if not groups and not cash_like_positions:
+    if not groups and not cash_like_positions and pending_activity_value == 0.0:
         logger.warning(
             "Cannot calculate summary for an empty portfolio. Returning default summary."
         )
@@ -915,7 +938,9 @@ def calculate_portfolio_summary(
             cash_like_value=0.0,
             cash_like_count=0,
             cash_percentage=0.0,
-            portfolio_estimate_value=0.0,
+            stock_value=0.0,
+            option_value=0.0,
+            portfolio_estimate_value=pending_activity_value,  # Include pending activity value
         )
 
     try:
@@ -1052,6 +1077,21 @@ def calculate_portfolio_summary(
             else 0.0
         )
 
+        # Calculate total position values
+        stock_value = 0.0
+        option_value = 0.0
+
+        # Process each group to calculate stock and option values
+        for group in groups:
+            # --- Process stock position ---
+            if group.stock_position:
+                stock = group.stock_position
+                stock_value += stock.market_value
+
+            # --- Process option positions ---
+            for opt in group.option_positions:
+                option_value += opt.market_value
+
         # Process cash-like positions
         cash_like_value = sum(pos["market_value"] for pos in cash_like_positions)
         cash_like_count = len(cash_like_positions)
@@ -1073,7 +1113,10 @@ def calculate_portfolio_summary(
         ]
 
         # Calculate portfolio estimated value and cash percentage
-        portfolio_estimate_value = net_market_exposure + cash_like_value
+        total_position_value = stock_value + option_value
+        portfolio_estimate_value = (
+            total_position_value + cash_like_value + pending_activity_value
+        )
         cash_percentage = (
             (cash_like_value / portfolio_estimate_value * 100)
             if portfolio_estimate_value > 0
@@ -1106,6 +1149,9 @@ def calculate_portfolio_summary(
             cash_like_value=cash_like_value,
             cash_like_count=cash_like_count,
             cash_percentage=cash_percentage,
+            stock_value=stock_value,  # Add stock value
+            option_value=option_value,  # Add option value
+            pending_activity_value=pending_activity_value,  # Add pending activity value
             portfolio_estimate_value=portfolio_estimate_value,
             price_updated_at=current_time,  # Set the timestamp
         )
@@ -1178,8 +1224,11 @@ def update_portfolio_prices(
         # Update stock position price
         if group.stock_position and group.stock_position.ticker in latest_prices:
             group.stock_position.price = latest_prices[group.stock_position.ticker]
-            # Update market exposure based on new price
+            # Update market exposure and market value based on new price
             group.stock_position.market_exposure = (
+                group.stock_position.price * group.stock_position.quantity
+            )
+            group.stock_position.market_value = (
                 group.stock_position.price * group.stock_position.quantity
             )
             group.stock_position.beta_adjusted_exposure = (
@@ -1190,6 +1239,8 @@ def update_portfolio_prices(
         for option in group.option_positions:
             if option.ticker in latest_prices:
                 option.price = latest_prices[option.ticker]
+                # Update market_value based on new price
+                option.market_value = option.price * option.quantity
                 # We don't update market_exposure for options as it's based on notional value
 
     # Return the current timestamp
@@ -1244,6 +1295,12 @@ def log_summary_details(summary: PortfolioSummary):
     logger.info(
         f"Portfolio Estimated Value: {format_currency(summary.portfolio_estimate_value)}"
     )
+    logger.info(f"Stock Value: {format_currency(summary.stock_value)}")
+    logger.info(f"Option Value: {format_currency(summary.option_value)}")
+    if summary.pending_activity_value != 0.0:
+        logger.info(
+            f"Pending Activity: {format_currency(summary.pending_activity_value)}"
+        )
     logger.info(f"Beta: {format_beta(summary.portfolio_beta)}")
     logger.info(f"Short %: {summary.short_percentage:.1f}%")
     logger.info(f"Cash %: {summary.cash_percentage:.1f}%")

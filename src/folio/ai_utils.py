@@ -53,10 +53,10 @@ def prepare_portfolio_data_for_analysis(
                 {
                     "ticker": stock.ticker,
                     "position_type": "stock",
-                    "market_value": stock.market_value,
+                    "market_value": stock.market_exposure,
                     "beta": stock.beta,
                     "weight": calculate_position_weight(
-                        stock.market_value, summary.net_market_exposure
+                        stock.market_exposure, summary.net_market_exposure
                     ),
                     "quantity": stock.quantity,
                 }
@@ -68,10 +68,10 @@ def prepare_portfolio_data_for_analysis(
                 {
                     "ticker": option.ticker,
                     "position_type": "option",
-                    "market_value": option.market_value,
+                    "market_value": option.market_exposure,
                     "beta": option.beta,
                     "weight": calculate_position_weight(
-                        option.market_value, summary.net_market_exposure
+                        option.market_exposure, summary.net_market_exposure
                     ),
                     "option_type": option.option_type,
                     "strike": option.strike,
@@ -85,11 +85,11 @@ def prepare_portfolio_data_for_analysis(
         "net_market_exposure": summary.net_market_exposure,
         "portfolio_beta": summary.portfolio_beta,
         "long_exposure": {
-            "total": summary.long_exposure.total_value,
+            "total": summary.long_exposure.total_exposure,
             "beta_adjusted": summary.long_exposure.total_beta_adjusted,
         },
         "short_exposure": {
-            "total": summary.short_exposure.total_value,
+            "total": summary.short_exposure.total_exposure,
             "beta_adjusted": summary.short_exposure.total_beta_adjusted,
         },
     }

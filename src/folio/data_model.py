@@ -10,7 +10,10 @@ class PositionDict(TypedDict):
     quantity: float
     beta: float
     beta_adjusted_exposure: float
-    market_exposure: float  # Quantity * Price (fetched at runtime)
+    market_exposure: (
+        float  # Quantity * Price (for stocks) or Delta * Notional Value (for options)
+    )
+    market_value: float  # Actual market value of the position (quantity * price)
     price: float  # Price per share/contract
 
 
@@ -80,7 +83,12 @@ class PortfolioSummaryDict(TypedDict):
     cash_like_value: float  # Total value of cash positions
     cash_like_count: int  # Number of cash positions
     cash_percentage: float  # Cash / Portfolio Estimated Value
-    portfolio_estimate_value: float  # Net Market Exposure + Cash
+    stock_value: float  # Total value of stock positions
+    option_value: float  # Total value of option positions
+    pending_activity_value: float  # Value of pending activity
+    portfolio_estimate_value: (
+        float  # Stock Value + Option Value + Cash + Pending Activity
+    )
     help_text: dict[str, str]  # Explanations of each metric
     price_updated_at: (
         str | None
@@ -96,7 +104,8 @@ class Position:
     quantity: float
     beta: float
     beta_adjusted_exposure: float
-    market_exposure: float  # Quantity * Current Price (fetched at runtime)
+    market_exposure: float  # Quantity * Current Price (for stocks) or Delta * Notional Value (for options)
+    market_value: float  # Actual market value of the position (quantity * price)
 
     def __init__(
         self,
@@ -106,6 +115,8 @@ class Position:
         beta: float,
         beta_adjusted_exposure: float,
         market_exposure: float,
+        market_value: float
+        | None = None,  # Default to None to calculate from market_exposure
     ):
         """Initialize a Position.
 
@@ -115,7 +126,8 @@ class Position:
             quantity: Number of shares or contracts
             beta: Position beta
             beta_adjusted_exposure: Beta-adjusted market exposure
-            market_exposure: Market exposure (quantity * price)
+            market_exposure: Market exposure (quantity * price for stocks, delta * notional for options)
+            market_value: Actual market value of the position (quantity * price)
         """
 
         self.ticker = ticker
@@ -124,22 +136,13 @@ class Position:
         self.beta = beta
         self.beta_adjusted_exposure = beta_adjusted_exposure
         self.market_exposure = market_exposure
-        self.market_value = market_exposure  # Set market_value to market_exposure
 
-    @property
-    def market_value(self) -> float:
-        """DEPRECATED: Use market_exposure instead.
-
-        This property exists for backward compatibility and will be removed in a future version.
-        """
-        return self.market_exposure
-
-    @market_value.setter
-    def market_value(self, value: float):
-        """Set market_value (also sets market_exposure)."""
-        # Update both market_value and market_exposure
-        self._market_value = value
-        self.market_exposure = value
+        # Set market_value to market_exposure if not provided
+        # This maintains backward compatibility
+        if market_value is None:
+            self.market_value = market_exposure
+        else:
+            self.market_value = market_value
 
     def to_dict(self) -> PositionDict:
         """Convert to a typed dictionary"""
@@ -150,6 +153,7 @@ class Position:
             "beta": self.beta,
             "beta_adjusted_exposure": self.beta_adjusted_exposure,
             "market_exposure": self.market_exposure,
+            "market_value": self.market_value,  # Add market_value to the dictionary
             "price": 0.0,  # Base Position class doesn't have price, but the dict type requires it
         }
 
@@ -163,6 +167,9 @@ class Position:
         Returns:
             A new Position instance
         """
+        # Get market_value if it exists in the data, otherwise use market_exposure
+        market_value = data.get("market_value", data["market_exposure"])
+
         return cls(
             ticker=data["ticker"],
             position_type=data["position_type"],
@@ -170,6 +177,7 @@ class Position:
             beta=data["beta"],
             beta_adjusted_exposure=data["beta_adjusted_exposure"],
             market_exposure=data["market_exposure"],
+            market_value=market_value,
         )
 
 
@@ -204,6 +212,8 @@ class OptionPosition(Position):
         market_exposure: float,
         price: float = 0.0,
         cost_basis: float = 0.0,
+        market_value: float
+        | None = None,  # Default to None to calculate from price and quantity
     ):
         """Initialize an OptionPosition.
 
@@ -224,6 +234,10 @@ class OptionPosition(Position):
             price: Price per contract
             cost_basis: Cost basis per contract (for P&L calculations)
         """
+        # Calculate market_value if not provided
+        if market_value is None:
+            market_value = price * quantity
+
         # Call the parent class constructor
         super().__init__(
             ticker=ticker,
@@ -232,6 +246,7 @@ class OptionPosition(Position):
             beta=beta,
             beta_adjusted_exposure=beta_adjusted_exposure,
             market_exposure=market_exposure,
+            market_value=market_value,
         )
 
         # Set option-specific fields
@@ -277,6 +292,9 @@ class OptionPosition(Position):
         price = data.get("price", 0.0)
         cost_basis = data.get("cost_basis", 0.0)
 
+        # Get market_value if it exists in the data
+        market_value = data.get("market_value", None)
+
         return cls(
             ticker=data["ticker"],
             position_type=data["position_type"],
@@ -293,6 +311,7 @@ class OptionPosition(Position):
             underlying_beta=data["underlying_beta"],
             price=price,
             cost_basis=cost_basis,
+            market_value=market_value,
         )
 
 
@@ -312,6 +331,7 @@ class StockPosition:
     price: float = 0.0  # Price per share
     position_type: str = "stock"  # Always "stock" for StockPosition
     cost_basis: float = 0.0  # Cost basis per share
+    market_value: float = 0.0  # Actual market value of the position (quantity * price)
 
     def __init__(
         self,
@@ -323,6 +343,8 @@ class StockPosition:
         price: float = 0.0,
         position_type: str = "stock",
         cost_basis: float = 0.0,
+        market_value: float
+        | None = None,  # Default to None to calculate from price and quantity
     ):
         """Initialize a StockPosition.
 
@@ -335,6 +357,7 @@ class StockPosition:
             price: Price per share
             position_type: Type of position, always "stock" for StockPosition
             cost_basis: Cost basis per share (for P&L calculations)
+            market_value: Actual market value of the position (quantity * price), calculated if None
         """
 
         self.ticker = ticker
@@ -345,22 +368,13 @@ class StockPosition:
         self.price = price
         self.cost_basis = cost_basis
         self.market_exposure = market_exposure
-        self.market_value = market_exposure  # Set market_value to market_exposure
 
-    @property
-    def market_value(self) -> float:
-        """DEPRECATED: Use market_exposure instead.
-
-        This property exists for backward compatibility and will be removed in a future version.
-        """
-        return self.market_exposure
-
-    @market_value.setter
-    def market_value(self, value: float):
-        """Set market_value (also sets market_exposure)."""
-        # Update both market_value and market_exposure
-        self._market_value = value
-        self.market_exposure = value
+        # For stocks, market_value is the same as market_exposure
+        # But we explicitly calculate it to ensure consistency
+        if market_value is None:
+            self.market_value = price * quantity
+        else:
+            self.market_value = market_value
 
     def to_dict(self) -> StockPositionDict:
         """Convert to a Dash-compatible dictionary"""
@@ -373,6 +387,7 @@ class StockPosition:
             "price": self.price,
             "position_type": "stock",
             "cost_basis": self.cost_basis,
+            "market_value": self.market_value,  # Add market_value to the dictionary
         }
 
     @classmethod
@@ -388,6 +403,9 @@ class StockPosition:
         # Handle price if it exists in the data
         price = data.get("price", 0.0)
 
+        # Get market_value if it exists in the data
+        market_value = data.get("market_value", None)
+
         return cls(
             ticker=data["ticker"],
             quantity=data["quantity"],
@@ -397,6 +415,7 @@ class StockPosition:
             price=price,
             position_type=data.get("position_type", "stock"),  # Pass position_type
             cost_basis=data.get("cost_basis", 0.0),  # Get cost_basis if it exists
+            market_value=market_value,  # Pass market_value if it exists
         )
 
 
@@ -750,8 +769,15 @@ class PortfolioSummary:
     cash_like_count: int = 0  # Number of cash positions
     cash_percentage: float = 0.0  # Cash / Portfolio Estimated Value
 
+    # Value metrics
+    stock_value: float = 0.0  # Total value of stock positions
+    option_value: float = 0.0  # Total value of option positions
+    pending_activity_value: float = 0.0  # Value of pending activity
+
     # Portfolio estimated value (for reference only)
-    portfolio_estimate_value: float = 0.0  # Net Market Exposure + Cash
+    portfolio_estimate_value: float = (
+        0.0  # Stock Value + Option Value + Cash + Pending Activity
+    )
 
     # Help text for each metric
     help_text: dict[str, str] | None = None
@@ -887,6 +913,9 @@ class PortfolioSummary:
             "cash_like_value": self.cash_like_value,
             "cash_like_count": self.cash_like_count,
             "cash_percentage": self.cash_percentage,
+            "stock_value": self.stock_value,
+            "option_value": self.option_value,
+            "pending_activity_value": self.pending_activity_value,
             "portfolio_estimate_value": self.portfolio_estimate_value,
             "help_text": self.help_text if self.help_text is not None else {},
             "price_updated_at": self.price_updated_at,
@@ -918,6 +947,9 @@ class PortfolioSummary:
         )
         cash_percentage = data.get("cash_percentage", 0.0)
         portfolio_estimate_value = data.get("portfolio_estimate_value", 0.0)
+        stock_value = data.get("stock_value", 0.0)
+        option_value = data.get("option_value", 0.0)
+        pending_activity_value = data.get("pending_activity_value", 0.0)
 
         return cls(
             net_market_exposure=net_market_exposure,
@@ -930,6 +962,9 @@ class PortfolioSummary:
             cash_like_value=data["cash_like_value"],
             cash_like_count=data["cash_like_count"],
             cash_percentage=cash_percentage,
+            stock_value=stock_value,
+            option_value=option_value,
+            pending_activity_value=pending_activity_value,
             portfolio_estimate_value=portfolio_estimate_value,
             help_text=data.get("help_text"),
             price_updated_at=data.get("price_updated_at"),

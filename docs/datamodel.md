@@ -1,11 +1,11 @@
 # Folio Data Model Documentation
 
-**Date:** 2025-04-05  
+**Date:** 2025-04-05
 **Status:** Current
 
 ## Fundamental Principle
 
-**WE CANNOT CALCULATE VALUE ACCURATELY.** This is the most critical insight that drives our entire approach. Portfolio values in CSV files are constantly changing, making them unreliable for risk assessment. Instead, we must focus exclusively on market exposure as our core metric.
+**SEPARATE VALUE FROM EXPOSURE.** This is the most critical insight that drives our approach. While portfolio values are constantly changing, we can calculate them accurately at a point in time. However, for risk assessment, we must focus on market exposure rather than market value.
 
 ## Data Model Overview
 
@@ -13,23 +13,27 @@ The Folio data model is designed around exposure-based metrics rather than value
 
 ### Key Concepts
 
-1. **Market Exposure**: The amount of money exposed to market movements, calculated as:
+1. **Market Value**: The actual worth of a position, calculated as:
+   - For stocks: Quantity × Current Price
+   - For options: Quantity × Current Price
+
+2. **Market Exposure**: The amount of money exposed to market movements, calculated as:
    - For stocks: Quantity × Current Price
    - For options: Delta × Notional Value (100 × Underlying Price × |Quantity|)
 
-2. **Beta-Adjusted Exposure**: Market exposure adjusted for the security's volatility relative to the market (SPY), calculated as:
+3. **Beta-Adjusted Exposure**: Market exposure adjusted for the security's volatility relative to the market (SPY), calculated as:
    - Market Exposure × Beta
 
-3. **Net Market Exposure**: The combined directional exposure of the portfolio, calculated as:
+4. **Net Market Exposure**: The combined directional exposure of the portfolio, calculated as:
    - Long Exposure - Short Exposure
 
-4. **Gross Market Exposure**: The total market exposure regardless of direction, calculated as:
+5. **Gross Market Exposure**: The total market exposure regardless of direction, calculated as:
    - Long Exposure + Short Exposure
 
-5. **Short Percentage**: The percentage of gross market exposure that is short, calculated as:
+6. **Short Percentage**: The percentage of gross market exposure that is short, calculated as:
    - (Short Exposure / Gross Market Exposure) × 100
 
-6. **Cash**: Cash and cash-like instruments have minimal market correlation (beta ≈ 0) and are tracked separately from market exposure.
+7. **Cash**: Cash and cash-like instruments have minimal market correlation (beta ≈ 0) and are tracked separately from market exposure.
 
 ## Data Model Classes
 
@@ -42,14 +46,9 @@ The base class for all position types.
 | `ticker` | `str` | The security identifier |
 | `quantity` | `int` | Number of shares or contracts |
 | `market_exposure` | `float` | The market exposure of the position |
+| `market_value` | `float` | The actual market value of the position (quantity * price) |
 | `beta` | `float` | The security's volatility relative to the market |
 | `beta_adjusted_exposure` | `float` | Market exposure adjusted for beta |
-
-#### Deprecated Fields
-
-| Field | Replacement | Description |
-|-------|-------------|-------------|
-| `market_value` | `market_exposure` | Use `market_exposure` instead |
 
 ### StockPosition
 
@@ -60,14 +59,9 @@ Represents a stock position in the portfolio.
 | `ticker` | `str` | The stock symbol |
 | `quantity` | `int` | Number of shares (negative for short positions) |
 | `market_exposure` | `float` | Quantity × Current Price |
+| `market_value` | `float` | Quantity × Current Price (same as market_exposure for stocks) |
 | `beta` | `float` | The stock's volatility relative to the market |
 | `beta_adjusted_exposure` | `float` | Market exposure adjusted for beta |
-
-#### Deprecated Fields
-
-| Field | Replacement | Description |
-|-------|-------------|-------------|
-| `market_value` | `market_exposure` | Use `market_exposure` instead |
 
 ### OptionPosition
 
@@ -79,6 +73,7 @@ Represents an option position in the portfolio.
 | `position_type` | `str` | Always "option" |
 | `quantity` | `int` | Number of contracts (negative for short positions) |
 | `market_exposure` | `float` | Delta × Notional Value |
+| `market_value` | `float` | Quantity × Current Price (actual worth of the position) |
 | `beta` | `float` | The underlying security's beta |
 | `beta_adjusted_exposure` | `float` | Market exposure adjusted for beta |
 | `strike` | `float` | The option strike price |
@@ -93,7 +88,6 @@ Represents an option position in the portfolio.
 
 | Field | Replacement | Description |
 |-------|-------------|-------------|
-| `market_value` | `market_exposure` | Use `market_exposure` instead |
 | `clean_value` | Removed | Not needed for exposure calculations |
 | `weight` | Calculated on-the-fly | Use `calculate_position_weight(position_market_exposure, portfolio_net_exposure)` |
 | `position_beta` | `beta` | Use `beta` instead |
@@ -162,7 +156,9 @@ Summary of portfolio metrics with detailed breakdowns.
 | `cash_like_value` | `float` | Total value of cash positions |
 | `cash_like_count` | `int` | Number of cash positions |
 | `cash_percentage` | `float` | Cash / (Cash + Gross Market Exposure) |
-| `portfolio_estimate_value` | `float` | Gross Market Exposure + Cash |
+| `stock_value` | `float` | Total value of stock positions |
+| `option_value` | `float` | Total value of option positions |
+| `portfolio_estimate_value` | `float` | Stock Value + Option Value + Cash Value |
 
 #### Deprecated Fields
 
@@ -188,15 +184,17 @@ def calculate_position_weight(position_market_exposure: float, portfolio_net_exp
 
 ## Best Practices
 
-1. **Use Exposure-Based Metrics**: Always use exposure-based metrics instead of value-based metrics.
+1. **Separate Value from Exposure**: Understand the difference between market value (the actual worth of a position) and market exposure (the amount of money exposed to market movements).
 
-2. **Calculate Weight On-the-Fly**: Weight is a derived property that depends on both the position's market value and the portfolio's total exposure. Calculate it on the fly using the `calculate_position_weight` function.
+2. **Use Appropriate Metrics**: Use market value for portfolio valuation and market exposure for risk assessment.
 
-3. **Handle Cash Separately**: Cash has zero market exposure and should be tracked separately from market exposure.
+3. **Calculate Weight On-the-Fly**: Weight is a derived property that depends on both the position's market value and the portfolio's total exposure. Calculate it on the fly using the `calculate_position_weight` function.
 
-4. **Use Consistent Naming**: Use consistent field names across the codebase to avoid confusion.
+4. **Handle Cash Separately**: Cash has zero market exposure and should be tracked separately from market exposure.
 
-5. **Document Deprecated Fields**: Clearly document deprecated fields and their replacements to help with the transition.
+5. **Use Consistent Naming**: Use consistent field names across the codebase to avoid confusion.
+
+6. **Document Deprecated Fields**: Clearly document deprecated fields and their replacements to help with the transition.
 
 ## Future Considerations
 
@@ -210,6 +208,6 @@ def calculate_position_weight(position_market_exposure: float, portfolio_net_exp
 
 ## Conclusion
 
-By focusing exclusively on market exposure and eliminating unreliable value-based calculations, we can create a more accurate and useful portfolio analysis tool. The revised data model provides a clearer picture of portfolio risk and helps users make better investment decisions.
+By separating market value from market exposure, we can create a more accurate and useful portfolio analysis tool. The revised data model provides a clearer picture of both portfolio value and risk, helping users make better investment decisions.
 
-Remember: **WE CANNOT CALCULATE VALUE ACCURATELY.** Our entire approach must be built around this fundamental limitation.
+Remember: **SEPARATE VALUE FROM EXPOSURE.** This fundamental principle allows us to accurately track both the worth of our positions and their risk exposure.
