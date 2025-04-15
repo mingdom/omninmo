@@ -130,6 +130,7 @@ def create_dashboard_section():
                         # Market Exposure Chart (in its own card)
                         dbc.Card(
                             [
+                                dbc.CardHeader("Market Exposure"),
                                 dbc.CardBody(
                                     [
                                         create_exposure_chart(),
@@ -141,6 +142,7 @@ def create_dashboard_section():
                         # Position Treemap (in its own card)
                         dbc.Card(
                             [
+                                dbc.CardHeader("Position Size by Exposure"),
                                 dbc.CardBody(
                                     [
                                         create_position_treemap(),

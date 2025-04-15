@@ -23,7 +23,7 @@ class DataFetcher(DataFetcherInterface):
     """Class to fetch stock data from Financial Modeling Prep API"""
 
     # Default period for beta calculations
-    beta_period = "6m"
+    beta_period = "3m"
 
     def __init__(self, cache_dir=".cache_fmp"):
         """Initialize with cache directory"""
@@ -63,13 +63,13 @@ class DataFetcher(DataFetcherInterface):
                 "configure it in the config file."
             )
 
-    def fetch_data(self, ticker, period="5y", interval="1d"):
+    def fetch_data(self, ticker, period="3m", interval="1d"):
         """
         Fetch stock data for a ticker
 
         Args:
             ticker (str): Stock ticker symbol
-            period (str): Time period ('1y', '5y', etc.)
+            period (str): Time period ('3m', '6m', '1y', etc.)
             interval (str): Data interval ('1d', '1wk', etc.)
 
         Returns:

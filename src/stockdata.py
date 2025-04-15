@@ -25,16 +25,16 @@ class DataFetcherInterface(ABC):
     """Interface for stock data fetchers"""
 
     # Default period for beta calculations
-    beta_period = "6m"
+    beta_period = "3m"
 
     @abstractmethod
-    def fetch_data(self, ticker, period="1y", interval="1d"):
+    def fetch_data(self, ticker, period="3m", interval="1d"):
         """
         Fetch stock data for a ticker.
 
         Args:
             ticker (str): Stock ticker symbol
-            period (str): Time period ('1y', '5y', etc.)
+            period (str): Time period ('3m', '6m', '1y', etc.)
             interval (str): Data interval ('1d', '1wk', etc.)
 
         Returns:

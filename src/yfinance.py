@@ -19,8 +19,8 @@ logger = logging.getLogger(__name__)
 class YFinanceDataFetcher(DataFetcherInterface):
     """Class to fetch stock data from Yahoo Finance API using yfinance"""
 
-    # Default period for beta calculations (6 months provides more current market behavior)
-    beta_period = "6m"
+    # Default period for beta calculations (3 months provides more current market behavior)
+    beta_period = "3m"
 
     def __init__(self, cache_dir=".cache_yf", cache_ttl=None):
         """
@@ -46,7 +46,7 @@ class YFinanceDataFetcher(DataFetcherInterface):
         else:
             self.cache_ttl = cache_ttl
 
-    def fetch_data(self, ticker, period="1y", interval="1d"):
+    def fetch_data(self, ticker, period="3m", interval="1d"):
         """
         Fetch stock data for a ticker from Yahoo Finance.
 
