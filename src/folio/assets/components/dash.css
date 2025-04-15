@@ -1,0 +1,42 @@
+/* 
+ * Dash-specific Styles
+ * This file defines styles for Dash-specific components
+ */
+
+/* Loading spinner */
+._dash-loading {
+  background-color: rgba(255, 255, 255, 0.8) !important;
+}
+
+._dash-loading-callback {
+  border-color: var(--primary-color) !important;
+}
+
+/* Dash charts */
+.dash-chart {
+  width: 100% !important;
+  max-width: 100% !important;
+  height: auto !important;
+  min-height: 350px;
+  max-height: 450px;
+  overflow: hidden !important;
+  border-radius: 0 0 var(--border-radius-md) var(--border-radius-md);
+  padding: var(--spacing-sm);
+}
+
+/* Ensure charts don't overflow */
+.js-plotly-plot,
+.plotly,
+.plot-container {
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .dash-chart {
+    min-height: 250px;
+    max-height: 300px;
+  }
+}

@@ -4,16 +4,16 @@
  */
 
 /* Chart container */
-.dash-chart {
-  width: 100% !important;
-  max-width: 100% !important;
-  height: auto !important;
-  min-height: 350px;
-  max-height: 450px;
-  overflow: hidden !important;
-  border-radius: 0 0 var(--border-radius-md) var(--border-radius-md);
-  padding: var(--spacing-sm);
+/* Note: Main dash-chart styles moved to components/dash.css */
+
+/* Chart controls */
+.chart-controls {
+  margin-top: var(--spacing-md);
+  display: flex;
+  justify-content: center;
 }
+
+/* Chart toggle buttons moved to buttons.css */
 
 /* Chart tooltips */
 .plotly-tooltip {

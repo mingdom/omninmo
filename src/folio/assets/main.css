@@ -16,6 +16,8 @@
 @import 'components/forms.css';
 @import 'components/modals.css';
 @import 'components/charts.css';
+@import 'components/dash.css';
+@import 'components/ai.css';
 
 /* Base styles */
 body {
