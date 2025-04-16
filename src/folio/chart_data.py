@@ -43,8 +43,21 @@ def transform_for_exposure_chart(
     """
     logger.debug("Transforming data for exposure chart")
 
+    # Log portfolio summary fields for debugging
+    logger.debug(
+        f"Portfolio summary net_market_exposure: {portfolio_summary.net_market_exposure}"
+    )
+    logger.debug(f"Portfolio summary long_exposure: {portfolio_summary.long_exposure}")
+    logger.debug(
+        f"Portfolio summary short_exposure: {portfolio_summary.short_exposure}"
+    )
+    logger.debug(
+        f"Portfolio summary options_exposure: {portfolio_summary.options_exposure}"
+    )
+
     # Extract values based on whether we want beta-adjusted or not
     if use_beta_adjusted:
+        logger.debug("Using beta-adjusted values for exposure chart")
         long_value = portfolio_summary.long_exposure.total_beta_adjusted
         # Show short exposure as negative
         short_value = portfolio_summary.short_exposure.total_beta_adjusted
@@ -54,13 +67,20 @@ def transform_for_exposure_chart(
             portfolio_summary.long_exposure.total_beta_adjusted,
             portfolio_summary.short_exposure.total_beta_adjusted,
         )
+        logger.debug(
+            f"Beta-adjusted values - Long: {long_value}, Short: {short_value}, Options: {options_value}, Net: {net_value}"
+        )
     else:
+        logger.debug("Using net exposure values for exposure chart")
         long_value = portfolio_summary.long_exposure.total_exposure
         # Show short exposure as negative
         short_value = portfolio_summary.short_exposure.total_exposure
         options_value = portfolio_summary.options_exposure.total_exposure
         # Use the pre-calculated net market exposure
         net_value = portfolio_summary.net_market_exposure
+        logger.debug(
+            f"Net exposure values - Long: {long_value}, Short: {short_value}, Options: {options_value}, Net: {net_value}"
+        )
 
     # Categories and values for the chart
     categories = ["Long", "Short", "Options", "Net"]
@@ -137,6 +157,17 @@ def transform_for_treemap(
         Dict containing data and layout for the treemap chart
     """
     logger.debug("Transforming data for treemap chart (grouped by ticker)")
+    logger.debug(f"Number of portfolio groups: {len(portfolio_groups)}")
+
+    # Log some details about the first few groups for debugging
+    for i, group in enumerate(portfolio_groups[:3]):
+        logger.debug(f"Group {i} ticker: {group.ticker}")
+        logger.debug(f"Group {i} net_exposure: {group.net_exposure}")
+        if group.stock_position:
+            logger.debug(
+                f"Group {i} stock position market_exposure: {group.stock_position.market_exposure}"
+            )
+        logger.debug(f"Group {i} has {len(group.option_positions)} option positions")
 
     # Initialize lists for treemap data
     labels = []
@@ -160,13 +191,25 @@ def transform_for_treemap(
         exposure = 0
 
         # Add stock position exposure
+        stock_exposure = 0
         if group.stock_position:
             # Use market exposure for stocks
-            exposure += group.stock_position.market_exposure
+            stock_exposure = group.stock_position.market_exposure
+            logger.debug(f"Ticker {ticker} stock exposure: {stock_exposure}")
+            exposure += stock_exposure
 
         # Add option positions exposure (delta exposure)
+        option_exposure = 0
         for option in group.option_positions:
-            exposure += option.delta_exposure
+            logger.debug(
+                f"Ticker {ticker} option {option.option_type} delta_exposure: {option.delta_exposure}"
+            )
+            option_exposure += option.delta_exposure
+
+        exposure += option_exposure
+        logger.debug(
+            f"Ticker {ticker} total exposure: {exposure} (stock: {stock_exposure}, options: {option_exposure})"
+        )
 
         # Store the net exposure value for sizing (not absolute)
         ticker_exposures[ticker] = exposure

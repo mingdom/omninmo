@@ -28,8 +28,27 @@ def create_exposure_chart():
         [
             dcc.Graph(
                 id="exposure-chart",
-                config={"displayModeBar": False, "responsive": True},
+                config={
+                    "displayModeBar": False,
+                    "responsive": True,
+                    "staticPlot": False,
+                    "doubleClick": "reset",
+                    "showTips": True,
+                    "scrollZoom": True,
+                },
                 className="dash-chart",
+                # Add an empty figure to ensure proper initialization
+                figure={
+                    "data": [],
+                    "layout": {
+                        "height": 300,
+                        "margin": {"l": 40, "r": 20, "t": 40, "b": 40},
+                        "paper_bgcolor": "white",
+                        "plot_bgcolor": "white",
+                        "autosize": True,
+                    },
+                },
+                style={"width": "100%", "height": "100%"},
             ),
             # Add controls for toggling between net and beta-adjusted
             html.Div(
@@ -72,8 +91,26 @@ def create_position_treemap():
         [
             dcc.Graph(
                 id="position-treemap",
-                config={"displayModeBar": False, "responsive": True},
+                config={
+                    "displayModeBar": False,
+                    "responsive": True,
+                    "staticPlot": False,
+                    "doubleClick": "reset",
+                    "showTips": True,
+                    "scrollZoom": True,
+                },
                 className="dash-chart",
+                # Add an empty figure to ensure proper initialization
+                figure={
+                    "data": [],
+                    "layout": {
+                        "height": 400,
+                        "margin": {"l": 0, "r": 0, "t": 40, "b": 0},
+                        "paper_bgcolor": "white",
+                        "autosize": True,
+                    },
+                },
+                style={"width": "100%", "height": "100%"},
             ),
             # Hidden input to maintain the 'ticker' grouping without a visible toggle
             html.Div(
@@ -247,9 +284,15 @@ def register_callbacks(app):
         """Update the exposure chart based on user selection."""
         if not summary_data:
             # Return empty figure if no data
+            logger.debug("No summary data for exposure chart")
             return ({"data": [], "layout": {"height": 300}}, True, False)
 
         try:
+            # Log the summary data for debugging
+            logger.debug(
+                f"Exposure chart summary data keys: {list(summary_data.keys())}"
+            )
+
             # Determine which view to use based on button clicks
             ctx = dash.callback_context
             if not ctx.triggered:
@@ -272,14 +315,50 @@ def register_callbacks(app):
                     use_beta_adjusted = beta_active
                     # Keep button states as they are
 
+            logger.debug(f"Using beta-adjusted: {use_beta_adjusted}")
+
             # Convert the JSON data back to a PortfolioSummary object
-            portfolio_summary = PortfolioSummary.from_dict(summary_data)
+            try:
+                logger.debug("Attempting to deserialize PortfolioSummary")
+                portfolio_summary = PortfolioSummary.from_dict(summary_data)
+                logger.debug("Successfully deserialized PortfolioSummary")
+            except Exception as deser_err:
+                logger.error(
+                    f"Error deserializing PortfolioSummary: {deser_err}", exc_info=True
+                )
+                # Check if pending_activity_value is missing
+                if "pending_activity_value" not in summary_data:
+                    logger.warning("pending_activity_value missing from summary_data")
+                    # Add it with a default value
+                    summary_data["pending_activity_value"] = 0.0
+                    try:
+                        portfolio_summary = PortfolioSummary.from_dict(summary_data)
+                        logger.info(
+                            "Successfully deserialized after adding pending_activity_value"
+                        )
+                    except Exception as retry_err:
+                        logger.error(
+                            f"Still failed after adding pending_activity_value: {retry_err}",
+                            exc_info=True,
+                        )
+                        raise
+                else:
+                    raise
 
             # Transform the data for the chart
-            chart_data = transform_for_exposure_chart(
-                portfolio_summary, use_beta_adjusted
-            )
-            return chart_data, net_active, beta_active
+            try:
+                logger.debug("Transforming data for exposure chart")
+                chart_data = transform_for_exposure_chart(
+                    portfolio_summary, use_beta_adjusted
+                )
+                logger.debug("Successfully transformed data for exposure chart")
+                return chart_data, net_active, beta_active
+            except Exception as transform_err:
+                logger.error(
+                    f"Error transforming data for exposure chart: {transform_err}",
+                    exc_info=True,
+                )
+                raise
         except Exception as e:
             logger.error(f"Error updating exposure chart: {e}", exc_info=True)
             error_figure = {
@@ -310,16 +389,51 @@ def register_callbacks(app):
         """Update the position treemap based on user selection."""
         if not groups_data:
             # Return empty figure if no data
+            logger.debug("No groups data for treemap chart")
             return {"data": [], "layout": {"height": 400}}
 
         try:
+            # Log the groups data for debugging
+            logger.debug(f"Treemap groups data count: {len(groups_data)}")
+            if groups_data:
+                logger.debug(f"First group keys: {list(groups_data[0].keys())}")
+
             # Convert the JSON data back to a list of PortfolioGroup objects
-            portfolio_groups = [
-                PortfolioGroup.from_dict(group) for group in groups_data
-            ]
+            try:
+                logger.debug("Attempting to deserialize PortfolioGroups")
+                portfolio_groups = []
+                for i, group in enumerate(groups_data):
+                    try:
+                        portfolio_group = PortfolioGroup.from_dict(group)
+                        portfolio_groups.append(portfolio_group)
+                    except Exception as group_err:
+                        logger.error(
+                            f"Error deserializing group {i}: {group_err}", exc_info=True
+                        )
+                        # Log the problematic group data
+                        logger.debug(f"Problematic group data: {group}")
+                        raise
+                logger.debug(
+                    f"Successfully deserialized {len(portfolio_groups)} PortfolioGroups"
+                )
+            except Exception as deser_err:
+                logger.error(
+                    f"Error deserializing PortfolioGroups: {deser_err}", exc_info=True
+                )
+                raise
 
             # Transform the data for the chart
-            return transform_for_treemap(portfolio_groups, group_by)
+            try:
+                logger.debug("Transforming data for treemap chart")
+                chart_data = transform_for_treemap(portfolio_groups, group_by)
+                logger.debug("Successfully transformed data for treemap chart")
+                return chart_data
+            except Exception as transform_err:
+                logger.error(
+                    f"Error transforming data for treemap chart: {transform_err}",
+                    exc_info=True,
+                )
+                raise
         except Exception as e:
             logger.error(f"Error updating position treemap: {e}", exc_info=True)
             return {

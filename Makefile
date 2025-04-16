@@ -22,7 +22,9 @@ help:
 	@echo "  mlflow      - Start the MLflow UI to view training results (optional: make mlflow PORT=5001)"
 	@echo "  folio       - Start the portfolio dashboard with debug mode enabled"
 	@echo "               Options: portfolio=path/to/file.csv (use custom portfolio file)"
+	@echo "                        log=LEVEL (set logging level: DEBUG, INFO, WARNING, ERROR)"
 	@echo "  portfolio   - Start the portfolio dashboard with sample portfolio and debug mode"
+	@echo "               Options: log=LEVEL (set logging level: DEBUG, INFO, WARNING, ERROR)"
 	@echo "  clean       - Clean up generated files and caches"
 	@echo "               Options: --cache (also clear data cache)"
 	@echo "  lint        - Run type checker and linter"
@@ -142,6 +144,7 @@ portfolio:
 		exit 1; \
 	fi
 	@source $(VENV_DIR)/bin/activate && \
+	LOG_LEVEL=$(if $(log),$(log),DEBUG) \
 	PYTHONPATH=. python3 -m src.folio.app --port 8051 --debug --portfolio src/folio/assets/sample-portfolio.csv
 
 port:
@@ -160,6 +163,7 @@ folio:
 		exit 1; \
 	fi
 	@source $(VENV_DIR)/bin/activate && \
+	LOG_LEVEL=$(if $(log),$(log),DEBUG) \
 	PYTHONPATH=. python3 -m src.folio.app --port 8051 --debug $(if $(portfolio),--portfolio $(portfolio),)
 
 stop-folio:

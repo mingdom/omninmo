@@ -289,31 +289,48 @@ class OptionPosition(Position):
         Returns:
             A new OptionPosition instance
         """
+        from .logger import logger
+
+        logger.debug(f"OptionPosition.from_dict called with keys: {list(data.keys())}")
+
         # Handle price and cost_basis if they exist in the data
         price = data.get("price", 0.0)
         cost_basis = data.get("cost_basis", 0.0)
 
         # Get market_value if it exists in the data
-        market_value = data.get("market_value", None)
+        if "market_value" in data:
+            market_value = data["market_value"]
+            logger.debug(f"Using provided market_value: {market_value}")
+        else:
+            # Calculate market_value using the 100x multiplier
+            market_value = price * data["quantity"] * 100
+            logger.debug(
+                f"Calculated market_value: {market_value} (price: {price}, quantity: {data['quantity']})"
+            )
 
-        return cls(
-            ticker=data["ticker"],
-            position_type=data["position_type"],
-            quantity=data["quantity"],
-            beta=data["beta"],
-            beta_adjusted_exposure=data["beta_adjusted_exposure"],
-            market_exposure=data["market_exposure"],
-            strike=data["strike"],
-            expiry=data["expiry"],
-            option_type=data["option_type"],
-            delta=data["delta"],
-            delta_exposure=data["delta_exposure"],
-            notional_value=data["notional_value"],
-            underlying_beta=data["underlying_beta"],
-            price=price,
-            cost_basis=cost_basis,
-            market_value=market_value,
-        )
+        try:
+            return cls(
+                ticker=data["ticker"],
+                position_type=data["position_type"],
+                quantity=data["quantity"],
+                beta=data["beta"],
+                beta_adjusted_exposure=data["beta_adjusted_exposure"],
+                market_exposure=data["market_exposure"],
+                strike=data["strike"],
+                expiry=data["expiry"],
+                option_type=data["option_type"],
+                delta=data["delta"],
+                delta_exposure=data["delta_exposure"],
+                notional_value=data["notional_value"],
+                underlying_beta=data["underlying_beta"],
+                price=price,
+                cost_basis=cost_basis,
+                market_value=market_value,
+            )
+        except Exception as e:
+            logger.error(f"Error creating option position: {e}", exc_info=True)
+            logger.debug(f"Problematic option data: {data}")
+            raise
 
 
 @dataclass
@@ -401,23 +418,40 @@ class StockPosition:
         Returns:
             A new StockPosition instance
         """
+        from .logger import logger
+
+        logger.debug(f"StockPosition.from_dict called with keys: {list(data.keys())}")
+
         # Handle price if it exists in the data
         price = data.get("price", 0.0)
 
         # Get market_value if it exists in the data
-        market_value = data.get("market_value", None)
+        if "market_value" in data:
+            market_value = data["market_value"]
+            logger.debug(f"Using provided market_value: {market_value}")
+        else:
+            # Calculate market_value from price and quantity
+            market_value = price * data["quantity"]
+            logger.debug(
+                f"Calculated market_value: {market_value} (price: {price}, quantity: {data['quantity']})"
+            )
 
-        return cls(
-            ticker=data["ticker"],
-            quantity=data["quantity"],
-            beta=data["beta"],
-            market_exposure=data["market_exposure"],
-            beta_adjusted_exposure=data["beta_adjusted_exposure"],
-            price=price,
-            position_type=data.get("position_type", "stock"),  # Pass position_type
-            cost_basis=data.get("cost_basis", 0.0),  # Get cost_basis if it exists
-            market_value=market_value,  # Pass market_value if it exists
-        )
+        try:
+            return cls(
+                ticker=data["ticker"],
+                quantity=data["quantity"],
+                beta=data["beta"],
+                market_exposure=data["market_exposure"],
+                beta_adjusted_exposure=data["beta_adjusted_exposure"],
+                price=price,
+                position_type=data.get("position_type", "stock"),  # Pass position_type
+                cost_basis=data.get("cost_basis", 0.0),  # Get cost_basis if it exists
+                market_value=market_value,  # Pass market_value if it exists
+            )
+        except Exception as e:
+            logger.error(f"Error creating stock position: {e}", exc_info=True)
+            logger.debug(f"Problematic stock data: {data}")
+            raise
 
 
 @dataclass
@@ -534,33 +568,63 @@ class PortfolioGroup:
         Returns:
             A new PortfolioGroup instance
         """
+        from .logger import logger
+
+        logger.debug(f"PortfolioGroup.from_dict called with keys: {list(data.keys())}")
+
         # Create stock position if present
         stock_position = None
         if data.get("stock_position"):
-            stock_position = StockPosition.from_dict(data["stock_position"])
+            try:
+                stock_position = StockPosition.from_dict(data["stock_position"])
+                logger.debug(f"Created stock position for {data['ticker']}")
+            except Exception as e:
+                logger.error(
+                    f"Error creating stock position for {data['ticker']}: {e}",
+                    exc_info=True,
+                )
+                logger.debug(f"Problematic stock data: {data['stock_position']}")
+                raise
 
         # Create option positions
         option_positions = []
-        for opt_data in data.get("option_positions", []):
-            option_positions.append(OptionPosition.from_dict(opt_data))
+        for i, opt_data in enumerate(data.get("option_positions", [])):
+            try:
+                option_position = OptionPosition.from_dict(opt_data)
+                option_positions.append(option_position)
+                logger.debug(f"Created option position {i} for {data['ticker']}")
+            except Exception as e:
+                logger.error(
+                    f"Error creating option position {i} for {data['ticker']}: {e}",
+                    exc_info=True,
+                )
+                logger.debug(f"Problematic option data: {opt_data}")
+                raise
 
         # Create the group
-        group = cls(
-            ticker=data["ticker"],
-            stock_position=stock_position,
-            option_positions=option_positions,
-            net_exposure=data["net_exposure"],
-            beta=data["beta"],
-            beta_adjusted_exposure=data["beta_adjusted_exposure"],
-            total_delta_exposure=data["total_delta_exposure"],
-            options_delta_exposure=data["options_delta_exposure"],
-        )
+        try:
+            group = cls(
+                ticker=data["ticker"],
+                stock_position=stock_position,
+                option_positions=option_positions,
+                net_exposure=data["net_exposure"],
+                beta=data["beta"],
+                beta_adjusted_exposure=data["beta_adjusted_exposure"],
+                total_delta_exposure=data["total_delta_exposure"],
+                options_delta_exposure=data["options_delta_exposure"],
+            )
 
-        # Set call_count and put_count directly
-        group.call_count = data.get("call_count", 0)
-        group.put_count = data.get("put_count", 0)
+            # Set call_count and put_count directly
+            group.call_count = data.get("call_count", 0)
+            group.put_count = data.get("put_count", 0)
 
-        return group
+            return group
+        except Exception as e:
+            logger.error(
+                f"Error creating portfolio group for {data['ticker']}: {e}",
+                exc_info=True,
+            )
+            raise
 
     def get_details(
         self,
@@ -932,6 +996,12 @@ class PortfolioSummary:
         Returns:
             A new PortfolioSummary instance
         """
+        from .logger import logger
+
+        logger.debug(
+            f"PortfolioSummary.from_dict called with keys: {list(data.keys())}"
+        )
+
         # Create exposure breakdowns
         long_exposure = ExposureBreakdown.from_dict(data["long_exposure"])
         short_exposure = ExposureBreakdown.from_dict(data["short_exposure"])
@@ -950,6 +1020,12 @@ class PortfolioSummary:
         portfolio_estimate_value = data.get("portfolio_estimate_value", 0.0)
         stock_value = data.get("stock_value", 0.0)
         option_value = data.get("option_value", 0.0)
+
+        # Handle missing pending_activity_value field
+        if "pending_activity_value" not in data:
+            logger.warning(
+                "pending_activity_value missing from PortfolioSummary data, using default value 0.0"
+            )
         pending_activity_value = data.get("pending_activity_value", 0.0)
 
         return cls(
