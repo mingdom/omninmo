@@ -265,6 +265,63 @@ class TestPortfolioUtilityFunctions:
         )
 
 
+class TestOptionMarketValue:
+    """Tests for option market value calculation."""
+
+    def test_option_market_value_calculation(self):
+        """Test that option market value is calculated correctly with 100x multiplier."""
+        # Create an option position
+        option_position = OptionPosition(
+            ticker="SPY",
+            position_type="option",
+            quantity=10,
+            beta=1.0,
+            beta_adjusted_exposure=1000.0,
+            market_exposure=1000.0,
+            strike=450.0,
+            expiry="2025-06-20",
+            option_type="CALL",
+            delta=0.5,
+            delta_exposure=1000.0,
+            notional_value=450000.0,  # 10 contracts * 100 shares * $450 strike
+            underlying_beta=1.0,
+            price=5.0,  # $5 per share
+        )
+
+        # Verify the market value is calculated with 100x multiplier
+        # Market value should be: quantity * price * 100
+        expected_market_value = (
+            10 * 5.0 * 100
+        )  # 10 contracts * $5 * 100 shares per contract
+        assert option_position.market_value == expected_market_value
+        assert option_position.market_value == 5000.0
+
+        # Test with negative quantity (short position)
+        short_option = OptionPosition(
+            ticker="SPY",
+            position_type="option",
+            quantity=-5,
+            beta=1.0,
+            beta_adjusted_exposure=-500.0,
+            market_exposure=-500.0,
+            strike=450.0,
+            expiry="2025-06-20",
+            option_type="PUT",
+            delta=-0.5,
+            delta_exposure=-500.0,
+            notional_value=225000.0,  # 5 contracts * 100 shares * $450 strike
+            underlying_beta=1.0,
+            price=2.0,  # $2 per share
+        )
+
+        # Verify the market value for short position
+        expected_short_value = (
+            -5 * 2.0 * 100
+        )  # -5 contracts * $2 * 100 shares per contract
+        assert short_option.market_value == expected_short_value
+        assert short_option.market_value == -1000.0
+
+
 class TestPriceUpdates:
     """Tests for portfolio price update functionality."""
 

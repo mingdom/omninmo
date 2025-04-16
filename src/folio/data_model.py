@@ -236,7 +236,8 @@ class OptionPosition(Position):
         """
         # Calculate market_value if not provided
         if market_value is None:
-            market_value = price * quantity
+            # Apply 100x multiplier for option contracts
+            market_value = price * quantity * 100
 
         # Call the parent class constructor
         super().__init__(
