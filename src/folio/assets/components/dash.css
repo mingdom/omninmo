@@ -49,6 +49,23 @@
   opacity: 1 !important;
 }
 
+/* Prevent charts from capturing scroll events */
+.dash-chart .plotly,
+.dash-chart .js-plotly-plot,
+.dash-chart .plot-container {
+  pointer-events: auto !important;
+  /* Allow clicks but not scroll */
+}
+
+/* Only allow pointer events on specific interactive elements */
+.dash-chart .drag,
+.dash-chart .zoom,
+.dash-chart .pan,
+.dash-chart .select,
+.dash-chart .lasso {
+  pointer-events: auto !important;
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .dash-chart {

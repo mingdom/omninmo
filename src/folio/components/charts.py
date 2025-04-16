@@ -18,6 +18,23 @@ from ..data_model import PortfolioGroup, PortfolioSummary
 from ..logger import logger
 from .summary_cards import create_summary_cards
 
+
+def get_chart_config():
+    """Get standard chart configuration with scroll zoom disabled.
+
+    Returns:
+        dict: Chart configuration with scroll zoom disabled
+    """
+    return {
+        "displayModeBar": False,
+        "responsive": True,
+        "staticPlot": False,
+        "doubleClick": "reset",
+        "showTips": True,
+        "scrollZoom": False,  # Disable scroll zoom to prevent interference with page scrolling
+    }
+
+
 # Asset Allocation Chart has been removed in favor of the more accurate Exposure Chart
 
 
@@ -28,14 +45,7 @@ def create_exposure_chart():
         [
             dcc.Graph(
                 id="exposure-chart",
-                config={
-                    "displayModeBar": False,
-                    "responsive": True,
-                    "staticPlot": False,
-                    "doubleClick": "reset",
-                    "showTips": True,
-                    "scrollZoom": True,
-                },
+                config=get_chart_config(),
                 className="dash-chart",
                 # Add an empty figure to ensure proper initialization
                 figure={
@@ -91,14 +101,7 @@ def create_position_treemap():
         [
             dcc.Graph(
                 id="position-treemap",
-                config={
-                    "displayModeBar": False,
-                    "responsive": True,
-                    "staticPlot": False,
-                    "doubleClick": "reset",
-                    "showTips": True,
-                    "scrollZoom": True,
-                },
+                config=get_chart_config(),
                 className="dash-chart",
                 # Add an empty figure to ensure proper initialization
                 figure={
