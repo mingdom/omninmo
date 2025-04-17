@@ -134,3 +134,19 @@
     padding: var(--spacing-sm);
   }
 }
+
+/* Tooltip behavior for portfolio table */
+.tooltip {
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+  z-index: var(--z-index-tooltip);
+}
+
+.tooltip.show {
+  opacity: 1;
+}
+
+/* Ensure only one tooltip is visible at a time */
+.position-row:not(:hover) .tooltip {
+  display: none !important;
+}
