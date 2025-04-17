@@ -138,7 +138,7 @@ def create_dashboard_section():
     Returns:
         html.Div: A div containing all dashboard components
     """
-    logger.info("Creating dashboard section with charts")
+    logger.debug("Creating dashboard section with charts")
 
     # Import the summary cards component
 
@@ -219,7 +219,7 @@ def register_callbacks(app):
     Args:
         app: The Dash application instance
     """
-    logger.info("Registering chart callbacks")
+    logger.debug("Registering chart callbacks")
 
     # Dashboard metrics callback
     @app.callback(
@@ -336,7 +336,7 @@ def register_callbacks(app):
                     summary_data["pending_activity_value"] = 0.0
                     try:
                         portfolio_summary = PortfolioSummary.from_dict(summary_data)
-                        logger.info(
+                        logger.debug(
                             "Successfully deserialized after adding pending_activity_value"
                         )
                     except Exception as retry_err:

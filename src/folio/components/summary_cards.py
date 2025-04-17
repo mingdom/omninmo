@@ -489,7 +489,7 @@ def create_summary_cards():
     Returns:
         dbc.Card: A card containing all summary cards
     """
-    logger.info("Creating summary cards")
+    logger.debug("Creating summary cards")
 
     # Create all the cards
     portfolio_value_card = create_portfolio_value_card()
@@ -537,7 +537,7 @@ def register_callbacks(app):
     Args:
         app: The Dash app
     """
-    logger.info("Registering summary cards callbacks")
+    logger.debug("Registering summary cards callbacks")
     # Debug logging for callback registration
     logger.debug(
         f"Callback map before summary cards registration: {len(app.callback_map)} callbacks"
@@ -567,7 +567,7 @@ def register_callbacks(app):
     )
     def update_summary_cards(summary_data):
         """Update summary cards with latest data"""
-        logger.info("Updating summary cards")
+        logger.debug("Updating summary cards")
         logger.debug(f"Summary data type: {type(summary_data)}")
 
         # Log the structure of the summary data
@@ -589,7 +589,7 @@ def register_callbacks(app):
             formatted_values = format_summary_card_values(summary_data)
 
             # Log the formatted values
-            logger.info(f"Formatted summary card values: {formatted_values}")
+            logger.debug(f"Formatted summary card values: {formatted_values}")
 
             return formatted_values
         except Exception as e:

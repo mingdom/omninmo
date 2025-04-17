@@ -128,8 +128,8 @@ def process_portfolio_data(
         )
         return [], empty_summary, []
 
-    logger.info("=== Portfolio Loading Started ===")
-    logger.info(f"Processing portfolio with {len(df)} initial rows")
+    logger.debug("=== Portfolio Loading Started ===")
+    logger.debug(f"Processing portfolio with {len(df)} initial rows")
 
     # Validate required columns
     required_columns = [
@@ -147,7 +147,7 @@ def process_portfolio_data(
         raise ValueError(f"Missing required columns: {', '.join(missing_columns)}")
 
     # Clean and prepare data
-    logger.info("Cleaning and validating data...")
+    logger.debug("Cleaning and validating data...")
     df = df.copy()  # Avoid SettingWithCopyWarning
     df["Symbol"] = df["Symbol"].str.strip()
     df["Type"] = df["Type"].fillna("")  # Ensure Type is never NaN
@@ -221,13 +221,13 @@ def process_portfolio_data(
         option_df["Description"].unique()
     )  # Using description as proxy
 
-    logger.info("=== Portfolio Overview ===")
-    logger.info(f"Total Input Rows: {total_positions}")
-    logger.info(f"Identified Stocks Rows: {len(stock_df)}")
-    logger.info(f"Identified Option Rows: {len(option_df)}")
+    logger.debug("=== Portfolio Overview ===")
+    logger.debug(f"Total Input Rows: {total_positions}")
+    logger.debug(f"Identified Stocks Rows: {len(stock_df)}")
+    logger.debug(f"Identified Option Rows: {len(option_df)}")
     # We no longer calculate or display the total portfolio value from the CSV
-    logger.info(f"Unique Stock Symbols: {unique_stocks}")
-    logger.info(
+    logger.debug(f"Unique Stock Symbols: {unique_stocks}")
+    logger.debug(
         f"Unique Option Descriptions: {unique_options}"
     )  # Might include duplicates if format varies slightly
 
@@ -236,7 +236,7 @@ def process_portfolio_data(
     cash_like_positions = []
     # Create a dictionary to track cash-like positions by ticker for deduplication
     cash_like_by_ticker = {}
-    logger.info("Processing stock-like positions...")
+    logger.debug("Processing stock-like positions...")
     # Process non-option positions
     for index, row in stock_df.iterrows():
         symbol_raw = row["Symbol"]
@@ -297,7 +297,7 @@ def process_portfolio_data(
                     price = 0.0
                     beta = 0.0
                     is_cash_like = True
-                    logger.info(
+                    logger.debug(
                         f"Row {index}: Cash-like position {symbol} missing price. Using defaults."
                     )
                 else:
@@ -335,7 +335,7 @@ def process_portfolio_data(
 
             if is_cash_like:
                 # Process cash-like position
-                logger.info(
+                logger.debug(
                     f"Identified cash-like position: {symbol}, Value: {format_currency(value_to_use)}"
                 )
 
@@ -411,7 +411,7 @@ def process_portfolio_data(
             continue
 
     # Group by underlying symbol (using stock symbols as base)
-    logger.info("=== Position Grouping and Analysis ===")
+    logger.debug("=== Position Grouping and Analysis ===")
     groups = []
     processed_option_indices = (
         set()
@@ -420,7 +420,7 @@ def process_portfolio_data(
     # Process stock positions first to form the basis of groups
     for symbol, stock_info in stock_positions.items():
         try:
-            logger.info(f"Processing Group for Underlying: {symbol}")
+            logger.debug(f"Processing Group for Underlying: {symbol}")
 
             # Create stock position data structure for the group
             value = stock_info["value"]
@@ -428,13 +428,13 @@ def process_portfolio_data(
             beta = stock_info["beta"]
             percent_of_account = stock_info["percent_of_account"]
 
-            logger.info("  Stock Details:")
-            logger.info(f"    Symbol: {symbol}")
-            logger.info(f"    Quantity: {quantity:,.0f}")
-            logger.info(f"    Market Value: {format_currency(value)}")
-            logger.info(f"    Beta: {format_beta(beta)}")
-            logger.info(f"    Beta-Adjusted Exposure: {format_currency(value * beta)}")
-            logger.info(f"    Percent of Account: {percent_of_account:.2%}")
+            logger.debug("  Stock Details:")
+            logger.debug(f"    Symbol: {symbol}")
+            logger.debug(f"    Quantity: {quantity:,.0f}")
+            logger.debug(f"    Market Value: {format_currency(value)}")
+            logger.debug(f"    Beta: {format_beta(beta)}")
+            logger.debug(f"    Beta-Adjusted Exposure: {format_currency(value * beta)}")
+            logger.debug(f"    Percent of Account: {percent_of_account:.2%}")
 
             stock_data_for_group = {
                 "ticker": symbol,
@@ -497,16 +497,16 @@ def process_portfolio_data(
                     processed_option_indices.add(row_index)
 
                     # Log the option details
-                    logger.info(f"    Option Added: {opt['description']}")
-                    logger.info(f"      Quantity: {opt['quantity']:,.0f}")
-                    logger.info(f"      Delta: {opt['delta']:.3f}")
-                    logger.info(
+                    logger.debug(f"    Option Added: {opt['description']}")
+                    logger.debug(f"      Quantity: {opt['quantity']:,.0f}")
+                    logger.debug(f"      Delta: {opt['delta']:.3f}")
+                    logger.debug(
                         f"      Notional Value: {format_currency(opt['notional_value'])}"
                     )
-                    logger.info(
+                    logger.debug(
                         f"      Delta Exposure: {format_currency(opt['delta_exposure'])}"
                     )
-                    logger.info(
+                    logger.debug(
                         f"      Beta-Adjusted Exposure: {format_currency(opt['beta_adjusted_exposure'])}"
                     )
 
@@ -573,7 +573,7 @@ def process_portfolio_data(
     # Process any options that were not matched to a stock position
     unprocessed_options = set(option_df.index) - processed_option_indices
     if unprocessed_options:
-        logger.info(
+        logger.debug(
             f"{len(unprocessed_options)} options without matching stock positions found - creating standalone option groups"
         )
 
@@ -593,7 +593,7 @@ def process_portfolio_data(
                 if underlying not in orphaned_options_by_underlying:
                     orphaned_options_by_underlying[underlying] = []
                 orphaned_options_by_underlying[underlying].append(idx)
-                logger.info(
+                logger.debug(
                     f"  - Orphaned option: {opt_desc} (Underlying: {underlying})"
                 )
             else:
@@ -603,7 +603,7 @@ def process_portfolio_data(
 
         # Process each group of orphaned options
         for underlying, option_indices in orphaned_options_by_underlying.items():
-            logger.info(
+            logger.debug(
                 f"Creating standalone option group for {underlying} with {len(option_indices)} options"
             )
 
@@ -696,16 +696,16 @@ def process_portfolio_data(
                     processed_option_indices.add(row_index)
 
                     # Log the option details
-                    logger.info(f"Orphaned Option Added: {opt['description']}")
-                    logger.info(f"  Quantity: {opt['quantity']:,.0f}")
-                    logger.info(f"  Delta: {opt['delta']:.3f}")
-                    logger.info(
+                    logger.debug(f"Orphaned Option Added: {opt['description']}")
+                    logger.debug(f"  Quantity: {opt['quantity']:,.0f}")
+                    logger.debug(f"  Delta: {opt['delta']:.3f}")
+                    logger.debug(
                         f"  Notional Value: {format_currency(opt['notional_value'])}"
                     )
-                    logger.info(
+                    logger.debug(
                         f"  Delta Exposure: {format_currency(opt['delta_exposure'])}"
                     )
-                    logger.info(
+                    logger.debug(
                         f"  Beta-Adjusted Exposure: {format_currency(opt['beta_adjusted_exposure'])}"
                     )
 
@@ -763,37 +763,37 @@ def process_portfolio_data(
                     # We'll keep the stock_position with quantity=0 to maintain the ticker information
                     # This ensures the group is properly displayed in the UI
                     groups.append(group)
-                    logger.info(
+                    logger.debug(
                         f"Successfully created options-only group for {underlying} with {len(option_data_for_group)} options"
                     )
 
                     # Log the group details
-                    logger.info(f"Group details for {underlying}:")
-                    logger.info(
+                    logger.debug(f"Group details for {underlying}:")
+                    logger.debug(
                         f"  Net Exposure: {format_currency(group.net_exposure)}"
                     )
-                    logger.info(f"  Beta: {format_beta(group.beta)}")
-                    logger.info(
+                    logger.debug(f"  Beta: {format_beta(group.beta)}")
+                    logger.debug(
                         f"  Beta-Adjusted Exposure: {format_currency(group.beta_adjusted_exposure)}"
                     )
-                    logger.info(
+                    logger.debug(
                         f"  Options Delta Exposure: {format_currency(group.options_delta_exposure)}"
                     )
-                    logger.info(f"  Number of Options: {len(group.option_positions)}")
-                    logger.info(
+                    logger.debug(f"  Number of Options: {len(group.option_positions)}")
+                    logger.debug(
                         f"  Stock Position: {'Yes' if group.stock_position else 'No'}"
                     )
                     if group.stock_position:
-                        logger.info(
+                        logger.debug(
                             f"  Stock Quantity: {group.stock_position.quantity}"
                         )
-                        logger.info(
+                        logger.debug(
                             f"  Stock Market Exposure: {format_currency(group.stock_position.market_exposure)}"
                         )
-                        logger.info(
+                        logger.debug(
                             f"  Stock Beta-Adjusted Exposure: {format_currency(group.stock_position.beta_adjusted_exposure)}"
                         )
-                    logger.info(
+                    logger.debug(
                         f"  Option Types: {group.call_count} calls, {group.put_count} puts"
                     )
                 else:
@@ -842,7 +842,7 @@ def process_portfolio_data(
             return [], empty_summary, []
 
     # Calculate portfolio summary using the final list of groups
-    logger.info("Calculating final portfolio summary...")
+    logger.debug("Calculating final portfolio summary...")
     try:
         summary = calculate_portfolio_summary(
             groups, cash_like_positions, pending_activity_value
@@ -851,7 +851,7 @@ def process_portfolio_data(
             logger.info(
                 f"Including Pending Activity value: {format_currency(pending_activity_value)}"
             )
-        logger.info("Portfolio summary calculated successfully.")
+        logger.debug("Portfolio summary calculated successfully.")
     except Exception as summary_err:
         logger.error(
             f"Failed to calculate portfolio summary: {summary_err}", exc_info=True
@@ -1124,10 +1124,10 @@ def calculate_portfolio_summary(
         )
 
         if cash_like_value > 0:
-            logger.info(
+            logger.debug(
                 f"Adding {cash_like_count} cash positions worth {format_currency(cash_like_value)}"
             )
-            logger.info(
+            logger.debug(
                 f"Cash represents {cash_percentage:.2f}% of the portfolio estimated value"
             )
 
@@ -1156,7 +1156,7 @@ def calculate_portfolio_summary(
             price_updated_at=current_time,  # Set the timestamp
         )
 
-        logger.info("Portfolio summary created successfully.")
+        logger.debug("Portfolio summary created successfully.")
         log_summary_details(summary)
         return summary
 
@@ -1287,60 +1287,60 @@ def log_summary_details(summary: PortfolioSummary):
         summary: The PortfolioSummary object containing calculated metrics
     """
     # Portfolio overview
-    logger.info("--- Portfolio Summary ---")
+    logger.debug("--- Portfolio Summary ---")
     if summary.price_updated_at:
-        logger.info(f"Prices Last Updated: {summary.price_updated_at}")
-    logger.info(f"Net Market Exposure: {format_currency(summary.net_market_exposure)}")
+        logger.debug(f"Prices Last Updated: {summary.price_updated_at}")
+    logger.debug(f"Net Market Exposure: {format_currency(summary.net_market_exposure)}")
 
-    logger.info(
+    logger.debug(
         f"Portfolio Estimated Value: {format_currency(summary.portfolio_estimate_value)}"
     )
-    logger.info(f"Stock Value: {format_currency(summary.stock_value)}")
-    logger.info(f"Option Value: {format_currency(summary.option_value)}")
+    logger.debug(f"Stock Value: {format_currency(summary.stock_value)}")
+    logger.debug(f"Option Value: {format_currency(summary.option_value)}")
     if summary.pending_activity_value != 0.0:
-        logger.info(
+        logger.debug(
             f"Pending Activity: {format_currency(summary.pending_activity_value)}"
         )
-    logger.info(f"Beta: {format_beta(summary.portfolio_beta)}")
-    logger.info(f"Short %: {summary.short_percentage:.1f}%")
-    logger.info(f"Cash %: {summary.cash_percentage:.1f}%")
+    logger.debug(f"Beta: {format_beta(summary.portfolio_beta)}")
+    logger.debug(f"Short %: {summary.short_percentage:.1f}%")
+    logger.debug(f"Cash %: {summary.cash_percentage:.1f}%")
 
     # Cash positions
-    logger.info(
+    logger.debug(
         f"Cash: {format_currency(summary.cash_like_value)} ({summary.cash_like_count} positions)"
     )
 
     # Long exposure
-    logger.info("Long Exposure:")
-    logger.info(f"  Total: {format_currency(summary.long_exposure.total_exposure)}")
-    logger.info(f"  Stocks: {format_currency(summary.long_exposure.stock_exposure)}")
-    logger.info(
+    logger.debug("Long Exposure:")
+    logger.debug(f"  Total: {format_currency(summary.long_exposure.total_exposure)}")
+    logger.debug(f"  Stocks: {format_currency(summary.long_exposure.stock_exposure)}")
+    logger.debug(
         f"  Options: {format_currency(summary.long_exposure.option_delta_exposure)}"
     )
 
     # Short exposure
-    logger.info("Short Exposure:")
-    logger.info(f"  Total: {format_currency(summary.short_exposure.total_exposure)}")
-    logger.info(f"  Stocks: {format_currency(summary.short_exposure.stock_exposure)}")
-    logger.info(
+    logger.debug("Short Exposure:")
+    logger.debug(f"  Total: {format_currency(summary.short_exposure.total_exposure)}")
+    logger.debug(f"  Stocks: {format_currency(summary.short_exposure.stock_exposure)}")
+    logger.debug(
         f"  Options: {format_currency(summary.short_exposure.option_delta_exposure)}"
     )
 
     # Options exposure
-    logger.info("Options Exposure:")
-    logger.info(
+    logger.debug("Options Exposure:")
+    logger.debug(
         f"  Total Delta: {format_currency(summary.options_exposure.total_exposure)}"
     )
-    logger.info(
+    logger.debug(
         f"  Long Delta: {format_currency(summary.options_exposure.components.get('Long Options Delta Exp', 0))}"
     )
-    logger.info(
+    logger.debug(
         f"  Short Delta: {format_currency(summary.options_exposure.components.get('Short Options Delta Exp', 0))}"
     )
-    logger.info(
+    logger.debug(
         f"  Net Delta: {format_currency(summary.options_exposure.components.get('Net Options Delta Exp', 0))}"
     )
-    logger.info("--------------------------------")
+    logger.debug("--------------------------------")
 
 
 def calculate_position_weight(

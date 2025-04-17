@@ -20,5 +20,10 @@ app:
 
   # Logging configuration
   logging:
+    # Default log level if environment is not specified
     level: "INFO"  # Options: "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"
     file: "folio.log"
+    # Environment-specific log levels
+    environments:
+      local: "INFO"     # For local development (make folio)
+      production: "ERROR"  # For production deployment (including Hugging Face)

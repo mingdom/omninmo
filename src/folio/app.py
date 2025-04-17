@@ -214,7 +214,7 @@ def create_position_modal() -> dbc.Modal:
 
 def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.Dash:
     """Create and configure the Dash application"""
-    logger.info("Initializing Dash application")
+    logger.debug("Initializing Dash application")
 
     # Create Dash app
     app = dash.Dash(
@@ -255,7 +255,7 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
 
     # Store portfolio file path
     app.portfolio_file = portfolio_file
-    logger.info(f"Portfolio file path set to: {portfolio_file}")
+    logger.debug(f"Portfolio file path set to: {portfolio_file}")
 
     # Define layout
     app.layout = dbc.Container(
@@ -432,17 +432,17 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
     )
     def toggle_empty_state(groups_data):
         """Show empty state when no data is loaded and collapse upload section when data is loaded"""
-        logger.info(f"TOGGLE_EMPTY_STATE called with groups_data: {bool(groups_data)}")
+        logger.debug(f"TOGGLE_EMPTY_STATE called with groups_data: {bool(groups_data)}")
 
         if not groups_data:
             # No data, show empty state, hide main content, keep upload open
-            logger.info(
+            logger.debug(
                 "TOGGLE_EMPTY_STATE: No data, showing empty state, hiding main content"
             )
             return create_empty_state(), {"display": "none"}, True
         else:
             # Data loaded, hide empty state, show main content, collapse upload
-            logger.info(
+            logger.debug(
                 "TOGGLE_EMPTY_STATE: Data loaded, hiding empty state, showing main content"
             )
             return None, {"display": "block"}, False
@@ -458,7 +458,7 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
     )
     def load_sample_portfolio(n_clicks):
         """Load a sample portfolio when the button is clicked"""
-        logger.info(f"LOAD_SAMPLE_PORTFOLIO: Button clicked: {n_clicks}")
+        logger.debug(f"LOAD_SAMPLE_PORTFOLIO: Button clicked: {n_clicks}")
         if n_clicks:
             logger.info("LOAD_SAMPLE_PORTFOLIO: Processing sample portfolio")
             try:
@@ -481,12 +481,14 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
                     logger.warning("Neither private nor sample portfolio found")
                     return None, None
 
-                logger.info(f"Loading portfolio from: {portfolio_path}")
+                logger.debug(f"Loading portfolio from: {portfolio_path}")
 
                 # Debug the file content
                 with open(portfolio_path) as f:
                     content = f.read()
-                    logger.info(f"Portfolio content (first 100 chars): {content[:100]}")
+                    logger.debug(
+                        f"Portfolio content (first 100 chars): {content[:100]}"
+                    )
 
                 # Read the portfolio file
                 with open(portfolio_path, "rb") as f:
@@ -544,10 +546,10 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
     def update_portfolio_data(_initial_trigger, _pathname, contents, filename):
         """Update portfolio data when triggered"""
         try:
-            logger.info("Loading portfolio data...")
+            logger.debug("Loading portfolio data...")
             ctx = dash.callback_context
             trigger_id = ctx.triggered[0]["prop_id"] if ctx.triggered else ""
-            logger.info(f"Trigger: {trigger_id}")
+            logger.debug(f"Trigger: {trigger_id}")
 
             # Handle file upload if provided
             if contents and "upload-portfolio.contents" in trigger_id:
@@ -558,7 +560,7 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
                     if error:
                         raise ValueError(error)
 
-                    logger.info(
+                    logger.debug(
                         f"Successfully read and validated {len(df)} rows from uploaded file {filename}"
                     )
                     status = html.Div(
@@ -602,8 +604,8 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
             # Convert to Dash-compatible format
             groups_data = [g.to_dict() for g in groups]
             summary_data = summary.to_dict()
-            logger.info(f"Summary data keys: {list(summary_data.keys())}")
-            logger.info(
+            logger.debug(f"Summary data keys: {list(summary_data.keys())}")
+            logger.debug(
                 f"Portfolio estimate value: {summary_data.get('portfolio_estimate_value', 'NOT FOUND')}"
             )
             portfolio_data = df.to_dict("records")

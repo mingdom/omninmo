@@ -97,6 +97,8 @@ The easiest way to try Folio is through our Hugging Face Spaces deployment:
 
 For more Docker commands and options, see [DOCKER.md](DOCKER.md).
 
+For information about logging configuration, see [docs/logging.md](docs/logging.md).
+
 ## Using Folio
 
 1. **Upload Your Portfolio**: Use the upload button to import a CSV file with your holdings

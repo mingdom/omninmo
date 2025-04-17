@@ -8,8 +8,7 @@ ENV PYTHONPATH=/app
 # The application will check for HF_SPACE environment variable to determine the environment
 ENV PORT=8050
 ENV HF_SPACE=1
-# Set logging level to WARNING for Hugging Face deployment (for privacy reasons)
-ENV LOG_LEVEL=WARNING
+# No need to set LOG_LEVEL as it will be determined from folio.yaml based on environment
 # Note: Sensitive environment variables like GEMINI_API_KEY should be passed at runtime
 # rather than build time for security reasons
 

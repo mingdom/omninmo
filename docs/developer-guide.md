@@ -106,7 +106,7 @@ features_df = feature_generator.generate(price_data)
 
 # Generate enhanced features with market comparison
 enhanced_features = feature_generator.generate(
-    price_data, 
+    price_data,
     market_data=market_data,
     use_enhanced_features=True
 )
@@ -179,11 +179,13 @@ predictor, results = train_model(
 
 ## Debugging Tips
 
-1. **Enable Debug Logging**
-   ```python
-   import logging
-   logging.basicConfig(level=logging.DEBUG)
+1. **Configure Logging Level**
+   ```bash
+   # Run with DEBUG level logging
+   LOG_LEVEL=DEBUG make folio
    ```
+
+   For more details on logging configuration, see [logging.md](logging.md).
 
 2. **Inspect Feature Engineering**
    - Set breakpoints in feature generation methods
@@ -238,4 +240,4 @@ predictor, results = train_model(
 - XGBoost Documentation: https://xgboost.readthedocs.io/
 - Financial Modeling Prep API: https://financialmodelingprep.com/developer/docs/
 - MLflow Documentation: https://www.mlflow.org/docs/latest/index.html
-- Pandas Documentation: https://pandas.pydata.org/docs/ 
+- Pandas Documentation: https://pandas.pydata.org/docs/

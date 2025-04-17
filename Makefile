@@ -144,7 +144,7 @@ portfolio:
 		exit 1; \
 	fi
 	@source $(VENV_DIR)/bin/activate && \
-	LOG_LEVEL=$(if $(log),$(log),DEBUG) \
+	LOG_LEVEL=$(if $(log),$(log),INFO) \
 	PYTHONPATH=. python3 -m src.folio.app --port 8051 --debug --portfolio src/folio/assets/sample-portfolio.csv
 
 port:
@@ -163,7 +163,7 @@ folio:
 		exit 1; \
 	fi
 	@source $(VENV_DIR)/bin/activate && \
-	LOG_LEVEL=$(if $(log),$(log),DEBUG) \
+	LOG_LEVEL=$(if $(log),$(log),INFO) \
 	PYTHONPATH=. python3 -m src.folio.app --port 8051 --debug $(if $(portfolio),--portfolio $(portfolio),)
 
 stop-folio:
