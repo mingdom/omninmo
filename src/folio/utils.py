@@ -73,7 +73,7 @@ def get_beta(ticker: str, description: str = "") -> float:
     """
     # For cash-like instruments, return 0 without calculation
     if is_cash_or_short_term(ticker, beta=None, description=description):
-        logger.info(f"Using default beta of 0.0 for cash-like position: {ticker}")
+        logger.debug(f"Using default beta of 0.0 for cash-like position: {ticker}")
         return 0.0
 
     if not data_fetcher:
@@ -124,7 +124,7 @@ def get_beta(ticker: str, description: str = "") -> float:
         if pd.isna(beta):
             raise ValueError(f"Beta calculation resulted in NaN for {ticker}")
 
-        logger.info(f"Calculated beta of {beta:.2f} for {ticker}")
+        logger.debug(f"Calculated beta of {beta:.2f} for {ticker}")
         return beta
 
     except (ValueError, pd.errors.InvalidIndexError) as e:

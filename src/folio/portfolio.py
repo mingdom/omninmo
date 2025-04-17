@@ -161,7 +161,7 @@ def process_portfolio_data(
             if pd.notna(row["Current Value"]):
                 try:
                     pending_activity_value += clean_currency_value(row["Current Value"])
-                    logger.info(
+                    logger.debug(
                         f"Found Pending Activity with value: {format_currency(pending_activity_value)}"
                     )
                 except (ValueError, TypeError) as e:
@@ -173,11 +173,11 @@ def process_portfolio_data(
     if (~valid_rows).any():
         filtered_count = (~valid_rows).sum()
         filtered_symbols = df.loc[~valid_rows, "Symbol"].tolist()
-        logger.info(
+        logger.debug(
             f"Filtered out {filtered_count} invalid entries: {filtered_symbols}"
         )
         df = df[valid_rows].reset_index(drop=True)
-        logger.info(f"Continuing with {len(df)} remaining rows")
+        logger.debug(f"Continuing with {len(df)} remaining rows")
 
     # Function to identify options based on description format
     def is_option_desc(desc: str) -> bool:
@@ -250,7 +250,7 @@ def process_portfolio_data(
                 or not isinstance(symbol_raw, str)
                 or not symbol_raw.strip()
             ):
-                logger.warning(f"Row {index}: Invalid symbol: {symbol_raw}. Skipping.")
+                logger.info(f"Row {index}: Invalid symbol: {symbol_raw}. Skipping.")
                 continue
 
             # Clean symbol (remove trailing asterisks for preferred shares)
@@ -265,7 +265,7 @@ def process_portfolio_data(
                     )
                     continue
                 # Process based on value only
-                logger.warning(
+                logger.info(
                     f"Row {index}: {symbol} missing quantity but has value. Using quantity=0."
                 )
                 quantity = 0
@@ -280,7 +280,7 @@ def process_portfolio_data(
 
                     logger.debug(f"Row {index}: {symbol} quantity parsed as {quantity}")
                 except (ValueError, TypeError):
-                    logger.warning(
+                    logger.info(
                         f"Row {index}: {symbol} has invalid quantity: '{row['Quantity']}'. Skipping."
                     )
                     continue
@@ -301,19 +301,17 @@ def process_portfolio_data(
                         f"Row {index}: Cash-like position {symbol} missing price. Using defaults."
                     )
                 else:
-                    logger.warning(
-                        f"Row {index}: {symbol} has missing price. Skipping."
-                    )
+                    logger.info(f"Row {index}: {symbol} has missing price. Skipping.")
                     continue
             else:
                 price = clean_currency_value(row["Last Price"])
                 if price < 0:
-                    logger.warning(
+                    logger.info(
                         f"Row {index}: {symbol} has negative price ({price}). Skipping."
                     )
                     continue
                 elif price == 0:
-                    logger.warning(
+                    logger.info(
                         f"Row {index}: {symbol} has zero price. Calculations may be affected."
                     )
 
@@ -382,7 +380,7 @@ def process_portfolio_data(
                     try:
                         cost_basis = clean_currency_value(row["Average Cost Basis"])
                     except (ValueError, TypeError):
-                        logger.warning(
+                        logger.info(
                             f"Row {index}: {symbol} has invalid cost basis: '{row['Average Cost Basis']}'. Using 0.0."
                         )
 
@@ -399,7 +397,7 @@ def process_portfolio_data(
 
         except (ValueError, TypeError) as e:
             # Handle data conversion and type errors
-            logger.warning(
+            logger.info(
                 f"Row {index}: Error processing '{symbol_raw}': {e}. Skipping row."
             )
             continue
@@ -848,7 +846,7 @@ def process_portfolio_data(
             groups, cash_like_positions, pending_activity_value
         )
         if pending_activity_value > 0:
-            logger.info(
+            logger.debug(
                 f"Including Pending Activity value: {format_currency(pending_activity_value)}"
             )
         logger.debug("Portfolio summary calculated successfully.")

@@ -460,7 +460,7 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
         """Load a sample portfolio when the button is clicked"""
         logger.debug(f"LOAD_SAMPLE_PORTFOLIO: Button clicked: {n_clicks}")
         if n_clicks:
-            logger.info("LOAD_SAMPLE_PORTFOLIO: Processing sample portfolio")
+            logger.debug("LOAD_SAMPLE_PORTFOLIO: Processing sample portfolio")
             try:
                 # First check if private portfolio exists for local debugging
                 private_path = (
@@ -470,11 +470,11 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
 
                 # Determine which file to use
                 if private_path.exists():
-                    logger.info(f"Found private portfolio at: {private_path}")
+                    logger.debug(f"Found private portfolio at: {private_path}")
                     portfolio_path = private_path
                     filename = "portfolio-private.csv"
                 elif sample_path.exists():
-                    logger.info(f"Using sample portfolio at: {sample_path}")
+                    logger.debug(f"Using sample portfolio at: {sample_path}")
                     portfolio_path = sample_path
                     filename = "sample-portfolio.csv"
                 else:
@@ -493,7 +493,7 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
                 # Read the portfolio file
                 with open(portfolio_path, "rb") as f:
                     file_content = f.read()
-                    logger.info(f"Read {len(file_content)} bytes from portfolio file")
+                    logger.debug(f"Read {len(file_content)} bytes from portfolio file")
 
                 # Validate the file content
                 # We'll sanitize it during the normal processing flow
@@ -554,7 +554,7 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
             # Handle file upload if provided
             if contents and "upload-portfolio.contents" in trigger_id:
                 try:
-                    logger.info(f"Processing uploaded file: {filename}")
+                    logger.debug(f"Processing uploaded file: {filename}")
                     # Validate and sanitize the CSV file
                     df, error = validate_csv_upload(contents, filename)
                     if error:
@@ -580,7 +580,7 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
                     logger.warning(f"Parser error with standard settings: {e}")
                     # Try again with more flexible quoting to handle commas in option symbols
                     df = pd.read_csv(app.portfolio_file, quoting=3)  # QUOTE_NONE
-                logger.info(f"Successfully read {len(df)} rows from portfolio file")
+                logger.debug(f"Successfully read {len(df)} rows from portfolio file")
                 status = html.Div(
                     "Using default portfolio file", className="text-muted"
                 )
@@ -597,7 +597,7 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
 
             # Process portfolio data
             groups, summary, cash_like_positions = portfolio.process_portfolio_data(df)
-            logger.info(
+            logger.debug(
                 f"Successfully processed {len(groups)} portfolio groups and {len(cash_like_positions)} cash-like positions"
             )
 
