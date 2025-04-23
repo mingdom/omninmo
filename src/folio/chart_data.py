@@ -9,6 +9,10 @@ from typing import Any
 from .data_model import PortfolioGroup, PortfolioSummary
 from .logger import logger
 from .portfolio import calculate_beta_adjusted_net_exposure
+from .portfolio_value import (
+    calculate_component_percentages,
+    get_portfolio_component_values,
+)
 from .utils import format_currency
 
 
@@ -24,6 +28,12 @@ class ChartColors:
     SHORT = "#2F3136"  # Dark gray for short positions
     OPTIONS = "#9B59B6"  # Purple for options
     NET = "#3498DB"  # Blue for net values
+
+    # Allocations chart colors
+    LONG_OPTIONS = "#4CAF50"  # Light green for long options
+    SHORT_OPTIONS = "#607D8B"  # Light gray for short options
+    CASH = "#9E9E9E"  # Medium gray for cash
+    PENDING = "#BDBDBD"  # Light gray for pending activity
 
 
 # transform_for_asset_allocation function has been removed in favor of the more accurate Exposure Chart
@@ -280,6 +290,193 @@ def transform_for_treemap(
 
 
 # Sector allocation chart has been removed as it's not currently supported
+
+
+def transform_for_allocations_chart(
+    portfolio_summary: PortfolioSummary,
+) -> dict[str, Any]:
+    """Transform portfolio summary data for the allocations stacked bar chart.
+
+    This function takes a portfolio summary and transforms it into a format
+    suitable for a stacked bar chart showing portfolio allocations. The chart
+    has four main categories:
+    - Long: Stacked with Long Stocks and Long Options
+    - Short: Stacked with Short Stocks and Short Options (negative values)
+    - Cash: Cash-like positions
+    - Pending: Pending activity
+
+    IMPORTANT: Short values are stored as negative numbers in the portfolio summary.
+    For display purposes in the chart, we use the absolute values but maintain
+    separate bars for long and short positions.
+
+    Args:
+        portfolio_summary: The portfolio summary to transform
+
+    Returns:
+        A dictionary with 'data' and 'layout' keys suitable for a Plotly chart
+    """
+    logger.debug("Transforming data for allocations chart")
+
+    # Skip empty portfolios
+    if portfolio_summary.portfolio_estimate_value == 0:
+        logger.warning("Empty portfolio - no data for allocations chart")
+        return {
+            "data": [],
+            "layout": {
+                "height": 300,
+                "annotations": [
+                    {
+                        "text": "No portfolio data available",
+                        "showarrow": False,
+                        "font": {"color": "#7F8C8D"},
+                    }
+                ],
+            },
+        }
+
+    # Get component values (short values are negative)
+    values = get_portfolio_component_values(portfolio_summary)
+
+    # Calculate percentages
+    percentages = calculate_component_percentages(values)
+
+    # Format values for display
+    long_stock_text = f"Long Stocks: {format_currency(values['long_stock'])} ({abs(percentages['long_stock']):.1f}%)"
+    short_stock_text = f"Short Stocks: {format_currency(abs(values['short_stock']))} ({abs(percentages['short_stock']):.1f}%)"
+    long_option_text = f"Long Options: {format_currency(values['long_option'])} ({abs(percentages['long_option']):.1f}%)"
+    short_option_text = f"Short Options: {format_currency(abs(values['short_option']))} ({abs(percentages['short_option']):.1f}%)"
+    cash_text = (
+        f"Cash: {format_currency(values['cash'])} ({abs(percentages['cash']):.1f}%)"
+    )
+    pending_text = f"Pending: {format_currency(values['pending'])} ({abs(percentages['pending']):.1f}%)"
+
+    # Create the stacked bar chart data with separate traces for each category
+    chart_data = {
+        "data": [
+            # Long position group
+            # Long Stocks (bottom of "Long" stack)
+            {
+                "name": "Long Stocks",
+                "x": ["Long"],
+                "y": [values["long_stock"]],
+                "type": "bar",
+                "marker": {"color": ChartColors.LONG},
+                "text": [long_stock_text],
+                "hoverinfo": "text",
+                "hovertemplate": "%{text}<extra></extra>",
+            },
+            # Long Options (top of "Long" stack)
+            {
+                "name": "Long Options",
+                "x": ["Long"],
+                "y": [values["long_option"]],
+                "type": "bar",
+                "marker": {"color": ChartColors.LONG_OPTIONS},
+                "text": [long_option_text],
+                "hoverinfo": "text",
+                "hovertemplate": "%{text}<extra></extra>",
+            },
+            # Short position group
+            # Short Stocks (bottom of "Short" stack)
+            {
+                "name": "Short Stocks",
+                "x": ["Short"],
+                "y": [abs(values["short_stock"])],  # Use absolute value for display
+                "type": "bar",
+                "marker": {"color": ChartColors.SHORT},
+                "text": [short_stock_text],
+                "hoverinfo": "text",
+                "hovertemplate": "%{text}<extra></extra>",
+            },
+            # Short Options (top of "Short" stack)
+            {
+                "name": "Short Options",
+                "x": ["Short"],
+                "y": [abs(values["short_option"])],  # Use absolute value for display
+                "type": "bar",
+                "marker": {"color": ChartColors.SHORT_OPTIONS},
+                "text": [short_option_text],
+                "hoverinfo": "text",
+                "hovertemplate": "%{text}<extra></extra>",
+            },
+            # Cash (single bar)
+            {
+                "name": "Cash",
+                "x": ["Cash"],
+                "y": [values["cash"]],
+                "type": "bar",
+                "marker": {"color": ChartColors.CASH},
+                "text": [cash_text],
+                "hoverinfo": "text",
+                "hovertemplate": "%{text}<extra></extra>",
+            },
+            # Pending (single bar)
+            {
+                "name": "Pending",
+                "x": ["Pending"],
+                "y": [values["pending"]],
+                "type": "bar",
+                "marker": {"color": ChartColors.PENDING},
+                "text": [pending_text],
+                "hoverinfo": "text",
+                "hovertemplate": "%{text}<extra></extra>",
+            },
+        ],
+        "layout": {
+            "title": {
+                "text": "Portfolio Allocation",
+                "font": {"size": 16, "color": "#2C3E50"},
+                "x": 0.5,  # Center the title
+                "xanchor": "center",
+            },
+            "barmode": "stack",
+            "margin": {"l": 60, "r": 60, "t": 50, "b": 40, "pad": 4},
+            "autosize": True,  # Allow the chart to resize with its container
+            "paper_bgcolor": "white",
+            "plot_bgcolor": "white",
+            "font": {
+                "family": "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
+            },
+            "showlegend": True,
+            "legend": {
+                "orientation": "h",
+                "xanchor": "center",
+                "x": 0.5,
+                "y": -0.15,
+            },
+            "yaxis": {
+                "title": "Value ($)",
+                "tickformat": "$,.0f",
+                "gridcolor": "#E5E5E5",
+            },
+            "yaxis2": {
+                "title": "Percentage (%)",
+                "overlaying": "y",
+                "side": "right",
+                "tickformat": ".1f%",
+                "range": [0, 100],  # Fixed range for percentage
+                "tickmode": "array",
+                "tickvals": [0, 25, 50, 75, 100],
+                "ticktext": ["0%", "25%", "50%", "75%", "100%"],
+                "gridcolor": "#E5E5E5",
+            },
+            "height": 300,
+        },
+    }
+
+    # Calculate the maximum y-value for setting the y-axis range
+    max_value = max(
+        values["long_stock"] + values["long_option"],
+        abs(values["short_stock"]) + abs(values["short_option"]),
+        values["cash"],
+        values["pending"],
+        1,  # Ensure we have a non-zero range
+    )
+
+    # Set the y-axis range with some padding
+    chart_data["layout"]["yaxis"]["range"] = [0, max_value * 1.1]
+
+    return chart_data
 
 
 def create_dashboard_metrics(

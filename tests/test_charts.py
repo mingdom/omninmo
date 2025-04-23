@@ -135,13 +135,14 @@ class TestChartComponents:
         card_body = collapse.children
         assert isinstance(card_body, dbc.CardBody)
 
-        # There should be 2 chart cards (exposure, treemap) after removing Asset Allocation Chart
+        # There should be 3 chart cards (exposure, treemap, allocations)
         chart_cards = card_body.children
-        assert len(chart_cards) == 2
+        assert len(chart_cards) == 3
 
         # Verify card titles
         assert "Market Exposure" in str(chart_cards[0])
         assert "Position Size by Exposure" in str(chart_cards[1])
+        assert "Portfolio Allocation" in str(chart_cards[2])
 
 
 class TestChartDataTransformation:
@@ -449,6 +450,7 @@ class TestChartIntegration:
             # Asset Allocation Chart has been removed in favor of the more accurate Exposure Chart
             "exposure-chart",
             "position-treemap",
+            "allocations-chart",  # Added allocations chart
             "charts-collapse",
             "charts-collapse-button",
             "charts-collapse-icon",

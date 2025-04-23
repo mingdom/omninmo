@@ -23,6 +23,13 @@ from .data_model import (
     create_portfolio_group,
 )
 from .logger import logger
+from .portfolio_value import (
+    calculate_portfolio_metrics,
+    calculate_portfolio_values,
+    create_value_breakdowns,
+    process_option_positions,
+    process_stock_positions,
+)
 from .utils import clean_currency_value, format_beta, format_currency, get_beta
 
 # Initialize data fetcher
@@ -886,10 +893,14 @@ def calculate_portfolio_summary(
     - Long calls & short puts → long options exposure
     - Short calls & long puts → short options exposure
 
+    IMPORTANT: Short values are stored as negative numbers throughout this function
+    and in the returned PortfolioSummary object.
+
     Args:
         groups: List of PortfolioGroup objects containing processed positions
         cash_like_positions: List of dictionaries representing cash-like positions
                            (money markets, short-term bonds, etc.)
+        pending_activity_value: Value of pending activity
 
     Returns:
         A PortfolioSummary object with calculated metrics including:
@@ -904,10 +915,7 @@ def calculate_portfolio_summary(
     """
     logger.debug(f"Starting portfolio summary calculations for {len(groups)} groups.")
 
-    # Initialize cash-like positions list if None
-    if cash_like_positions is None:
-        cash_like_positions = []
-
+    # Validate inputs
     if not groups and not cash_like_positions and pending_activity_value == 0.0:
         logger.warning(
             "Cannot calculate summary for an empty portfolio. Returning default summary."
@@ -941,160 +949,37 @@ def calculate_portfolio_summary(
             portfolio_estimate_value=pending_activity_value,  # Include pending activity value
         )
 
+    # Initialize cash-like positions list if None
+    if cash_like_positions is None:
+        cash_like_positions = []
+
     try:
-        # Initialize exposure breakdowns using the structure from data_model
-        long_stocks = {"value": 0.0, "beta_adjusted": 0.0}
-        long_options_delta = {"value": 0.0, "beta_adjusted": 0.0}
-        short_stocks = {"value": 0.0, "beta_adjusted": 0.0}
-        short_options_delta = {"value": 0.0, "beta_adjusted": 0.0}
+        # Process positions using modular functions
+        long_stocks, short_stocks = process_stock_positions(groups)
+        long_options, short_options = process_option_positions(groups)
 
-        # Process each group
-        for group in groups:
-            # --- Process stock position ---
-            if group.stock_position:
-                stock = group.stock_position
-                # For stocks, market_exposure = quantity * price, so it's already negative for short positions
-                if stock.quantity >= 0:  # Treat quantity 0 as neutral/long for value
-                    long_stocks["value"] += stock.market_exposure
-                    long_stocks["beta_adjusted"] += stock.beta_adjusted_exposure
-                else:  # Negative quantity means short - store as negative value
-                    # No need for abs() - keep the negative sign for short positions
-                    short_stocks["value"] += stock.market_exposure  # Already negative
-                    short_stocks["beta_adjusted"] += (
-                        stock.beta_adjusted_exposure
-                    )  # Already negative
-
-            # --- Process option positions ---
-            for opt in group.option_positions:
-                # Determine if the option contributes positively (long-like) or negatively (short-like)
-                # to the portfolio's directional delta exposure.
-                # Long Call / Short Put => Positive Delta Exposure contribution
-                # Short Call / Long Put => Negative Delta Exposure contribution
-                # Note: opt.delta_exposure already accounts for quantity (long/short)
-                # Note: opt.beta_adjusted_exposure also accounts for quantity
-
-                if opt.delta_exposure >= 0:
-                    long_options_delta["value"] += opt.delta_exposure
-                    long_options_delta["beta_adjusted"] += opt.beta_adjusted_exposure
-                else:
-                    # Store as negative value - no need for abs()
-                    short_options_delta["value"] += (
-                        opt.delta_exposure
-                    )  # Already negative
-                    # Beta-adjusted exposure is also negative
-                    short_options_delta["beta_adjusted"] += (
-                        opt.beta_adjusted_exposure
-                    )  # Already negative
-
-        # Create exposure breakdown objects
-        # 1. Long exposure (stocks + positive delta options)
-        long_stock_value = long_stocks["value"]
-        long_option_value = long_options_delta["value"]
-        long_stock_beta_adj = long_stocks["beta_adjusted"]
-        long_option_beta_adj = long_options_delta["beta_adjusted"]
-
-        long_exposure = ExposureBreakdown(
-            stock_exposure=long_stock_value,
-            stock_beta_adjusted=long_stock_beta_adj,
-            option_delta_exposure=long_option_value,
-            option_beta_adjusted=long_option_beta_adj,
-            total_exposure=long_stock_value + long_option_value,
-            total_beta_adjusted=long_stock_beta_adj + long_option_beta_adj,
-            description="Long market exposure (Stocks + Positive Delta Options)",
-            formula="Long Stocks + Long Calls Delta Exp + Short Puts Delta Exp",
-            components={
-                "Long Stocks Exposure": long_stock_value,
-                "Long Options Delta Exp": long_option_value,
-            },
-        )
-
-        # 2. Short exposure (stocks + negative delta options)
-        short_stock_value = short_stocks["value"]
-        short_option_value = short_options_delta["value"]
-        short_stock_beta_adj = short_stocks["beta_adjusted"]
-        short_option_beta_adj = short_options_delta["beta_adjusted"]
-
-        short_exposure = ExposureBreakdown(
-            stock_exposure=short_stock_value,
-            stock_beta_adjusted=short_stock_beta_adj,
-            option_delta_exposure=short_option_value,
-            option_beta_adjusted=short_option_beta_adj,
-            total_exposure=short_stock_value + short_option_value,
-            total_beta_adjusted=short_stock_beta_adj + short_option_beta_adj,
-            description="Short market exposure (Stocks + Negative Delta Options)",
-            formula="Short Stocks + Short Calls Delta Exp + Long Puts Delta Exp",
-            components={
-                "Short Stocks Exposure": short_stock_value,
-                "Short Options Delta Exp": short_option_value,
-            },
-        )
-
-        # 3. Options exposure (net delta exposure from all options)
-        # Since short_option_value is already negative, we can simply add them
-        net_delta_exposure = long_option_value + short_option_value
-        net_option_beta_adj = long_option_beta_adj + short_option_beta_adj
-        options_exposure = ExposureBreakdown(
-            stock_exposure=0,  # Options only view
-            stock_beta_adjusted=0,
-            option_delta_exposure=net_delta_exposure,
-            option_beta_adjusted=net_option_beta_adj,
-            total_exposure=net_delta_exposure,
-            total_beta_adjusted=net_option_beta_adj,
-            description="Net delta exposure from options",
-            formula="Long Options Delta + Short Options Delta (where Short is negative)",
-            components={
-                "Long Options Delta Exp": long_option_value,
-                "Short Options Delta Exp": short_option_value,
-                "Net Options Delta Exp": net_delta_exposure,
-            },
+        # Create value breakdowns
+        long_value, short_value, options_value = create_value_breakdowns(
+            long_stocks, short_stocks, long_options, short_options
         )
 
         # Calculate portfolio metrics
-        # 1. Market exposure metrics
-        # Note: short_exposure is now stored as a negative value, so we can simply add them
-        net_market_exposure = (
-            long_exposure.total_exposure + short_exposure.total_exposure
+        net_market_exposure, portfolio_beta, short_percentage = (
+            calculate_portfolio_metrics(long_value, short_value)
         )
 
-        # 2. Portfolio beta (weighted average)
-        net_beta_adjusted_exposure = calculate_beta_adjusted_net_exposure(
-            long_exposure.total_beta_adjusted, short_exposure.total_beta_adjusted
-        )
-        portfolio_beta = (
-            net_beta_adjusted_exposure / net_market_exposure
-            if net_market_exposure != 0
-            else 0.0
-        )
-
-        # 3. Exposure percentages
-        # Calculate short percentage as a percentage of the total long exposure
-        # This gives a more meaningful measure of how much the portfolio is hedged
-        short_percentage = (
-            (abs(short_exposure.total_exposure) / long_exposure.total_exposure) * 100
-            if long_exposure.total_exposure > 0
-            else 0.0
+        # Calculate portfolio values
+        (
+            stock_value,
+            option_value,
+            cash_like_value,
+            portfolio_estimate_value,
+            cash_percentage,
+        ) = calculate_portfolio_values(
+            groups, cash_like_positions, pending_activity_value
         )
 
-        # Calculate total position values
-        stock_value = 0.0
-        option_value = 0.0
-
-        # Process each group to calculate stock and option values
-        for group in groups:
-            # --- Process stock position ---
-            if group.stock_position:
-                stock = group.stock_position
-                stock_value += stock.market_value
-
-            # --- Process option positions ---
-            for opt in group.option_positions:
-                option_value += opt.market_value
-
-        # Process cash-like positions
-        cash_like_value = sum(pos["market_value"] for pos in cash_like_positions)
-        cash_like_count = len(cash_like_positions)
-
-        # Convert to StockPosition objects for consistent handling
+        # Convert cash-like positions to StockPosition objects for consistent handling
         cash_like_stock_positions = [
             StockPosition(
                 ticker=pos["ticker"],
@@ -1110,48 +995,28 @@ def calculate_portfolio_summary(
             for pos in cash_like_positions
         ]
 
-        # Calculate portfolio estimated value and cash percentage
-        total_position_value = stock_value + option_value
-        portfolio_estimate_value = (
-            total_position_value + cash_like_value + pending_activity_value
-        )
-        cash_percentage = (
-            (cash_like_value / portfolio_estimate_value * 100)
-            if portfolio_estimate_value > 0
-            else 0.0
-        )
-
-        if cash_like_value > 0:
-            logger.debug(
-                f"Adding {cash_like_count} cash positions worth {format_currency(cash_like_value)}"
-            )
-            logger.debug(
-                f"Cash represents {cash_percentage:.2f}% of the portfolio estimated value"
-            )
-
         # Get current timestamp in ISO format
         from datetime import UTC, datetime
 
-        # If prices have been updated, use that timestamp, otherwise use current time
         current_time = datetime.now(UTC).isoformat()
 
         # Create and return the portfolio summary
         summary = PortfolioSummary(
             net_market_exposure=net_market_exposure,
             portfolio_beta=portfolio_beta,
-            long_exposure=long_exposure,
-            short_exposure=short_exposure,
-            options_exposure=options_exposure,
-            short_percentage=short_percentage,  # Already calculated as percentage
+            long_exposure=long_value,  # Using value breakdown
+            short_exposure=short_value,  # Using value breakdown
+            options_exposure=options_value,  # Using value breakdown
+            short_percentage=short_percentage,
             cash_like_positions=cash_like_stock_positions,
             cash_like_value=cash_like_value,
-            cash_like_count=cash_like_count,
+            cash_like_count=len(cash_like_positions),
             cash_percentage=cash_percentage,
-            stock_value=stock_value,  # Add stock value
-            option_value=option_value,  # Add option value
-            pending_activity_value=pending_activity_value,  # Add pending activity value
+            stock_value=stock_value,
+            option_value=option_value,
+            pending_activity_value=pending_activity_value,
             portfolio_estimate_value=portfolio_estimate_value,
-            price_updated_at=current_time,  # Set the timestamp
+            price_updated_at=current_time,
         )
 
         logger.debug("Portfolio summary created successfully.")
