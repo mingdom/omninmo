@@ -11,6 +11,7 @@ from dash import Input, Output, State, dcc, html
 
 from ..chart_data import (
     create_dashboard_metrics,
+    transform_for_allocations_chart,
     transform_for_exposure_chart,
     transform_for_treemap,
 )
@@ -129,6 +130,33 @@ def create_position_treemap():
     )
 
 
+def create_allocations_chart():
+    """Create a portfolio allocations stacked bar chart component."""
+    logger.debug("Creating allocations chart component")
+    return html.Div(
+        [
+            dcc.Graph(
+                id="allocations-chart",
+                config=get_chart_config(),
+                className="dash-chart",
+                # Add an empty figure to ensure proper initialization
+                figure={
+                    "data": [],
+                    "layout": {
+                        "height": 300,
+                        "margin": {"l": 60, "r": 60, "t": 50, "b": 40},
+                        "paper_bgcolor": "white",
+                        "plot_bgcolor": "white",
+                        "autosize": True,
+                    },
+                },
+                style={"width": "100%", "height": "100%"},
+            ),
+        ],
+        className="mb-4",
+    )
+
+
 # Sector chart removed for now - will be implemented in a separate task
 
 
@@ -186,6 +214,18 @@ def create_dashboard_section():
                                 dbc.CardBody(
                                     [
                                         create_position_treemap(),
+                                    ]
+                                ),
+                            ],
+                            className="mb-4 chart-card",
+                        ),
+                        # Portfolio Allocations Chart (in its own card)
+                        dbc.Card(
+                            [
+                                dbc.CardHeader("Portfolio Allocation"),
+                                dbc.CardBody(
+                                    [
+                                        create_allocations_chart(),
                                     ]
                                 ),
                             ],
@@ -443,6 +483,80 @@ def register_callbacks(app):
                 "data": [],
                 "layout": {
                     "height": 400,
+                    "annotations": [
+                        {
+                            "text": f"Error: {e!s}",
+                            "showarrow": False,
+                            "font": {"color": "red"},
+                        }
+                    ],
+                },
+            }
+
+    # Allocations Chart callback
+    @app.callback(
+        Output("allocations-chart", "figure"),
+        [Input("portfolio-summary", "data")],
+    )
+    def update_allocations_chart(summary_data):
+        """Update the allocations chart based on portfolio summary data."""
+        if not summary_data:
+            # Return empty figure if no data
+            logger.debug("No summary data for allocations chart")
+            return {"data": [], "layout": {"height": 300}}
+
+        try:
+            # Convert the JSON data back to a PortfolioSummary object
+            try:
+                logger.debug(
+                    "Attempting to deserialize PortfolioSummary for allocations chart"
+                )
+                portfolio_summary = PortfolioSummary.from_dict(summary_data)
+                logger.debug(
+                    "Successfully deserialized PortfolioSummary for allocations chart"
+                )
+            except Exception as deser_err:
+                logger.error(
+                    f"Error deserializing PortfolioSummary for allocations chart: {deser_err}",
+                    exc_info=True,
+                )
+                # Check if pending_activity_value is missing
+                if "pending_activity_value" not in summary_data:
+                    logger.warning("pending_activity_value missing from summary_data")
+                    # Add it with a default value
+                    summary_data["pending_activity_value"] = 0.0
+                    try:
+                        portfolio_summary = PortfolioSummary.from_dict(summary_data)
+                        logger.debug(
+                            "Successfully deserialized after adding pending_activity_value"
+                        )
+                    except Exception as retry_err:
+                        logger.error(
+                            f"Still failed after adding pending_activity_value: {retry_err}",
+                            exc_info=True,
+                        )
+                        raise
+                else:
+                    raise
+
+            # Transform the data for the chart
+            try:
+                logger.debug("Transforming data for allocations chart")
+                chart_data = transform_for_allocations_chart(portfolio_summary)
+                logger.debug("Successfully transformed data for allocations chart")
+                return chart_data
+            except Exception as transform_err:
+                logger.error(
+                    f"Error transforming data for allocations chart: {transform_err}",
+                    exc_info=True,
+                )
+                raise
+        except Exception as e:
+            logger.error(f"Error updating allocations chart: {e}", exc_info=True)
+            return {
+                "data": [],
+                "layout": {
+                    "height": 300,
                     "annotations": [
                         {
                             "text": f"Error: {e!s}",
