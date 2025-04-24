@@ -26,8 +26,8 @@ def error_values():
         "Error",  # Portfolio Value
         "Error",  # Net Exposure
         "Data missing",  # Net Exposure Percent
-        "Error",  # Portfolio Beta
         "Error",  # Beta-Adjusted Net Exposure
+        "Data missing",  # Beta-Adjusted Net Exposure Percent
         "Error",  # Long Exposure
         "Data missing",  # Long Exposure Percent
         "Error",  # Short Exposure
@@ -99,7 +99,6 @@ def format_summary_card_values(summary_data):
     # Extract values with defaults
     portfolio_estimate_value = summary_data.get("portfolio_estimate_value", 0.0)
     net_market_exposure = summary_data.get("net_market_exposure", 0.0)
-    portfolio_beta = summary_data.get("portfolio_beta", 0.0)
     cash_like_value = summary_data.get("cash_like_value", 0.0)
 
     # Get exposure values
@@ -115,28 +114,42 @@ def format_summary_card_values(summary_data):
     # Get beta-adjusted values
     long_total_beta_adjusted = long_exposure.get("total_beta_adjusted", 0.0)
     short_total_beta_adjusted = short_exposure.get("total_beta_adjusted", 0.0)
-    options_total_beta_adjusted = options_exposure.get("total_beta_adjusted", 0.0)
-
-    # Verify that we have all the required data
-    try:
-        # Just a basic check to make sure we can access all the required values
-        # We don't need to calculate individual betas anymore
-        if None in [
-            long_total_beta_adjusted,
-            short_total_beta_adjusted,
-            options_total_beta_adjusted,
-            portfolio_beta,
-        ]:
-            raise ValueError("Missing required beta values")
-    except Exception as e:
-        logger.error(f"Error validating beta values: {e}")
-        return error_values()
 
     # Calculate beta-adjusted net exposure using the utility function
     # Note: options_total_beta_adjusted is already included in long/short, so we don't add it separately
     beta_adjusted_net_exposure = calculate_beta_adjusted_net_exposure(
         long_total_beta_adjusted, short_total_beta_adjusted
     )
+
+    # Calculate percentages of portfolio value
+    if portfolio_estimate_value > 0:
+        net_exposure_percent = (net_market_exposure / portfolio_estimate_value) * 100
+        beta_adjusted_percent = (
+            beta_adjusted_net_exposure / portfolio_estimate_value
+        ) * 100
+        long_exposure_percent = (long_total_exposure / portfolio_estimate_value) * 100
+        short_exposure_percent = (
+            abs(short_total_exposure) / portfolio_estimate_value
+        ) * 100
+        options_exposure_percent = (
+            abs(options_total_exposure) / portfolio_estimate_value
+        ) * 100
+        cash_percent = (cash_like_value / portfolio_estimate_value) * 100
+    else:
+        net_exposure_percent = 0
+        beta_adjusted_percent = 0
+        long_exposure_percent = 0
+        short_exposure_percent = 0
+        options_exposure_percent = 0
+        cash_percent = 0
+
+    # Format the percentages
+    net_exposure_percent_str = f"{net_exposure_percent:.1f}% of portfolio"
+    beta_adjusted_percent_str = f"{beta_adjusted_percent:.1f}% of portfolio"
+    long_exposure_percent_str = f"{long_exposure_percent:.1f}% of portfolio"
+    short_exposure_percent_str = f"{short_exposure_percent:.1f}% of portfolio"
+    options_exposure_percent_str = f"{options_exposure_percent:.1f}% of portfolio"
+    cash_percent_str = f"{cash_percent:.1f}% of portfolio"
 
     # Format the values for display
     try:
@@ -145,23 +158,22 @@ def format_summary_card_values(summary_data):
             utils.format_currency(portfolio_estimate_value),
             # Net Exposure
             utils.format_currency(net_market_exposure),
-            "",  # Removed percentage
-            # Portfolio Beta
-            utils.format_beta(portfolio_beta),
+            net_exposure_percent_str,
             # Beta-Adjusted Net Exposure
             utils.format_currency(beta_adjusted_net_exposure),
+            beta_adjusted_percent_str,
             # Long Exposure
             utils.format_currency(long_total_exposure),
-            "",  # Removed percentage
+            long_exposure_percent_str,
             # Short Exposure
             utils.format_currency(short_total_exposure),
-            "",  # Removed percentage
+            short_exposure_percent_str,
             # Options Exposure
             utils.format_currency(options_total_exposure),
-            "",  # Removed percentage
+            options_exposure_percent_str,
             # Cash & Equivalents
             utils.format_currency(cash_like_value),
-            "",  # Removed percentage
+            cash_percent_str,
         )
     except Exception as e:
         logger.error(f"Error formatting values: {e}")
@@ -241,7 +253,7 @@ def create_net_exposure_card():
                 placement="top",
             ),
         ],
-        width=3,
+        width=4,  # Adjusted width for new layout
     )
 
 
@@ -283,7 +295,7 @@ def create_long_exposure_card():
                 placement="top",
             ),
         ],
-        width=3,
+        width=4,  # Adjusted width for new layout
     )
 
 
@@ -325,7 +337,7 @@ def create_short_exposure_card():
                 placement="top",
             ),
         ],
-        width=3,
+        width=4,  # Adjusted width for new layout
     )
 
 
@@ -367,7 +379,7 @@ def create_options_exposure_card():
                 placement="top",
             ),
         ],
-        width=3,
+        width=4,  # Adjusted width for new layout
     )
 
 
@@ -409,52 +421,23 @@ def create_cash_card():
                 placement="top",
             ),
         ],
-        width=3,
-    )
-
-
-def create_portfolio_beta_card():
-    """Create the portfolio beta card."""
-    # Create the component
-    portfolio_beta = html.H5(
-        id="portfolio-beta",
-        className="card-title text-primary",
-        children="0.00β",  # Default value
-    )
-
-    # Create the card with the component nested inside it
-    return dbc.Col(
-        [
-            dbc.Card(
-                dbc.CardBody(
-                    [
-                        html.H6(
-                            "Portfolio Beta",
-                            className="card-subtitle",
-                        ),
-                        portfolio_beta,  # Nest the component here
-                    ]
-                ),
-                className="mb-3",
-                id="portfolio-beta-card",
-            ),
-            dbc.Tooltip(
-                "Measures your portfolio's sensitivity to market movements. A beta of 1.0 means your portfolio moves with the market, 2.0 means twice as volatile, and 0.5 means half as volatile. Use this to gauge your market risk.",
-                target="portfolio-beta-card",
-                placement="top",
-            ),
-        ],
-        width=3,
+        width=4,  # Adjusted width for new layout
     )
 
 
 def create_beta_adjusted_exposure_card():
     """Create the beta-adjusted net exposure card."""
-    # Create the component
+    # Create the components
     beta_adjusted_exposure = html.H5(
         id="beta-adjusted-exposure",
         className="card-title text-primary",
         children="$0.00",  # Default value
+    )
+
+    beta_adjusted_percent = html.P(
+        id="beta-adjusted-percent",
+        className="card-text text-muted",
+        children="",  # Default value
     )
 
     # Create the card with the component nested inside it
@@ -468,6 +451,7 @@ def create_beta_adjusted_exposure_card():
                             className="card-subtitle",
                         ),
                         beta_adjusted_exposure,  # Nest the component here
+                        beta_adjusted_percent,  # Nest the component here
                     ]
                 ),
                 className="mb-3",
@@ -479,7 +463,7 @@ def create_beta_adjusted_exposure_card():
                 placement="top",
             ),
         ],
-        width=3,
+        width=4,  # Adjusted width for new layout
     )
 
 
@@ -492,32 +476,59 @@ def create_summary_cards():
     logger.debug("Creating summary cards")
 
     # Create all the cards
-    portfolio_value_card = create_portfolio_value_card()
     net_exposure_card = create_net_exposure_card()
-    portfolio_beta_card = create_portfolio_beta_card()
     beta_adjusted_exposure_card = create_beta_adjusted_exposure_card()
     long_exposure_card = create_long_exposure_card()
     short_exposure_card = create_short_exposure_card()
     options_exposure_card = create_options_exposure_card()
     cash_card = create_cash_card()
 
+    # Create the portfolio value banner card
+    portfolio_value_banner = dbc.Card(
+        dbc.CardBody(
+            [
+                html.Div(
+                    [
+                        html.H4(
+                            [
+                                html.Span(
+                                    "Total Portfolio Value: ", className="text-muted"
+                                ),
+                                html.Span(
+                                    id="portfolio-value",
+                                    children="$0.00",
+                                    className="text-primary",
+                                ),
+                            ],
+                            className="text-center mb-0",
+                        ),
+                    ],
+                    className="d-flex justify-content-center",
+                ),
+            ]
+        ),
+        className="mb-3",
+        style={
+            "background-color": "#f8f9fa"
+        },  # Light gray background to make it stand out
+    )
+
     # Create the summary card with all the components nested inside it
     return dbc.Card(
         dbc.CardBody(
             [
-                html.H4("Portfolio Summary", className="mb-3"),
+                html.H4("Portfolio Summary", className="text-center mb-3"),
+                portfolio_value_banner,
                 dbc.Row(
                     [
-                        portfolio_value_card,
                         net_exposure_card,
-                        portfolio_beta_card,
                         beta_adjusted_exposure_card,
+                        long_exposure_card,
                     ],
                     className="mb-3",
                 ),
                 dbc.Row(
                     [
-                        long_exposure_card,
                         short_exposure_card,
                         options_exposure_card,
                         cash_card,
@@ -550,8 +561,8 @@ def register_callbacks(app):
             Output("portfolio-value", "children"),
             Output("total-value", "children"),
             Output("total-value-percent", "children"),
-            Output("portfolio-beta", "children"),
             Output("beta-adjusted-exposure", "children"),
+            Output("beta-adjusted-percent", "children"),
             Output("long-exposure", "children"),
             Output("long-exposure-percent", "children"),
             Output("short-exposure", "children"),

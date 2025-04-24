@@ -82,17 +82,17 @@ def test_format_summary_card_values(test_summary):
     expected_values = [
         "$10,000.00",  # Portfolio Value
         "$8,000.00",  # Net Exposure
-        "",  # Net Exposure Percent
-        "1.20β",  # Portfolio Beta
-        "$19,200.00",  # Beta-Adjusted Net Exposure - updated to match current implementation
+        "80.0% of portfolio",  # Net Exposure Percent
+        "$19,200.00",  # Beta-Adjusted Net Exposure
+        "192.0% of portfolio",  # Beta-Adjusted Net Exposure Percent
         "$12,000.00",  # Long Exposure
-        "",  # Long Exposure Percent
+        "120.0% of portfolio",  # Long Exposure Percent
         "$4,000.00",  # Short Exposure
-        "",  # Short Exposure Percent
+        "40.0% of portfolio",  # Short Exposure Percent
         "$1,000.00",  # Options Exposure
-        "",  # Options Exposure Percent
+        "10.0% of portfolio",  # Options Exposure Percent
         "$2,000.00",  # Cash Value
-        "",  # Cash Percent
+        "20.0% of portfolio",  # Cash Percent
     ]
 
     # Check each value
@@ -117,17 +117,17 @@ def test_format_summary_card_values_with_missing_keys(test_summary):
     expected_values = [
         "$10,000.00",  # Portfolio Value (8000 + 2000)
         "$8,000.00",  # Net Exposure
-        "",  # Net Exposure Percent
-        "1.20β",  # Portfolio Beta
-        "$19,200.00",  # Beta-Adjusted Net Exposure - updated to match current implementation
+        "80.0% of portfolio",  # Net Exposure Percent
+        "$19,200.00",  # Beta-Adjusted Net Exposure
+        "192.0% of portfolio",  # Beta-Adjusted Net Exposure Percent
         "$12,000.00",  # Long Exposure
-        "",  # Long Exposure Percent
+        "120.0% of portfolio",  # Long Exposure Percent
         "$4,000.00",  # Short Exposure
-        "",  # Short Exposure Percent
+        "40.0% of portfolio",  # Short Exposure Percent
         "$1,000.00",  # Options Exposure
-        "",  # Options Exposure Percent
+        "10.0% of portfolio",  # Options Exposure Percent
         "$2,000.00",  # Cash Value
-        "",  # Cash Percent
+        "20.0% of portfolio",  # Cash Percent
     ]
 
     # Check each value
@@ -145,8 +145,7 @@ def test_format_summary_card_values_with_invalid_data():
     # Check that the result has error values
     assert result[0] == "Error"  # Portfolio Value
     assert result[1] == "Error"  # Net Exposure
-    assert result[3] == "Error"  # Portfolio Beta
-    assert result[4] == "Error"  # Beta-Adjusted Net Exposure
+    assert result[3] == "Error"  # Beta-Adjusted Net Exposure
 
     # Call the format_summary_card_values function with an empty dictionary
     result = format_summary_card_values({})
@@ -154,8 +153,7 @@ def test_format_summary_card_values_with_invalid_data():
     # Check that the result has error values
     assert result[0] == "Error"  # Portfolio Value
     assert result[1] == "Error"  # Net Exposure
-    assert result[3] == "Error"  # Portfolio Beta
-    assert result[4] == "Error"  # Beta-Adjusted Net Exposure
+    assert result[3] == "Error"  # Beta-Adjusted Net Exposure
 
 
 def test_error_values():
@@ -166,8 +164,7 @@ def test_error_values():
     assert result[0] == "Error"  # Portfolio Value
     assert result[1] == "Error"  # Net Exposure
     assert result[2] == "Data missing"  # Net Exposure Percent
-    assert result[3] == "Error"  # Portfolio Beta
-    assert result[4] == "Error"  # Beta-Adjusted Net Exposure
+    assert result[3] == "Error"  # Beta-Adjusted Net Exposure
 
 
 # Integration Tests
@@ -236,9 +233,13 @@ def test_summary_cards_user_expectations():
     layout_str = str(summary_card)
 
     # Check for the presence of key metrics that users expect to see
-    assert "Portfolio Value" in layout_str, "Portfolio Value not found in summary cards"
+    assert "Portfolio Summary" in layout_str, (
+        "Portfolio Summary not found in summary cards"
+    )
+    assert "Total Portfolio Value" in layout_str, (
+        "Total Portfolio Value not found in summary cards"
+    )
     assert "Net Exposure" in layout_str, "Net Exposure not found in summary cards"
-    assert "Portfolio Beta" in layout_str, "Portfolio Beta not found in summary cards"
     assert "Beta-Adjusted Net Exposure" in layout_str, (
         "Beta-Adjusted Net Exposure not found in summary cards"
     )
@@ -270,8 +271,8 @@ def test_summary_cards_rendered_and_callback_registered():
         "summary-card",
         "portfolio-value",
         "total-value",
-        "portfolio-beta",
         "beta-adjusted-exposure",
+        "beta-adjusted-percent",
         "long-exposure",
         "short-exposure",
         "options-exposure",

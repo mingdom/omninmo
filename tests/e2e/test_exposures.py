@@ -16,21 +16,26 @@ class TestExposures:
         formatted_values = format_summary_card_values(summary_dict)
 
         # Extract the values from the formatted values
-        formatted_values[0]
-        net_exposure = formatted_values[1]
-        formatted_values[3]
-        beta_adjusted_net_exposure = formatted_values[4]
-        long_exposure = formatted_values[5]
-        short_exposure = formatted_values[7]
-        options_exposure = formatted_values[9]
-        formatted_values[11]
+        formatted_values[0]  # Portfolio Value
+        net_exposure = formatted_values[1]  # Net Exposure
+        formatted_values[2]  # Net Exposure Percent
+        beta_adjusted_exposure = formatted_values[3]  # Beta-Adjusted Net Exposure
+        formatted_values[4]  # Beta-Adjusted Net Exposure Percent
+        long_exposure = formatted_values[5]  # Long Exposure
+        formatted_values[6]  # Long Exposure Percent
+        short_exposure = formatted_values[7]  # Short Exposure
+        formatted_values[8]  # Short Exposure Percent
+        options_exposure = formatted_values[9]  # Options Exposure
+        formatted_values[10]  # Options Exposure Percent
+        formatted_values[11]  # Cash Value
+        formatted_values[12]  # Cash Percent
 
         # Extract numeric values from formatted strings
         def extract_numeric(value):
             return float(value.replace("$", "").replace(",", ""))
 
         summary_net_exposure = extract_numeric(net_exposure)
-        summary_beta_adjusted_net_exposure = extract_numeric(beta_adjusted_net_exposure)
+        summary_beta_adjusted_net_exposure = extract_numeric(beta_adjusted_exposure)
         summary_long_exposure = extract_numeric(long_exposure)
         summary_short_exposure = extract_numeric(short_exposure)
         summary_options_exposure = extract_numeric(options_exposure)
