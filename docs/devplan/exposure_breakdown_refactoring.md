@@ -72,7 +72,7 @@ components={
 }
 ```
 
-This approach works but is confusing and error-prone, as evidenced by the recent regression where pending activity values were not properly included in the Portfolio Allocation chart.
+This approach works but is confusing and error-prone, as evidenced by the recent issues where pending activity values were not properly included in the Portfolio Allocation chart due to inconsistent CSV formats and the loss of pending activity values when updating prices.
 
 ### 3. Lack of Clear Separation
 
@@ -212,7 +212,10 @@ can be much less than the exposure (delta * notional value).
    - Use consistent suffixes: "Exposure", "Value", "Delta Exp"
 2. Update all functions that access these components to use the correct names
 3. Add comprehensive tests to verify that both value and exposure calculations work correctly
-4. Run tests to ensure the stabilized implementation works correctly
+4. Ensure consistent chart titles between data transformation functions and UI components
+5. Improve pending activity value extraction to handle different CSV formats
+6. Ensure pending activity values are preserved when updating prices
+7. Run tests to ensure the stabilized implementation works correctly
 
 ### Phase 3: Create New Classes
 
@@ -261,9 +264,9 @@ can be much less than the exposure (delta * notional value).
 
 ## Immediate Fix vs. Long-term Solution
 
-### Immediate Fix
+### Immediate Fixes
 
-We've implemented an immediate fix to address the regression where pending activity values were not showing up in the Portfolio Allocation chart:
+We've implemented several immediate fixes to address issues with pending activity values and chart display:
 
 1. **Added Value Components**: We added market value components to the `ExposureBreakdown` class:
    ```python
@@ -285,7 +288,51 @@ We've implemented an immediate fix to address the regression where pending activ
    )
    ```
 
-This fix maintains backward compatibility while ensuring that both exposure and value calculations work correctly. However, it's still a temporary solution that doesn't address the underlying architectural issues.
+3. **Fixed Chart Title Mismatch**: We fixed a mismatch between the chart title in the `transform_for_allocations_chart` function and the title in the `create_dashboard_section` function:
+   ```python
+   # In chart_data.py
+   chart_data = {
+       "data": [...],
+       "layout": {
+           "title": {
+               "text": "Portfolio Allocation",  # Changed from "Portfolio Value Allocation"
+               # ...
+           },
+           # ...
+       }
+   }
+   ```
+
+4. **Enhanced Pending Activity Value Extraction**: We improved the extraction of pending activity values from CSV files by checking multiple columns:
+   ```python
+   # Check multiple columns for the pending activity value
+   value_columns = ["Current Value", "Last Price Change", "Today's Gain/Loss Dollar"]
+
+   for col in value_columns:
+       if col in row and pd.notna(row[col]) and str(row[col]).strip():
+           try:
+               value = clean_currency_value(row[col])
+               if value != 0:
+                   pending_activity_value = value  # Use the first non-zero value found
+                   break  # Stop checking other columns once we find a value
+           except (ValueError, TypeError) as e:
+               logger.warning(f"Error parsing Pending Activity value from column '{col}': {e}")
+   ```
+
+5. **Preserved Pending Activity Value**: We fixed the `update_portfolio_summary_with_prices` function to preserve the pending activity value when updating prices:
+   ```python
+   def update_portfolio_summary_with_prices(
+       portfolio_groups: list[PortfolioGroup], summary: PortfolioSummary, data_fetcher=None
+   ) -> PortfolioSummary:
+       # ...
+       # Preserve the pending activity value from the original summary
+       updated_summary = calculate_portfolio_summary(
+           portfolio_groups, summary.cash_like_positions, summary.pending_activity_value
+       )
+       # ...
+   ```
+
+These fixes maintain backward compatibility while ensuring that both exposure and value calculations work correctly. However, they're still temporary solutions that don't address the underlying architectural issues.
 
 ### Long-term Solution
 
@@ -297,4 +344,14 @@ This refactoring will significantly improve the clarity and maintainability of t
 
 The changes are substantial but manageable with careful planning and comprehensive testing. The benefits of the refactoring outweigh the risks, and the end result will be a more robust and maintainable codebase.
 
-The immediate fix we've implemented provides a stable foundation for the larger refactoring effort, ensuring that the application continues to work correctly while we implement the long-term solution.
+The immediate fixes we've implemented provide a stable foundation for the larger refactoring effort, ensuring that the application continues to work correctly while we implement the long-term solution. These fixes have addressed several specific issues:
+
+1. **Chart Title Consistency**: Ensuring that chart titles are consistent between the data transformation functions and the UI components.
+
+2. **Pending Activity Value Extraction**: Improving the extraction of pending activity values from CSV files by checking multiple columns, making the code more robust against variations in CSV format.
+
+3. **Pending Activity Value Preservation**: Ensuring that pending activity values are preserved when updating prices, maintaining the integrity of the portfolio summary.
+
+4. **Comprehensive Testing**: Adding tests to verify that pending activity values are correctly extracted and preserved, including tests for different CSV formats.
+
+These fixes have improved the robustness of the codebase, but the long-term solution outlined in this plan will provide a more comprehensive and maintainable architecture.
