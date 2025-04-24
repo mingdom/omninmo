@@ -16,14 +16,14 @@ class TestExposures:
         formatted_values = format_summary_card_values(summary_dict)
 
         # Extract the values from the formatted values
-        portfolio_value = formatted_values[0]
+        formatted_values[0]
         net_exposure = formatted_values[1]
-        portfolio_beta = formatted_values[3]
+        formatted_values[3]
         beta_adjusted_net_exposure = formatted_values[4]
         long_exposure = formatted_values[5]
         short_exposure = formatted_values[7]
         options_exposure = formatted_values[9]
-        cash_value = formatted_values[11]
+        formatted_values[11]
 
         # Extract numeric values from formatted strings
         def extract_numeric(value):

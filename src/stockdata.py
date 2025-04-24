@@ -4,7 +4,8 @@ Stock data interface and factory.
 This module provides:
 1. A common interface for data fetchers (DataFetcherInterface)
 2. A factory function to create data fetchers (create_data_fetcher)
-3. Utility functions for cache management and market hours
+3. A singleton data fetcher instance (get_data_fetcher)
+4. Utility functions for cache management and market hours
 
 This allows for interchangeable use of different data sources (FMP API, Yahoo Finance, etc.)
 with runtime selection between them.
@@ -98,6 +99,82 @@ def create_data_fetcher(source="yfinance", cache_dir=None):
         return DataFetcher(cache_dir=cache_dir)
     else:
         raise ValueError(f"Unknown data source: {source}")
+
+
+# Singleton data fetcher class
+class DataFetcherSingleton:
+    """Singleton class for data fetcher."""
+
+    _instance = None
+
+    @classmethod
+    def get_instance(cls, source=None, cache_dir=None, config=None):
+        """
+        Get the singleton instance of the data fetcher.
+
+        This method ensures that only one data fetcher is created throughout
+        the application, preventing duplicate initialization.
+
+        Args:
+            source (str, optional): Data source to use ('yfinance' or 'fmp').
+                If None, uses the value from config or defaults to 'yfinance'.
+            cache_dir (str, optional): Cache directory. If None, uses default.
+            config (dict, optional): Configuration dictionary. If provided,
+                used to determine the data source if source is None.
+
+        Returns:
+            DataFetcherInterface: The singleton data fetcher instance.
+
+        Raises:
+            RuntimeError: If the data fetcher initialization fails.
+        """
+        if cls._instance is not None:
+            return cls._instance
+
+        # Determine the data source
+        if source is None:
+            if config is not None:
+                source = config.get("app", {}).get("data_source", "yfinance")
+            else:
+                source = "yfinance"
+
+        try:
+            logger.info(f"Using data source: {source}")
+            cls._instance = create_data_fetcher(source=source, cache_dir=cache_dir)
+
+            if cls._instance is None:
+                raise RuntimeError(
+                    "Data fetcher initialization failed but didn't raise an exception"
+                )
+
+            return cls._instance
+        except ValueError as e:
+            logger.error(f"Failed to initialize data fetcher: {e}")
+            # Re-raise to fail fast rather than continuing with a null reference
+            raise RuntimeError(
+                f"Critical component data fetcher could not be initialized: {e}"
+            ) from e
+
+
+# Convenience function to maintain backward compatibility
+def get_data_fetcher(source=None, cache_dir=None, config=None):
+    """
+    Get the singleton instance of the data fetcher.
+
+    This function is a wrapper around DataFetcherSingleton.get_instance()
+    for backward compatibility.
+
+    Args:
+        source (str, optional): Data source to use ('yfinance' or 'fmp').
+            If None, uses the value from config or defaults to 'yfinance'.
+        cache_dir (str, optional): Cache directory. If None, uses default.
+        config (dict, optional): Configuration dictionary. If provided,
+            used to determine the data source if source is None.
+
+    Returns:
+        DataFetcherInterface: The singleton data fetcher instance.
+    """
+    return DataFetcherSingleton.get_instance(source, cache_dir, config)
 
 
 # Cache management functions

@@ -7,7 +7,7 @@ import os
 import pandas as pd
 import yaml
 
-from src.stockdata import create_data_fetcher
+from src.stockdata import get_data_fetcher
 
 # Import cash detection functions
 from .cash_detection import is_cash_or_short_term
@@ -31,25 +31,8 @@ def load_config():
 # Get configuration
 config = load_config()
 
-# Initialize data fetcher
-try:
-    # Get data source from config (default to "yfinance" if not specified)
-    data_source = config.get("app", {}).get("data_source", "yfinance")
-    logger.info(f"Using data source: {data_source}")
-
-    # Create data fetcher using factory
-    data_fetcher = create_data_fetcher(source=data_source)
-
-    if data_fetcher is None:
-        raise RuntimeError(
-            "Data fetcher initialization failed but didn't raise an exception"
-        )
-except ValueError as e:
-    logger.error(f"Failed to initialize data fetcher: {e}")
-    # Re-raise to fail fast rather than continuing with a null reference
-    raise RuntimeError(
-        f"Critical component data fetcher could not be initialized: {e}"
-    ) from e
+# Get the singleton data fetcher instance
+data_fetcher = get_data_fetcher(config=config)
 
 
 def get_beta(ticker: str, description: str = "") -> float:

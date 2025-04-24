@@ -12,7 +12,7 @@ import os
 import pandas as pd
 import yaml
 
-from src.stockdata import create_data_fetcher
+from src.stockdata import get_data_fetcher
 
 from .cash_detection import is_cash_or_short_term
 from .data_model import (
@@ -32,32 +32,18 @@ from .portfolio_value import (
 )
 from .utils import clean_currency_value, format_beta, format_currency, get_beta
 
-# Initialize data fetcher
-try:
-    # Get data source from config (default to "yfinance" if not specified)
-    data_source = "yfinance"  # Default value
+# Load configuration
+config_path = os.path.join(os.path.dirname(__file__), "folio.yaml")
+config = {}
+if os.path.exists(config_path):
+    try:
+        with open(config_path) as f:
+            config = yaml.safe_load(f) or {}
+    except Exception as e:
+        logger.warning(f"Failed to load folio.yaml: {e}. Using default configuration.")
 
-    # Try to load from config file if it exists
-    config_path = os.path.join(os.path.dirname(__file__), "folio.yaml")
-    with open(config_path) as f:
-        config = yaml.safe_load(f)
-        data_source = config.get("app", {}).get("data_source", "yfinance")
-
-    logger.info(f"Using data source: {data_source}")
-
-    # Create data fetcher using factory
-    data_fetcher = create_data_fetcher(source=data_source)
-
-    if data_fetcher is None:
-        raise RuntimeError(
-            "Data fetcher initialization failed but didn't raise an exception"
-        )
-except ValueError as e:
-    logger.error(f"Failed to initialize data fetcher: {e}")
-    # Re-raise to fail fast rather than continuing with a null reference
-    raise RuntimeError(
-        f"Critical component data fetcher could not be initialized: {e}"
-    ) from e
+# Get the singleton data fetcher instance
+data_fetcher = get_data_fetcher(config=config)
 
 
 def process_portfolio_data(
@@ -278,7 +264,7 @@ def process_portfolio_data(
                 or not isinstance(symbol_raw, str)
                 or not symbol_raw.strip()
             ):
-                logger.info(f"Row {index}: Invalid symbol: {symbol_raw}. Skipping.")
+                logger.debug(f"Row {index}: Invalid symbol: {symbol_raw}. Skipping.")
                 continue
 
             # Clean symbol (remove trailing asterisks for preferred shares)
@@ -293,7 +279,7 @@ def process_portfolio_data(
                     )
                     continue
                 # Process based on value only
-                logger.info(
+                logger.debug(
                     f"Row {index}: {symbol} missing quantity but has value. Using quantity=0."
                 )
                 quantity = 0
@@ -308,7 +294,7 @@ def process_portfolio_data(
 
                     logger.debug(f"Row {index}: {symbol} quantity parsed as {quantity}")
                 except (ValueError, TypeError):
-                    logger.info(
+                    logger.debug(
                         f"Row {index}: {symbol} has invalid quantity: '{row['Quantity']}'. Skipping."
                     )
                     continue
@@ -329,17 +315,17 @@ def process_portfolio_data(
                         f"Row {index}: Cash-like position {symbol} missing price. Using defaults."
                     )
                 else:
-                    logger.info(f"Row {index}: {symbol} has missing price. Skipping.")
+                    logger.debug(f"Row {index}: {symbol} has missing price. Skipping.")
                     continue
             else:
                 price = clean_currency_value(row["Last Price"])
                 if price < 0:
-                    logger.info(
+                    logger.debug(
                         f"Row {index}: {symbol} has negative price ({price}). Skipping."
                     )
                     continue
                 elif price == 0:
-                    logger.info(
+                    logger.debug(
                         f"Row {index}: {symbol} has zero price. Calculations may be affected."
                     )
 
@@ -408,7 +394,7 @@ def process_portfolio_data(
                     try:
                         cost_basis = clean_currency_value(row["Average Cost Basis"])
                     except (ValueError, TypeError):
-                        logger.info(
+                        logger.debug(
                             f"Row {index}: {symbol} has invalid cost basis: '{row['Average Cost Basis']}'. Using 0.0."
                         )
 
@@ -425,7 +411,7 @@ def process_portfolio_data(
 
         except (ValueError, TypeError) as e:
             # Handle data conversion and type errors
-            logger.info(
+            logger.debug(
                 f"Row {index}: Error processing '{symbol_raw}': {e}. Skipping row."
             )
             continue
@@ -1065,7 +1051,7 @@ def update_portfolio_prices(
 
     # Use the default data fetcher if none is provided
     if data_fetcher is None:
-        data_fetcher = create_data_fetcher()
+        data_fetcher = get_data_fetcher()
 
     # Extract unique tickers from all positions
     tickers = set()
