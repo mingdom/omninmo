@@ -1243,6 +1243,120 @@ def calculate_beta_adjusted_net_exposure(
     return long_beta_adjusted + short_beta_adjusted
 
 
+def recalculate_portfolio_with_prices(
+    groups: list[PortfolioGroup],
+    price_adjustments: dict[str, float],
+    cash_like_positions: list[dict] | None = None,
+    pending_activity_value: float = 0.0,
+) -> tuple[list[PortfolioGroup], PortfolioSummary]:
+    """Recalculate portfolio groups and summary with adjusted prices.
+
+    Args:
+        groups: Original portfolio groups
+        price_adjustments: Dictionary mapping tickers to price adjustment factors
+                          (e.g., {'SPY': 1.05} for a 5% increase)
+        cash_like_positions: Cash-like positions
+        pending_activity_value: Value of pending activity
+
+    Returns:
+        Tuple of (recalculated_groups, recalculated_summary)
+    """
+    if not groups:
+        logger.warning("Cannot recalculate an empty portfolio")
+        # Return empty results
+        empty_exposure = ExposureBreakdown(
+            stock_exposure=0.0,
+            stock_beta_adjusted=0.0,
+            option_delta_exposure=0.0,
+            option_beta_adjusted=0.0,
+            total_exposure=0.0,
+            total_beta_adjusted=0.0,
+            description="Empty exposure",
+            formula="N/A",
+            components={},
+        )
+
+        empty_summary = PortfolioSummary(
+            net_market_exposure=0.0,
+            portfolio_beta=0.0,
+            long_exposure=empty_exposure,
+            short_exposure=empty_exposure,
+            options_exposure=empty_exposure,
+            short_percentage=0.0,
+            cash_like_positions=[],
+            cash_like_value=0.0,
+            cash_like_count=0,
+            cash_percentage=0.0,
+            stock_value=0.0,
+            option_value=0.0,
+            portfolio_estimate_value=pending_activity_value,
+        )
+        return [], empty_summary
+
+    # Initialize cash-like positions list if None
+    if cash_like_positions is None:
+        cash_like_positions = []
+
+    # Create new recalculated groups
+    recalculated_groups = []
+
+    for group in groups:
+        ticker = group.ticker
+        adjustment_factor = price_adjustments.get(ticker, 1.0)
+
+        # Recalculate stock position if it exists
+        recalculated_stock = None
+        if group.stock_position:
+            current_price = group.stock_position.price
+            new_price = current_price * adjustment_factor
+            recalculated_stock = group.stock_position.recalculate_with_price(new_price)
+
+        # Recalculate option positions
+        recalculated_options = []
+        for option in group.option_positions:
+            current_price = group.stock_position.price if group.stock_position else 0.0
+            new_price = current_price * adjustment_factor
+            recalculated_option = option.recalculate_with_price(new_price)
+            recalculated_options.append(recalculated_option)
+
+        # Calculate group metrics
+        net_exposure = (
+            recalculated_stock.market_exposure if recalculated_stock else 0
+        ) + sum(opt.delta_exposure for opt in recalculated_options)
+
+        beta = (
+            recalculated_stock.beta if recalculated_stock else 0
+        )  # Use stock beta as base
+
+        beta_adjusted_exposure = (
+            recalculated_stock.beta_adjusted_exposure if recalculated_stock else 0
+        ) + sum(opt.beta_adjusted_exposure for opt in recalculated_options)
+
+        total_delta_exposure = sum(opt.delta_exposure for opt in recalculated_options)
+        options_delta_exposure = sum(opt.delta_exposure for opt in recalculated_options)
+
+        # Create new portfolio group
+        recalculated_group = PortfolioGroup(
+            ticker=ticker,
+            stock_position=recalculated_stock,
+            option_positions=recalculated_options,
+            net_exposure=net_exposure,
+            beta=beta,
+            beta_adjusted_exposure=beta_adjusted_exposure,
+            total_delta_exposure=total_delta_exposure,
+            options_delta_exposure=options_delta_exposure,
+        )
+
+        recalculated_groups.append(recalculated_group)
+
+    # Recalculate portfolio summary
+    recalculated_summary = calculate_portfolio_summary(
+        recalculated_groups, cash_like_positions, pending_activity_value
+    )
+
+    return recalculated_groups, recalculated_summary
+
+
 def calculate_position_metrics(group: PortfolioGroup) -> dict:
     """Format portfolio group metrics for display in the UI.
 

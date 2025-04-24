@@ -1,3 +1,4 @@
+import datetime
 from dataclasses import dataclass
 from typing import Literal, TypedDict
 
@@ -264,6 +265,79 @@ class OptionPosition(Position):
         # Ensure position_type is always "option"
         self.position_type = "option"
 
+    def recalculate_with_price(
+        self,
+        new_underlying_price: float,
+        risk_free_rate: float = 0.05,
+        implied_volatility: float | None = None,
+    ) -> "OptionPosition":
+        """Create a new OptionPosition with recalculated values based on a new underlying price.
+
+        Args:
+            new_underlying_price: The new price of the underlying asset
+            risk_free_rate: The risk-free interest rate
+            implied_volatility: Optional override for implied volatility
+
+        Returns:
+            A new OptionPosition instance with updated values
+        """
+        from .options import (
+            OptionContract,
+            calculate_bs_price,
+            calculate_option_exposure,
+        )
+
+        # Create a temporary OptionContract for calculations
+        temp_contract = OptionContract(
+            underlying=self.ticker,
+            expiry=datetime.datetime.strptime(self.expiry, "%Y-%m-%d")
+            if isinstance(self.expiry, str)
+            else self.expiry,
+            strike=self.strike,
+            option_type=self.option_type,
+            quantity=self.quantity,
+            current_price=self.price,
+            description=getattr(
+                self,
+                "description",
+                f"{self.ticker} {self.option_type} {self.strike} {self.expiry}",
+            ),
+        )
+
+        # Calculate new option price
+        new_price = calculate_bs_price(
+            temp_contract, new_underlying_price, risk_free_rate, implied_volatility
+        )
+
+        # Calculate new exposures
+        exposures = calculate_option_exposure(
+            temp_contract,
+            new_underlying_price,
+            self.underlying_beta,
+            risk_free_rate,
+            implied_volatility,
+        )
+
+        # Create a new instance with updated values
+        return OptionPosition(
+            ticker=self.ticker,
+            position_type=self.position_type,
+            quantity=self.quantity,
+            beta=self.beta,
+            beta_adjusted_exposure=exposures["beta_adjusted_exposure"],
+            strike=self.strike,
+            expiry=self.expiry,
+            option_type=self.option_type,
+            delta=exposures["delta"],
+            delta_exposure=exposures["delta_exposure"],
+            notional_value=self.notional_value,
+            underlying_beta=self.underlying_beta,
+            market_exposure=exposures["delta_exposure"],
+            price=new_price,
+            cost_basis=self.cost_basis,
+            market_value=new_price * self.quantity * 100,
+        )
+
     def to_dict(self) -> OptionPositionDict:
         base_dict = super().to_dict()
         return {
@@ -393,6 +467,32 @@ class StockPosition:
             self.market_value = price * quantity
         else:
             self.market_value = market_value
+
+    def recalculate_with_price(self, new_price: float) -> "StockPosition":
+        """Create a new StockPosition with recalculated values based on a new price.
+
+        Args:
+            new_price: The new price to use for calculations
+
+        Returns:
+            A new StockPosition instance with updated values
+        """
+        # Calculate new market exposure and beta-adjusted exposure
+        new_market_exposure = self.quantity * new_price
+        new_beta_adjusted_exposure = new_market_exposure * self.beta
+
+        # Create a new instance with updated values
+        return StockPosition(
+            ticker=self.ticker,
+            quantity=self.quantity,
+            beta=self.beta,
+            beta_adjusted_exposure=new_beta_adjusted_exposure,
+            market_exposure=new_market_exposure,
+            price=new_price,
+            position_type=self.position_type,
+            cost_basis=self.cost_basis,
+            market_value=new_market_exposure,
+        )
 
     def to_dict(self) -> StockPositionDict:
         """Convert to a Dash-compatible dictionary"""

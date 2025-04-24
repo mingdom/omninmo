@@ -1,4 +1,23 @@
-"""Tests for the portfolio_value module."""
+"""Tests for the portfolio_value module.
+
+!!! IMPORTANT !!!
+This module contains CRITICAL tests for ensuring the correctness of portfolio exposure calculations.
+If these tests fail, it indicates a REAL ISSUE with the exposure calculations.
+
+DO NOT modify the expected values in these tests to make them pass.
+DO NOT disable these tests.
+
+If these tests fail, you MUST fix the underlying calculation logic.
+Exposure calculations are fundamental to the application and must be accurate.
+
+The tests verify that:
+1. Options are categorized correctly based on delta exposure, not quantity
+2. Summary exposures match position table exposures
+3. Large negative option exposures are handled correctly
+
+These tests use fixed test data that should not change unless the API changes.
+If the API changes, update the tests carefully to maintain their integrity.
+"""
 
 import pytest
 
@@ -9,6 +28,7 @@ from src.folio.data_model import (
     PortfolioSummary,
     StockPosition,
 )
+from src.folio.portfolio import calculate_portfolio_summary
 from src.folio.portfolio_value import (
     calculate_component_percentages,
     calculate_portfolio_metrics,
@@ -422,3 +442,358 @@ def test_short_values_remain_negative():
     assert (percentages["short_option"] < 0) == (values["short_option"] < 0), (
         "Short option percentage sign should match value sign"
     )
+
+
+def test_option_categorization_by_delta_exposure():
+    """Test that options are categorized correctly based on delta exposure, not quantity.
+
+    This test is CRITICAL for ensuring that options are categorized correctly in the portfolio summary.
+    Options should be categorized as long or short based on their delta exposure, not their quantity.
+
+    - Long Call (positive quantity) with positive delta => LONG exposure
+    - Long Put (positive quantity) with negative delta => SHORT exposure
+    - Short Call (negative quantity) with negative delta => SHORT exposure
+    - Short Put (negative quantity) with positive delta => LONG exposure
+
+    DO NOT modify the expected values in this test to make it pass.
+    If this test fails, it indicates a real issue with the option exposure calculation.
+    """
+    # Create test data with various option scenarios
+    groups = []
+
+    # SPY group with various option positions
+    spy_group = PortfolioGroup(
+        ticker="SPY",
+        stock_position=StockPosition(
+            ticker="SPY",
+            quantity=100,
+            market_exposure=50000.0,
+            beta=1.0,
+            beta_adjusted_exposure=50000.0,
+            market_value=50000.0,
+        ),
+        option_positions=[
+            # Long call with positive delta (should be categorized as LONG)
+            OptionPosition(
+                ticker="SPY",
+                position_type="option",
+                quantity=1,  # Long position
+                market_value=5000.0,
+                beta=1.0,
+                beta_adjusted_exposure=20000.0,
+                strike=400.0,
+                expiry="2023-12-15",
+                option_type="CALL",
+                delta=0.7,
+                delta_exposure=28000.0,  # Positive delta exposure
+                notional_value=40000.0,
+                underlying_beta=1.0,
+                market_exposure=28000.0,  # Same as delta_exposure
+            ),
+            # Long put with negative delta (should be categorized as SHORT)
+            OptionPosition(
+                ticker="SPY",
+                position_type="option",
+                quantity=1,  # Long position
+                market_value=3000.0,
+                beta=1.0,
+                beta_adjusted_exposure=-15000.0,
+                strike=400.0,
+                expiry="2023-12-15",
+                option_type="PUT",
+                delta=-0.3,
+                delta_exposure=-12000.0,  # Negative delta exposure
+                notional_value=40000.0,
+                underlying_beta=1.0,
+                market_exposure=-12000.0,  # Same as delta_exposure
+            ),
+            # Short call with negative delta (should be categorized as SHORT)
+            OptionPosition(
+                ticker="SPY",
+                position_type="option",
+                quantity=-1,  # Short position
+                market_value=-2000.0,
+                beta=1.0,
+                beta_adjusted_exposure=-16000.0,
+                strike=450.0,
+                expiry="2023-12-15",
+                option_type="CALL",
+                delta=0.4,
+                delta_exposure=-16000.0,  # Negative delta exposure
+                notional_value=40000.0,
+                underlying_beta=1.0,
+                market_exposure=-16000.0,  # Same as delta_exposure
+            ),
+            # Short put with positive delta (should be categorized as LONG)
+            OptionPosition(
+                ticker="SPY",
+                position_type="option",
+                quantity=-1,  # Short position
+                market_value=-1000.0,
+                beta=1.0,
+                beta_adjusted_exposure=8000.0,
+                strike=350.0,
+                expiry="2023-12-15",
+                option_type="PUT",
+                delta=-0.2,
+                delta_exposure=8000.0,  # Positive delta exposure
+                notional_value=40000.0,
+                underlying_beta=1.0,
+                market_exposure=8000.0,  # Same as delta_exposure
+            ),
+        ],
+        net_exposure=58000.0,
+        beta=1.0,
+        beta_adjusted_exposure=58000.0,
+        total_delta_exposure=8000.0,
+        options_delta_exposure=8000.0,
+    )
+    groups.append(spy_group)
+
+    # Process option positions
+    long_options, short_options = process_option_positions(groups)
+
+    # Verify that options are categorized correctly based on delta exposure
+    # Long options should include long call and short put (positive delta exposure)
+    assert long_options["value"] == 4000.0  # 5000.0 - 1000.0
+    # Short options should include long put and short call (negative delta exposure)
+    assert short_options["value"] == 1000.0  # 3000.0 - 2000.0
+
+    # Verify delta exposure values
+    assert long_options["delta_exposure"] == 36000.0  # 28000.0 + 8000.0
+    assert short_options["delta_exposure"] == -28000.0  # -12000.0 + (-16000.0)
+
+    # Verify beta-adjusted values
+    assert long_options["beta_adjusted"] == 28000.0  # 20000.0 + 8000.0
+    assert short_options["beta_adjusted"] == -31000.0  # -15000.0 + (-16000.0)
+
+
+def test_summary_matches_position_table():
+    """Test that portfolio summary exposures match position table exposures.
+
+    This test is CRITICAL for ensuring that the summary exposures match the position table exposures.
+    The summary exposures should be calculated by iterating through all positions and categorizing them
+    correctly based on their delta exposure.
+
+    DO NOT modify the expected values in this test to make it pass.
+    If this test fails, it indicates a real issue with the exposure calculation.
+    """
+    # Create test data with various positions
+    groups = []
+
+    # SPY group with stock and options
+    spy_group = PortfolioGroup(
+        ticker="SPY",
+        stock_position=StockPosition(
+            ticker="SPY",
+            quantity=100,
+            market_exposure=50000.0,
+            beta=1.0,
+            beta_adjusted_exposure=50000.0,
+            market_value=50000.0,
+        ),
+        option_positions=[
+            # Long put with negative delta (should be categorized as SHORT)
+            OptionPosition(
+                ticker="SPY",
+                position_type="option",
+                quantity=1,  # Long position
+                market_value=5000.0,
+                beta=1.0,
+                beta_adjusted_exposure=-15000.0,
+                strike=400.0,
+                expiry="2023-12-15",
+                option_type="PUT",
+                delta=-0.3,
+                delta_exposure=-12000.0,  # Negative delta exposure
+                notional_value=40000.0,
+                underlying_beta=1.0,
+                market_exposure=-12000.0,  # Same as delta_exposure
+            ),
+            # Short call with negative delta (should be categorized as SHORT)
+            OptionPosition(
+                ticker="SPY",
+                position_type="option",
+                quantity=-1,  # Short position
+                market_value=-2000.0,
+                beta=1.0,
+                beta_adjusted_exposure=-16000.0,
+                strike=450.0,
+                expiry="2023-12-15",
+                option_type="CALL",
+                delta=0.4,
+                delta_exposure=-16000.0,  # Negative delta exposure
+                notional_value=40000.0,
+                underlying_beta=1.0,
+                market_exposure=-16000.0,  # Same as delta_exposure
+            ),
+        ],
+        net_exposure=22000.0,  # 50000 - 12000 - 16000
+        beta=1.0,
+        beta_adjusted_exposure=19000.0,  # 50000 - 15000 - 16000
+        total_delta_exposure=-28000.0,  # -12000 - 16000
+        options_delta_exposure=-28000.0,  # -12000 - 16000
+    )
+    groups.append(spy_group)
+
+    # AAPL group with stock only
+    aapl_group = PortfolioGroup(
+        ticker="AAPL",
+        stock_position=StockPosition(
+            ticker="AAPL",
+            quantity=200,
+            market_exposure=40000.0,
+            beta=1.2,
+            beta_adjusted_exposure=48000.0,
+            market_value=40000.0,
+        ),
+        option_positions=[],
+        net_exposure=40000.0,
+        beta=1.2,
+        beta_adjusted_exposure=48000.0,
+        total_delta_exposure=0.0,
+        options_delta_exposure=0.0,
+    )
+    groups.append(aapl_group)
+
+    # TSLA group with short stock
+    tsla_group = PortfolioGroup(
+        ticker="TSLA",
+        stock_position=StockPosition(
+            ticker="TSLA",
+            quantity=-50,
+            market_exposure=-15000.0,
+            beta=1.5,
+            beta_adjusted_exposure=-22500.0,
+            market_value=-15000.0,
+        ),
+        option_positions=[],
+        net_exposure=-15000.0,
+        beta=1.5,
+        beta_adjusted_exposure=-22500.0,
+        total_delta_exposure=0.0,
+        options_delta_exposure=0.0,
+    )
+    groups.append(tsla_group)
+
+    # Calculate portfolio summary
+    summary = calculate_portfolio_summary(groups, [], 0.0)
+
+    # Calculate total exposures from position details
+    total_long_exposure = 0.0
+    total_short_exposure = 0.0
+
+    for group in groups:
+        # Process stock positions
+        if group.stock_position:
+            exposure = group.stock_position.market_exposure
+            if exposure > 0:
+                total_long_exposure += exposure
+            else:
+                total_short_exposure += exposure
+
+        # Process option positions
+        for opt in group.option_positions:
+            exposure = opt.delta_exposure
+            if exposure > 0:
+                total_long_exposure += exposure
+            else:
+                total_short_exposure += exposure
+
+    # Verify that summary exposures match position table exposures
+    assert summary.long_exposure.total_exposure == total_long_exposure
+    assert summary.short_exposure.total_exposure == total_short_exposure
+    assert summary.net_market_exposure == total_long_exposure + total_short_exposure
+
+    # Verify the specific values
+    assert summary.long_exposure.total_exposure == 90000.0  # 50000 + 40000
+    assert (
+        summary.short_exposure.total_exposure == -43000.0
+    )  # -15000 + (-12000) + (-16000)
+    assert summary.net_market_exposure == 47000.0  # 90000 + (-43000)
+
+    # Verify that the components are correct
+    assert (
+        summary.long_exposure.components["Long Stocks Exposure"] == 90000.0
+    )  # 50000 + 40000
+    assert summary.long_exposure.components.get("Long Options Delta Exp", 0.0) == 0.0
+    assert summary.short_exposure.components["Short Stocks Exposure"] == -15000.0
+    assert (
+        summary.short_exposure.components["Short Options Delta Exp"] == -28000.0
+    )  # -12000 + (-16000)
+
+    # Verify that the options exposure is correct
+    assert summary.options_exposure.total_exposure == -28000.0  # -12000 + (-16000)
+    assert summary.options_exposure.components.get("Long Options Delta Exp", 0.0) == 0.0
+    assert summary.options_exposure.components["Short Options Delta Exp"] == -28000.0
+    assert summary.options_exposure.components["Net Options Delta Exp"] == -28000.0
+
+
+def test_large_negative_option_exposure():
+    """Test portfolio summary with large negative option exposure.
+
+    This test is CRITICAL for ensuring that large negative option exposures are handled correctly.
+    A portfolio with a large negative option exposure should have a negative net market exposure.
+
+    DO NOT modify the expected values in this test to make it pass.
+    If this test fails, it indicates a real issue with the exposure calculation.
+    """
+    # Create test data with a large negative option exposure
+    groups = []
+
+    # SPY group with a large negative option exposure
+    spy_group = PortfolioGroup(
+        ticker="SPY",
+        stock_position=StockPosition(
+            ticker="SPY",
+            quantity=100,
+            market_exposure=50000.0,
+            beta=1.0,
+            beta_adjusted_exposure=50000.0,
+            market_value=50000.0,
+        ),
+        option_positions=[
+            # Long put with large negative delta (should be categorized as SHORT)
+            OptionPosition(
+                ticker="SPY",
+                position_type="option",
+                quantity=10,  # Long position
+                market_value=50000.0,
+                beta=1.0,
+                beta_adjusted_exposure=-1200000.0,
+                strike=500.0,
+                expiry="2023-12-15",
+                option_type="PUT",
+                delta=-0.4,
+                delta_exposure=-1000000.0,  # Large negative delta exposure
+                notional_value=2500000.0,
+                underlying_beta=1.0,
+                market_exposure=-1000000.0,  # Same as delta_exposure
+            ),
+        ],
+        net_exposure=-950000.0,  # 50000 + (-1000000)
+        beta=1.0,
+        beta_adjusted_exposure=-1150000.0,  # 50000 + (-1200000)
+        total_delta_exposure=-1000000.0,
+        options_delta_exposure=-1000000.0,
+    )
+    groups.append(spy_group)
+
+    # Calculate portfolio summary
+    summary = calculate_portfolio_summary(groups, [], 0.0)
+
+    # Verify that the summary correctly calculates exposures
+    assert summary.long_exposure.total_exposure == 50000.0  # Stock only
+    assert summary.short_exposure.total_exposure == -1000000.0  # Option only
+    assert summary.net_market_exposure == -950000.0  # 50000 + (-1000000)
+
+    # Verify that the components are correct
+    assert summary.long_exposure.components["Long Stocks Exposure"] == 50000.0
+    assert summary.long_exposure.components.get("Long Options Delta Exp", 0.0) == 0.0
+    assert summary.short_exposure.components["Short Options Delta Exp"] == -1000000.0
+
+    # Verify that the options exposure is correct
+    assert summary.options_exposure.total_exposure == -1000000.0
+    assert summary.options_exposure.components.get("Long Options Delta Exp", 0.0) == 0.0
+    assert summary.options_exposure.components["Short Options Delta Exp"] == -1000000.0
+    assert summary.options_exposure.components["Net Options Delta Exp"] == -1000000.0

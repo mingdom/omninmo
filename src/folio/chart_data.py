@@ -424,7 +424,7 @@ def transform_for_allocations_chart(
         ],
         "layout": {
             "title": {
-                "text": "Portfolio Allocation",
+                "text": "Portfolio Value Allocation",
                 "font": {"size": 16, "color": "#2C3E50"},
                 "x": 0.5,  # Center the title
                 "xanchor": "center",

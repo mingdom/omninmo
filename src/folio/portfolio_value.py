@@ -3,6 +3,13 @@
 This module provides functions for calculating and extracting portfolio values
 from portfolio groups and summaries. These functions are used for portfolio
 analysis and visualization, particularly for the allocations chart.
+
+IMPORTANT: There is a distinction between portfolio exposure and portfolio value:
+- Portfolio exposure represents the directional risk (shown in the Exposure Chart)
+- Portfolio value represents the actual dollar amount invested (shown in the Value Allocation Chart)
+
+For stocks, these are typically the same, but for options, the market value (what you paid)
+can be much less than the exposure (delta * notional value).
 """
 
 from .data_model import ExposureBreakdown, PortfolioGroup, PortfolioSummary
@@ -47,7 +54,11 @@ def process_option_positions(groups: list[PortfolioGroup]) -> tuple[dict, dict]:
     """Process option positions from portfolio groups.
 
     Extracts and categorizes option positions into long and short components
-    based on their market value. Short values are stored as negative numbers.
+    based on their delta exposure. Short values are stored as negative numbers.
+
+    IMPORTANT: Options are categorized based on their delta exposure, not quantity:
+    - Positive delta exposure (long calls, short puts) => Long position
+    - Negative delta exposure (short calls, long puts) => Short position
 
     This function handles option positions safely, logging any errors but continuing
     processing to ensure the chart can still be displayed even if some options
@@ -60,28 +71,30 @@ def process_option_positions(groups: list[PortfolioGroup]) -> tuple[dict, dict]:
         Tuple of (long_options, short_options) dictionaries with keys:
         - 'value': Market value
         - 'beta_adjusted': Beta-adjusted value
+        - 'delta_exposure': Delta exposure
     """
-    long_options = {"value": 0.0, "beta_adjusted": 0.0}
-    short_options = {"value": 0.0, "beta_adjusted": 0.0}  # Will contain negative values
+    long_options = {"value": 0.0, "beta_adjusted": 0.0, "delta_exposure": 0.0}
+    short_options = {"value": 0.0, "beta_adjusted": 0.0, "delta_exposure": 0.0}  # Will contain negative values
 
     for group in groups:
         for opt in group.option_positions:
             try:
-                if opt.quantity >= 0:  # Long position
+                # Categorize options based on delta exposure, not quantity
+                # Long Call / Short Put => Positive Delta Exposure => Long position
+                # Short Call / Long Put => Negative Delta Exposure => Short position
+                if opt.delta_exposure >= 0:  # Positive delta exposure = Long position
                     long_options["value"] += opt.market_value
                     long_options["beta_adjusted"] += opt.beta_adjusted_exposure
-                else:  # Short position
+                    long_options["delta_exposure"] += opt.delta_exposure
+                else:  # Negative delta exposure = Short position
                     # Keep negative values for short positions
-                    short_options["value"] += (
-                        opt.market_value
-                    )  # Already negative for short positions
-                    short_options["beta_adjusted"] += (
-                        opt.beta_adjusted_exposure
-                    )  # Already negative
+                    short_options["value"] += opt.market_value
+                    short_options["beta_adjusted"] += opt.beta_adjusted_exposure
+                    short_options["delta_exposure"] += opt.delta_exposure
             except Exception as e:
                 # Log the error but continue processing other options
                 logger.error(
-                    f"Error processing option {opt.description if hasattr(opt, 'description') else 'unknown'}: {e}"
+                    f"Error processing option {opt.option_type} {opt.strike} {opt.expiry} for {group.ticker}: {e}"
                 )
                 # Don't add this option to the totals
                 continue
@@ -117,19 +130,20 @@ def create_value_breakdowns(
     long_option_value = long_options["value"]  # Market value
     long_stock_beta_adj = long_stocks["beta_adjusted"]
     long_option_beta_adj = long_options["beta_adjusted"]
+    long_option_delta_exp = long_options["delta_exposure"]  # Delta exposure
 
     long_value = ExposureBreakdown(
         stock_exposure=long_stock_value,
         stock_beta_adjusted=long_stock_beta_adj,
-        option_delta_exposure=long_option_value,  # Using market value here
+        option_delta_exposure=long_option_delta_exp,  # Using delta exposure here
         option_beta_adjusted=long_option_beta_adj,
-        total_exposure=long_stock_value + long_option_value,
+        total_exposure=long_stock_value + long_option_delta_exp,
         total_beta_adjusted=long_stock_beta_adj + long_option_beta_adj,
-        description="Long market value (Stocks + Options)",
-        formula="Long Stocks + Long Options",
+        description="Long market exposure (Stocks + Options)",
+        formula="Long Stocks + Long Options Delta Exp",
         components={
-            "Long Stocks Value": long_stock_value,
-            "Long Options Value": long_option_value,
+            "Long Stocks Exposure": long_stock_value,
+            "Long Options Delta Exp": long_option_delta_exp,
         },
     )
 
@@ -138,39 +152,40 @@ def create_value_breakdowns(
     short_option_value = short_options["value"]  # Already negative, market value
     short_stock_beta_adj = short_stocks["beta_adjusted"]  # Already negative
     short_option_beta_adj = short_options["beta_adjusted"]  # Already negative
+    short_option_delta_exp = short_options["delta_exposure"]  # Already negative, delta exposure
 
     short_value = ExposureBreakdown(
         stock_exposure=short_stock_value,
         stock_beta_adjusted=short_stock_beta_adj,
-        option_delta_exposure=short_option_value,  # Using market value here
+        option_delta_exposure=short_option_delta_exp,  # Using delta exposure here
         option_beta_adjusted=short_option_beta_adj,
-        total_exposure=short_stock_value + short_option_value,
+        total_exposure=short_stock_value + short_option_delta_exp,
         total_beta_adjusted=short_stock_beta_adj + short_option_beta_adj,
-        description="Short market value (Stocks + Options)",
-        formula="Short Stocks + Short Options",
+        description="Short market exposure (Stocks + Options)",
+        formula="Short Stocks + Short Options Delta Exp",
         components={
-            "Short Stocks Value": short_stock_value,
-            "Short Options Value": short_option_value,
+            "Short Stocks Exposure": short_stock_value,
+            "Short Options Delta Exp": short_option_delta_exp,
         },
     )
 
-    # 3. Options value (net market value from all options)
-    net_option_value = long_option_value + short_option_value
+    # 3. Options value (net delta exposure from all options)
+    net_option_delta_exp = long_option_delta_exp + short_option_delta_exp
     net_option_beta_adj = long_option_beta_adj + short_option_beta_adj
 
     options_value = ExposureBreakdown(
         stock_exposure=0,  # Options only view
         stock_beta_adjusted=0,
-        option_delta_exposure=net_option_value,  # Using market value here
+        option_delta_exposure=net_option_delta_exp,  # Using delta exposure here
         option_beta_adjusted=net_option_beta_adj,
-        total_exposure=net_option_value,
+        total_exposure=net_option_delta_exp,
         total_beta_adjusted=net_option_beta_adj,
-        description="Net market value from options",
-        formula="Long Options Value + Short Options Value (where Short is negative)",
+        description="Net delta exposure from options",
+        formula="Long Options Delta Exp + Short Options Delta Exp (where Short is negative)",
         components={
-            "Long Options Value": long_option_value,
-            "Short Options Value": short_option_value,
-            "Net Options Value": net_option_value,
+            "Long Options Delta Exp": long_option_delta_exp,
+            "Short Options Delta Exp": short_option_delta_exp,
+            "Net Options Delta Exp": net_option_delta_exp,
         },
     )
 
@@ -311,16 +326,16 @@ def get_portfolio_component_values(
         - total: Total portfolio value
     """
     long_stock = portfolio_summary.long_exposure.components.get(
-        "Long Stocks Value", 0.0
+        "Long Stocks Exposure", 0.0
     )
     short_stock = portfolio_summary.short_exposure.components.get(
-        "Short Stocks Value", 0.0
+        "Short Stocks Exposure", 0.0
     )  # Already negative
     long_option = portfolio_summary.long_exposure.components.get(
-        "Long Options Value", 0.0
+        "Long Options Delta Exp", 0.0
     )
     short_option = portfolio_summary.short_exposure.components.get(
-        "Short Options Value", 0.0
+        "Short Options Delta Exp", 0.0
     )  # Already negative
     cash = portfolio_summary.cash_like_value
     pending = portfolio_summary.pending_activity_value

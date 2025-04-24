@@ -222,7 +222,7 @@ def create_dashboard_section():
                         # Portfolio Allocations Chart (in its own card)
                         dbc.Card(
                             [
-                                dbc.CardHeader("Portfolio Allocation"),
+                                dbc.CardHeader("Portfolio Value Allocation"),
                                 dbc.CardBody(
                                     [
                                         create_allocations_chart(),
