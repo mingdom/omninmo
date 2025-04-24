@@ -243,11 +243,11 @@ class TestChartDataTransformations:
             option_beta_adjusted=2400.0,
             total_exposure=12000.0,
             total_beta_adjusted=14400.0,
-            description="Long market value (Stocks + Options)",
-            formula="Long Stocks + Long Options",
+            description="Long market exposure (Stocks + Options)",
+            formula="Long Stocks + Long Options Delta Exp",
             components={
-                "Long Stocks Value": 10000.0,
-                "Long Options Value": 2000.0,
+                "Long Stocks Exposure": 10000.0,
+                "Long Options Delta Exp": 2000.0,
             },
         )
 
@@ -258,11 +258,11 @@ class TestChartDataTransformations:
             option_beta_adjusted=-1200.0,
             total_exposure=-6000.0,
             total_beta_adjusted=-7200.0,
-            description="Short market value (Stocks + Options)",
-            formula="Short Stocks + Short Options",
+            description="Short market exposure (Stocks + Options)",
+            formula="Short Stocks + Short Options Delta Exp",
             components={
-                "Short Stocks Value": -5000.0,  # Negative value
-                "Short Options Value": -1000.0,  # Negative value
+                "Short Stocks Exposure": -5000.0,  # Negative value
+                "Short Options Delta Exp": -1000.0,  # Negative value
             },
         )
 
@@ -273,12 +273,12 @@ class TestChartDataTransformations:
             option_beta_adjusted=1200.0,
             total_exposure=1000.0,
             total_beta_adjusted=1200.0,
-            description="Net market value from options",
-            formula="Long Options Value + Short Options Value (where Short is negative)",
+            description="Net delta exposure from options",
+            formula="Long Options Delta Exp + Short Options Delta Exp (where Short is negative)",
             components={
-                "Long Options Value": 2000.0,
-                "Short Options Value": -1000.0,  # Negative value
-                "Net Options Value": 1000.0,
+                "Long Options Delta Exp": 2000.0,
+                "Short Options Delta Exp": -1000.0,  # Negative value
+                "Net Options Delta Exp": 1000.0,
             },
         )
 
@@ -435,8 +435,8 @@ class TestChartDataTransformations:
             description="Long Exposure",
             formula="Long Stock + Long Call Delta + Short Put Delta",
             components={
-                "Long Stocks Value": 2000000.0,
-                "Long Options Value": 500000.0,
+                "Long Stocks Exposure": 2000000.0,
+                "Long Options Delta Exp": 500000.0,
             },
         )
 
@@ -450,8 +450,8 @@ class TestChartDataTransformations:
             description="Short Exposure",
             formula="Short Stock + Short Call Delta + Long Put Delta",
             components={
-                "Short Stocks Value": -300000.0,
-                "Short Options Value": -100000.0,
+                "Short Stocks Exposure": -300000.0,
+                "Short Options Delta Exp": -100000.0,
             },
         )
 
@@ -466,9 +466,9 @@ class TestChartDataTransformations:
             description="Options Exposure",
             formula="Long Options Delta - Short Options Delta",
             components={
-                "Long Options": 500000.0,
-                "Short Options": -100000.0,
-                "Net": 400000.0,
+                "Long Options Delta Exp": 500000.0,
+                "Short Options Delta Exp": -100000.0,
+                "Net Options Delta Exp": 400000.0,
             },
         )
 
@@ -585,8 +585,8 @@ class TestChartDataTransformations:
             description="Long Exposure",
             formula="Long Stock + Long Call Delta + Short Put Delta",
             components={
-                "Long Stocks Value": 300000.0,
-                "Long Options Value": 200000.0,
+                "Long Stocks Exposure": 300000.0,
+                "Long Options Delta Exp": 200000.0,
             },
         )
 
@@ -600,8 +600,8 @@ class TestChartDataTransformations:
             description="Short Exposure",
             formula="Short Stock + Short Call Delta + Long Put Delta",
             components={
-                "Short Stocks Value": -1000000.0,
-                "Short Options Value": -500000.0,
+                "Short Stocks Exposure": -1000000.0,
+                "Short Options Delta Exp": -500000.0,
             },
         )
 
@@ -616,9 +616,9 @@ class TestChartDataTransformations:
             description="Options Exposure",
             formula="Long Options Delta - Short Options Delta",
             components={
-                "Long Options": 200000.0,
-                "Short Options": -500000.0,
-                "Net": -300000.0,
+                "Long Options Delta Exp": 200000.0,
+                "Short Options Delta Exp": -500000.0,
+                "Net Options Delta Exp": -300000.0,
             },
         )
 

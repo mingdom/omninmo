@@ -74,7 +74,11 @@ def process_option_positions(groups: list[PortfolioGroup]) -> tuple[dict, dict]:
         - 'delta_exposure': Delta exposure
     """
     long_options = {"value": 0.0, "beta_adjusted": 0.0, "delta_exposure": 0.0}
-    short_options = {"value": 0.0, "beta_adjusted": 0.0, "delta_exposure": 0.0}  # Will contain negative values
+    short_options = {
+        "value": 0.0,
+        "beta_adjusted": 0.0,
+        "delta_exposure": 0.0,
+    }  # Will contain negative values
 
     for group in groups:
         for opt in group.option_positions:
@@ -127,7 +131,7 @@ def create_value_breakdowns(
     """
     # 1. Long value (stocks + options)
     long_stock_value = long_stocks["value"]
-    long_option_value = long_options["value"]  # Market value
+    long_options["value"]  # Market value
     long_stock_beta_adj = long_stocks["beta_adjusted"]
     long_option_beta_adj = long_options["beta_adjusted"]
     long_option_delta_exp = long_options["delta_exposure"]  # Delta exposure
@@ -149,10 +153,12 @@ def create_value_breakdowns(
 
     # 2. Short value (stocks + options)
     short_stock_value = short_stocks["value"]  # Already negative
-    short_option_value = short_options["value"]  # Already negative, market value
+    short_options["value"]  # Already negative, market value
     short_stock_beta_adj = short_stocks["beta_adjusted"]  # Already negative
     short_option_beta_adj = short_options["beta_adjusted"]  # Already negative
-    short_option_delta_exp = short_options["delta_exposure"]  # Already negative, delta exposure
+    short_option_delta_exp = short_options[
+        "delta_exposure"
+    ]  # Already negative, delta exposure
 
     short_value = ExposureBreakdown(
         stock_exposure=short_stock_value,

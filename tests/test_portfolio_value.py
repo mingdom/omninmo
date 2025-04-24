@@ -50,11 +50,11 @@ def create_test_portfolio_summary():
         option_beta_adjusted=2400.0,
         total_exposure=12000.0,
         total_beta_adjusted=14400.0,
-        description="Long market value (Stocks + Options)",
-        formula="Long Stocks + Long Options",
+        description="Long market exposure (Stocks + Options)",
+        formula="Long Stocks + Long Options Delta Exp",
         components={
-            "Long Stocks Value": 10000.0,
-            "Long Options Value": 2000.0,
+            "Long Stocks Exposure": 10000.0,
+            "Long Options Delta Exp": 2000.0,
         },
     )
 
@@ -65,11 +65,11 @@ def create_test_portfolio_summary():
         option_beta_adjusted=-1200.0,
         total_exposure=-6000.0,
         total_beta_adjusted=-7200.0,
-        description="Short market value (Stocks + Options)",
-        formula="Short Stocks + Short Options",
+        description="Short market exposure (Stocks + Options)",
+        formula="Short Stocks + Short Options Delta Exp",
         components={
-            "Short Stocks Value": -5000.0,  # Negative value
-            "Short Options Value": -1000.0,  # Negative value
+            "Short Stocks Exposure": -5000.0,  # Negative value
+            "Short Options Delta Exp": -1000.0,  # Negative value
         },
     )
 
@@ -80,12 +80,12 @@ def create_test_portfolio_summary():
         option_beta_adjusted=1200.0,
         total_exposure=1000.0,
         total_beta_adjusted=1200.0,
-        description="Net market value from options",
-        formula="Long Options Value + Short Options Value (where Short is negative)",
+        description="Net delta exposure from options",
+        formula="Long Options Delta Exp + Short Options Delta Exp (where Short is negative)",
         components={
-            "Long Options Value": 2000.0,
-            "Short Options Value": -1000.0,  # Negative value
-            "Net Options Value": 1000.0,
+            "Long Options Delta Exp": 2000.0,
+            "Short Options Delta Exp": -1000.0,  # Negative value
+            "Net Options Delta Exp": 1000.0,
         },
     )
 
@@ -245,8 +245,12 @@ def test_create_value_breakdowns():
     # Create test data
     long_stocks = {"value": 10000.0, "beta_adjusted": 12000.0}
     short_stocks = {"value": -5000.0, "beta_adjusted": -5000.0}  # Negative values
-    long_options = {"value": 2000.0, "beta_adjusted": 2400.0}
-    short_options = {"value": -1000.0, "beta_adjusted": -1200.0}  # Negative values
+    long_options = {"value": 2000.0, "beta_adjusted": 2400.0, "delta_exposure": 2000.0}
+    short_options = {
+        "value": -1000.0,
+        "beta_adjusted": -1200.0,
+        "delta_exposure": -1000.0,
+    }  # Negative values
 
     # Create value breakdowns
     long_value, short_value, options_value = create_value_breakdowns(
@@ -260,8 +264,8 @@ def test_create_value_breakdowns():
     assert long_value.option_beta_adjusted == 2400.0
     assert long_value.total_exposure == 12000.0
     assert long_value.total_beta_adjusted == 14400.0
-    assert long_value.components["Long Stocks Value"] == 10000.0
-    assert long_value.components["Long Options Value"] == 2000.0
+    assert long_value.components["Long Stocks Exposure"] == 10000.0
+    assert long_value.components["Long Options Delta Exp"] == 2000.0
 
     # Verify that short value breakdown is correct and contains negative values
     assert short_value.stock_exposure == -5000.0  # Negative value
@@ -270,17 +274,21 @@ def test_create_value_breakdowns():
     assert short_value.option_beta_adjusted == -1200.0  # Negative value
     assert short_value.total_exposure == -6000.0  # Negative value
     assert short_value.total_beta_adjusted == -6200.0  # Negative value
-    assert short_value.components["Short Stocks Value"] == -5000.0  # Negative value
-    assert short_value.components["Short Options Value"] == -1000.0  # Negative value
+    assert short_value.components["Short Stocks Exposure"] == -5000.0  # Negative value
+    assert (
+        short_value.components["Short Options Delta Exp"] == -1000.0
+    )  # Negative value
 
     # Verify that options value breakdown is correct
     assert options_value.option_delta_exposure == 1000.0
     assert options_value.option_beta_adjusted == 1200.0
     assert options_value.total_exposure == 1000.0
     assert options_value.total_beta_adjusted == 1200.0
-    assert options_value.components["Long Options Value"] == 2000.0
-    assert options_value.components["Short Options Value"] == -1000.0  # Negative value
-    assert options_value.components["Net Options Value"] == 1000.0
+    assert options_value.components["Long Options Delta Exp"] == 2000.0
+    assert (
+        options_value.components["Short Options Delta Exp"] == -1000.0
+    )  # Negative value
+    assert options_value.components["Net Options Delta Exp"] == 1000.0
 
 
 def test_calculate_portfolio_metrics():
@@ -293,11 +301,11 @@ def test_calculate_portfolio_metrics():
         option_beta_adjusted=2400.0,
         total_exposure=12000.0,
         total_beta_adjusted=14400.0,
-        description="Long market value (Stocks + Options)",
-        formula="Long Stocks + Long Options",
+        description="Long market exposure (Stocks + Options)",
+        formula="Long Stocks + Long Options Delta Exp",
         components={
-            "Long Stocks Value": 10000.0,
-            "Long Options Value": 2000.0,
+            "Long Stocks Exposure": 10000.0,
+            "Long Options Delta Exp": 2000.0,
         },
     )
 
@@ -308,11 +316,11 @@ def test_calculate_portfolio_metrics():
         option_beta_adjusted=-1200.0,  # Negative value
         total_exposure=-6000.0,  # Negative value
         total_beta_adjusted=-6200.0,  # Negative value
-        description="Short market value (Stocks + Options)",
-        formula="Short Stocks + Short Options",
+        description="Short market exposure (Stocks + Options)",
+        formula="Short Stocks + Short Options Delta Exp",
         components={
-            "Short Stocks Value": -5000.0,  # Negative value
-            "Short Options Value": -1000.0,  # Negative value
+            "Short Stocks Exposure": -5000.0,  # Negative value
+            "Short Options Delta Exp": -1000.0,  # Negative value
         },
     )
 
