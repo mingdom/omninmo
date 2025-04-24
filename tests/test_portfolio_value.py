@@ -55,6 +55,8 @@ def create_test_portfolio_summary():
         components={
             "Long Stocks Exposure": 10000.0,
             "Long Options Delta Exp": 2000.0,
+            "Long Stocks Value": 10000.0,
+            "Long Options Value": 2000.0,
         },
     )
 
@@ -70,6 +72,8 @@ def create_test_portfolio_summary():
         components={
             "Short Stocks Exposure": -5000.0,  # Negative value
             "Short Options Delta Exp": -1000.0,  # Negative value
+            "Short Stocks Value": -5000.0,  # Negative value
+            "Short Options Value": -1000.0,  # Negative value
         },
     )
 
@@ -266,6 +270,8 @@ def test_create_value_breakdowns():
     assert long_value.total_beta_adjusted == 14400.0
     assert long_value.components["Long Stocks Exposure"] == 10000.0
     assert long_value.components["Long Options Delta Exp"] == 2000.0
+    assert long_value.components["Long Stocks Value"] == 10000.0
+    assert long_value.components["Long Options Value"] == 2000.0
 
     # Verify that short value breakdown is correct and contains negative values
     assert short_value.stock_exposure == -5000.0  # Negative value
@@ -278,6 +284,8 @@ def test_create_value_breakdowns():
     assert (
         short_value.components["Short Options Delta Exp"] == -1000.0
     )  # Negative value
+    assert short_value.components["Short Stocks Value"] == -5000.0  # Negative value
+    assert short_value.components["Short Options Value"] == -1000.0  # Negative value
 
     # Verify that options value breakdown is correct
     assert options_value.option_delta_exposure == 1000.0
@@ -366,6 +374,19 @@ def test_calculate_portfolio_values():
     assert cash_like_value == 3000.0
     assert portfolio_estimate_value == 9000.0  # 5000 + 500 + 3000 + 500 = 9000
     assert cash_percentage == pytest.approx(33.33, 0.01)  # (3000 / 9000) * 100 = 33.33
+
+    # Test with different pending activity value
+    (
+        stock_value,
+        option_value,
+        cash_like_value,
+        portfolio_estimate_value,
+        cash_percentage,
+    ) = calculate_portfolio_values(groups, cash_like_positions, 1000.0)
+
+    # Verify that pending activity is correctly included in portfolio estimate value
+    assert portfolio_estimate_value == 9500.0  # 5000 + 500 + 3000 + 1000 = 9500
+    assert cash_percentage == pytest.approx(31.58, 0.01)  # (3000 / 9500) * 100 = 31.58
 
 
 def test_get_portfolio_component_values():

@@ -165,14 +165,35 @@ def process_portfolio_data(
     pending_activity_rows = df[df["Symbol"] == "Pending Activity"]
     if not pending_activity_rows.empty:
         for _, row in pending_activity_rows.iterrows():
-            if pd.notna(row["Current Value"]):
-                try:
-                    pending_activity_value += clean_currency_value(row["Current Value"])
-                    logger.debug(
-                        f"Found Pending Activity with value: {format_currency(pending_activity_value)}"
-                    )
-                except (ValueError, TypeError) as e:
-                    logger.warning(f"Error parsing Pending Activity value: {e}")
+            # Check multiple columns for the pending activity value
+            # The column containing the value seems to vary between CSV files
+            value_columns = [
+                "Current Value",
+                "Last Price Change",
+                "Today's Gain/Loss Dollar",
+            ]
+
+            for col in value_columns:
+                if col in row and pd.notna(row[col]) and str(row[col]).strip():
+                    try:
+                        value = clean_currency_value(row[col])
+                        if value != 0:
+                            pending_activity_value = (
+                                value  # Use the first non-zero value found
+                            )
+                            logger.debug(
+                                f"Found Pending Activity with value: {format_currency(pending_activity_value)} in column '{col}'"
+                            )
+                            break  # Stop checking other columns once we find a value
+                    except (ValueError, TypeError) as e:
+                        logger.warning(
+                            f"Error parsing Pending Activity value from column '{col}': {e}"
+                        )
+
+            if pending_activity_value == 0:
+                logger.warning(
+                    "No valid Pending Activity value found in any expected column"
+                )
 
     # Filter out invalid entries like "Pending Activity" which aren't actual positions
     invalid_symbols = ["Pending Activity", "021ESC017"]
@@ -1113,7 +1134,7 @@ def update_portfolio_prices(
 
 
 def update_portfolio_summary_with_prices(
-    portfolio_groups: list[PortfolioGroup], _: PortfolioSummary, data_fetcher=None
+    portfolio_groups: list[PortfolioGroup], summary: PortfolioSummary, data_fetcher=None
 ) -> PortfolioSummary:
     """Update the portfolio summary with the latest prices.
 
@@ -1129,7 +1150,10 @@ def update_portfolio_summary_with_prices(
     price_updated_at = update_portfolio_prices(portfolio_groups, data_fetcher)
 
     # Recalculate the portfolio summary with the updated prices
-    updated_summary = calculate_portfolio_summary(portfolio_groups)
+    # Preserve the pending activity value from the original summary
+    updated_summary = calculate_portfolio_summary(
+        portfolio_groups, summary.cash_like_positions, summary.pending_activity_value
+    )
 
     # Set the price_updated_at timestamp
     updated_summary.price_updated_at = price_updated_at

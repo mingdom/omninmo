@@ -248,6 +248,8 @@ class TestChartDataTransformations:
             components={
                 "Long Stocks Exposure": 10000.0,
                 "Long Options Delta Exp": 2000.0,
+                "Long Stocks Value": 10000.0,
+                "Long Options Value": 2000.0,
             },
         )
 
@@ -263,6 +265,8 @@ class TestChartDataTransformations:
             components={
                 "Short Stocks Exposure": -5000.0,  # Negative value
                 "Short Options Delta Exp": -1000.0,  # Negative value
+                "Short Stocks Value": -5000.0,  # Negative value
+                "Short Options Value": -1000.0,  # Negative value
             },
         )
 
@@ -419,6 +423,7 @@ class TestChartDataTransformations:
         2. Negative short values that need to be displayed as absolute values
         3. Proper calculation of percentages
         4. Correct total portfolio value calculation
+        5. Pending activity values are correctly included
         """
         # Create a complex portfolio summary with significant differences in component values
         # and both long and short positions
@@ -437,6 +442,8 @@ class TestChartDataTransformations:
             components={
                 "Long Stocks Exposure": 2000000.0,
                 "Long Options Delta Exp": 500000.0,
+                "Long Stocks Value": 2000000.0,
+                "Long Options Value": 500000.0,
             },
         )
 
@@ -452,6 +459,8 @@ class TestChartDataTransformations:
             components={
                 "Short Stocks Exposure": -300000.0,
                 "Short Options Delta Exp": -100000.0,
+                "Short Stocks Value": -300000.0,
+                "Short Options Value": -100000.0,
             },
         )
 
@@ -496,6 +505,21 @@ class TestChartDataTransformations:
 
         # Extract values from chart data
         chart_values = {}
+
+        # Verify that pending activity is included in the chart data
+        pending_bar = None
+        for trace in chart_data["data"]:
+            if trace["name"] == "Pending":
+                pending_bar = trace
+                break
+
+        assert pending_bar is not None, (
+            "Pending activity bar should be included in the chart"
+        )
+        assert pending_bar["x"] == ["Pending"]
+        assert pending_bar["y"][0] == 200000.0, (
+            "Pending activity value should be 200000.0"
+        )
         for trace in chart_data["data"]:
             name = trace["name"]
             value = trace["y"][0]
@@ -587,6 +611,8 @@ class TestChartDataTransformations:
             components={
                 "Long Stocks Exposure": 300000.0,
                 "Long Options Delta Exp": 200000.0,
+                "Long Stocks Value": 300000.0,
+                "Long Options Value": 200000.0,
             },
         )
 
@@ -602,6 +628,8 @@ class TestChartDataTransformations:
             components={
                 "Short Stocks Exposure": -1000000.0,
                 "Short Options Delta Exp": -500000.0,
+                "Short Stocks Value": -1000000.0,
+                "Short Options Value": -500000.0,
             },
         )
 

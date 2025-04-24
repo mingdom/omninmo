@@ -131,7 +131,7 @@ def create_value_breakdowns(
     """
     # 1. Long value (stocks + options)
     long_stock_value = long_stocks["value"]
-    long_options["value"]  # Market value
+    long_option_value = long_options["value"]  # Market value
     long_stock_beta_adj = long_stocks["beta_adjusted"]
     long_option_beta_adj = long_options["beta_adjusted"]
     long_option_delta_exp = long_options["delta_exposure"]  # Delta exposure
@@ -148,12 +148,14 @@ def create_value_breakdowns(
         components={
             "Long Stocks Exposure": long_stock_value,
             "Long Options Delta Exp": long_option_delta_exp,
+            "Long Stocks Value": long_stock_value,
+            "Long Options Value": long_option_value,
         },
     )
 
     # 2. Short value (stocks + options)
     short_stock_value = short_stocks["value"]  # Already negative
-    short_options["value"]  # Already negative, market value
+    short_option_value = short_options["value"]  # Already negative, market value
     short_stock_beta_adj = short_stocks["beta_adjusted"]  # Already negative
     short_option_beta_adj = short_options["beta_adjusted"]  # Already negative
     short_option_delta_exp = short_options[
@@ -172,6 +174,8 @@ def create_value_breakdowns(
         components={
             "Short Stocks Exposure": short_stock_value,
             "Short Options Delta Exp": short_option_delta_exp,
+            "Short Stocks Value": short_stock_value,
+            "Short Options Value": short_option_value,
         },
     )
 
@@ -332,16 +336,16 @@ def get_portfolio_component_values(
         - total: Total portfolio value
     """
     long_stock = portfolio_summary.long_exposure.components.get(
-        "Long Stocks Exposure", 0.0
+        "Long Stocks Value", 0.0
     )
     short_stock = portfolio_summary.short_exposure.components.get(
-        "Short Stocks Exposure", 0.0
+        "Short Stocks Value", 0.0
     )  # Already negative
     long_option = portfolio_summary.long_exposure.components.get(
-        "Long Options Delta Exp", 0.0
+        "Long Options Value", 0.0
     )
     short_option = portfolio_summary.short_exposure.components.get(
-        "Short Options Delta Exp", 0.0
+        "Short Options Value", 0.0
     )  # Already negative
     cash = portfolio_summary.cash_like_value
     pending = portfolio_summary.pending_activity_value
