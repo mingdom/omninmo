@@ -29,7 +29,8 @@ help:
 	@echo "               Options: --cache (also clear data cache)"
 	@echo "  lint        - Run type checker and linter"
 	@echo "               Options: --fix (auto-fix linting issues)"
-	@echo "  test        - Run all tests in the tests directory"
+	@echo "  test        - Run all unit tests in the tests directory"
+	@echo "  test-e2e    - Run end-to-end tests against real portfolio data"
 	@echo "  docker-build - Build the Docker image"
 	@echo "  docker-run   - Run the Docker container"
 	@echo "  docker-up    - Start the application with docker-compose"
@@ -180,10 +181,10 @@ stop-folio:
 		echo "No running folio processes found."; \
 	fi
 
-# Test target
-.PHONY: test
+# Test targets
+.PHONY: test test-e2e
 test:
-	@echo "Running tests..."
+	@echo "Running unit tests..."
 	@if [ ! -d "$(VENV_DIR)" ]; then \
 		echo "Virtual environment not found. Please run 'make env' first."; \
 		exit 1; \
@@ -194,6 +195,23 @@ test:
 	(source $(VENV_DIR)/bin/activate && \
 	PYTHONPATH=. pytest tests/ -v) 2>&1) | tee $(LOGS_DIR)/test_latest.log
 	@echo "Test log saved to: $(LOGS_DIR)/test_latest.log"
+
+test-e2e:
+	@echo "Running end-to-end tests..."
+	@if [ ! -d "$(VENV_DIR)" ]; then \
+		echo "Virtual environment not found. Please run 'make env' first."; \
+		exit 1; \
+	fi
+	@if [ ! -f "private-data/test/test-portfolio.csv" ]; then \
+		echo "Warning: Test portfolio file not found at private-data/test/test-portfolio.csv"; \
+		echo "E2E tests will try to use sample-data/sample-portfolio.csv instead."; \
+	fi
+	@mkdir -p $(LOGS_DIR)
+	@(echo "=== E2E Test Run Log $(TIMESTAMP) ===" && \
+	echo "Starting E2E tests at: $$(date)" && \
+	(source $(VENV_DIR)/bin/activate && \
+	PYTHONPATH=. pytest tests/e2e/ -v) 2>&1) | tee $(LOGS_DIR)/test_e2e_latest.log
+	@echo "E2E test log saved to: $(LOGS_DIR)/test_e2e_latest.log"
 
 # Docker commands
 docker-build:

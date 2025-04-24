@@ -194,7 +194,7 @@ def create_portfolio_value_card():
                 id="portfolio-value-card",
             ),
             dbc.Tooltip(
-                "Estimated total portfolio value (Net Market Exposure + Cash).",
+                "Total value of your portfolio including all positions and cash. This represents your total investment and is used to calculate percentage allocations.",
                 target="portfolio-value-card",
                 placement="top",
             ),
@@ -236,7 +236,7 @@ def create_net_exposure_card():
                 id="total-value-card",
             ),
             dbc.Tooltip(
-                "Net market exposure (Long - Short). Includes stock positions and option market values.",
+                "Net market exposure (Long - Short) showing your directional bias. A positive value indicates net long exposure, while negative indicates net short. Use this to understand your overall market stance.",
                 target="total-value-card",
                 placement="top",
             ),
@@ -278,7 +278,7 @@ def create_long_exposure_card():
                 id="long-exposure-card",
             ),
             dbc.Tooltip(
-                "Total long market exposure from stocks and options.",
+                "Total long market exposure from stocks and options (not beta-adjusted). This shows your total bullish positioning and is used to calculate your gross exposure.",
                 target="long-exposure-card",
                 placement="top",
             ),
@@ -320,7 +320,7 @@ def create_short_exposure_card():
                 id="short-exposure-card",
             ),
             dbc.Tooltip(
-                "Total short market exposure from stocks and options.",
+                "Total short market exposure from stocks and options (not beta-adjusted). This shows your total bearish positioning and helps measure your hedging level.",
                 target="short-exposure-card",
                 placement="top",
             ),
@@ -362,7 +362,7 @@ def create_options_exposure_card():
                 id="options-exposure-card",
             ),
             dbc.Tooltip(
-                "Net delta exposure from all options (Long - Short).",
+                "Net delta-adjusted exposure from all options (not beta-adjusted). This shows how your options positions affect your overall market exposure, with each option weighted by its delta.",
                 target="options-exposure-card",
                 placement="top",
             ),
@@ -404,7 +404,7 @@ def create_cash_card():
                 id="cash-like-card",
             ),
             dbc.Tooltip(
-                "Total value of cash and cash-equivalent positions.",
+                "Total value of cash and cash-equivalent positions (money market funds, T-bills, etc.). This represents your defensive positioning and available buying power.",
                 target="cash-like-card",
                 placement="top",
             ),
@@ -439,7 +439,7 @@ def create_portfolio_beta_card():
                 id="portfolio-beta-card",
             ),
             dbc.Tooltip(
-                "Overall portfolio beta (weighted average of all positions).",
+                "Measures your portfolio's sensitivity to market movements. A beta of 1.0 means your portfolio moves with the market, 2.0 means twice as volatile, and 0.5 means half as volatile. Use this to gauge your market risk.",
                 target="portfolio-beta-card",
                 placement="top",
             ),
@@ -474,7 +474,7 @@ def create_beta_adjusted_exposure_card():
                 id="beta-adjusted-exposure-card",
             ),
             dbc.Tooltip(
-                "Net market exposure adjusted for beta (risk-adjusted exposure).",
+                "Net exposure adjusted for each position's beta, showing true market risk. This risk-adjusted measure accounts for the fact that high-beta stocks have more market impact than low-beta stocks of the same value.",
                 target="beta-adjusted-exposure-card",
                 placement="top",
             ),
