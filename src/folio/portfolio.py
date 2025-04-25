@@ -22,6 +22,7 @@ from .data_model import (
     StockPosition,
     create_portfolio_group,
 )
+from .formatting import format_beta, format_currency
 from .logger import logger
 from .portfolio_value import (
     calculate_portfolio_metrics,
@@ -30,7 +31,7 @@ from .portfolio_value import (
     process_option_positions,
     process_stock_positions,
 )
-from .utils import clean_currency_value, format_beta, format_currency, get_beta
+from .utils import clean_currency_value, get_beta
 
 # Load configuration
 config_path = os.path.join(os.path.dirname(__file__), "folio.yaml")

@@ -13,8 +13,8 @@ can be much less than the exposure (delta * notional value).
 """
 
 from .data_model import ExposureBreakdown, PortfolioGroup, PortfolioSummary
+from .formatting import format_currency
 from .logger import logger
-from .utils import format_currency
 
 
 def process_stock_positions(groups: list[PortfolioGroup]) -> tuple[dict, dict]:
@@ -399,5 +399,15 @@ def calculate_component_percentages(
             # Calculate percentage based on absolute value, but preserve sign
             sign = -1 if v < 0 else 1
             result[k] = sign * (abs(v) / total) * 100
+
+    # Add combined long and short totals
+    long_total = component_values["long_stock"] + component_values["long_option"]
+    short_total = component_values["short_stock"] + component_values["short_option"]
+
+    # Calculate percentages for the totals
+    result["long_total"] = (long_total / total) * 100 if total > 0 else 0.0
+    result["short_total"] = (
+        (short_total / total) * 100 if total > 0 else 0.0
+    )  # Will be negative
 
     return result

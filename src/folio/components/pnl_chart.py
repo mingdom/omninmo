@@ -13,9 +13,9 @@ import plotly.graph_objects as go
 from dash import ALL, Input, Output, State, callback_context, dcc, html
 
 from ..data_model import OptionPosition, PortfolioGroup, StockPosition
+from ..formatting import format_currency
 from ..logger import logger
 from ..pnl import calculate_strategy_pnl, determine_price_range, summarize_strategy_pnl
-from ..utils import format_currency
 
 
 def create_pnl_chart(

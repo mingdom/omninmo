@@ -1,7 +1,7 @@
 """End-to-end tests for exposure calculations."""
 
 from src.folio.components.summary_cards import format_summary_card_values
-from src.folio.utils import format_currency
+from src.folio.formatting import format_currency
 
 
 class TestExposures:

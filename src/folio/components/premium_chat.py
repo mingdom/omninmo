@@ -53,7 +53,7 @@ def create_premium_chat_component():
                                     html.Div(
                                         dcc.Markdown(
                                             """
-                                            👋 Hello! I'm your AI Portfolio Advisor powered by Google Gemini 2.5 Pro.
+                                            👋 Hello! I'm your AI Portfolio Advisor!
 
                                             I can help you analyze your portfolio and provide insights on:
                                             - Risk assessment

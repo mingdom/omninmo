@@ -11,6 +11,46 @@ from .ai_utils import PORTFOLIO_ADVISOR_SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
 
+# Model configuration
+# https://ai.google.dev/gemini-api/docs/models#model-versions
+GEMINI_MODEL_NAME = (
+    # alternatively: gemini-2.5-pro-exp-03-25
+    "gemini-2.5-flash-preview-04-17"
+)
+GEMINI_TEMPERATURE = 0.7
+GEMINI_TOP_P = 0.95
+GEMINI_TOP_K = 40
+GEMINI_MAX_OUTPUT_TOKENS = 4096
+CONVERSATION_HISTORY_LIMIT = 10
+
+# Analysis prompt template
+PORTFOLIO_ANALYSIS_PROMPT_TEMPLATE = """
+You are a professional financial advisor analyzing a stock portfolio.
+Remember that you should ONLY answer questions related to finance, investments, and the client's portfolio.
+
+Provide a comprehensive analysis of the following portfolio data:
+
+PORTFOLIO SUMMARY:
+- Total Portfolio Value: ${total_value:.2f}
+- Net Market Exposure: ${net_exposure:.2f}
+- Long Exposure: ${long_exposure:.2f}
+- Short Exposure: ${short_exposure:.2f}
+- Beta-Adjusted Net Exposure: ${beta_adjusted_net_exposure:.2f}
+
+POSITIONS:
+{positions_text}
+
+Please analyze this portfolio and provide insights on:
+1. Overall risk assessment (based on exposures, diversification, and position sizes)
+2. Sector concentration and diversification analysis
+3. Quality of the companies in the portfolio
+4. Specific improvement recommendations
+
+Format your response in clear sections with headers. Be specific and actionable in your recommendations.
+
+If the user asks about topics unrelated to finance or investments, politely redirect them back to discussing their portfolio.
+"""
+
 
 class GeminiClient:
     """Client for interacting with Google Gemini AI API."""
@@ -27,19 +67,19 @@ class GeminiClient:
         try:
             genai.configure(api_key=self.api_key)
             self.model = genai.GenerativeModel(
-                model_name="gemini-2.5-pro-exp-03-25",
+                model_name=GEMINI_MODEL_NAME,
                 generation_config=GenerationConfig(
-                    temperature=0.2,
-                    top_p=0.95,
-                    top_k=40,
-                    max_output_tokens=4096,
+                    temperature=GEMINI_TEMPERATURE,
+                    top_p=GEMINI_TOP_P,
+                    top_k=GEMINI_TOP_K,
+                    max_output_tokens=GEMINI_MAX_OUTPUT_TOKENS,
                 ),
                 # Set the system prompt to ensure the AI stays focused on portfolio advising
                 system_instruction=PORTFOLIO_ADVISOR_SYSTEM_PROMPT,
             )
             self.is_available = True
             logger.info(
-                "Gemini client initialized successfully with portfolio advisor system prompt"
+                f"Gemini client initialized successfully with model {GEMINI_MODEL_NAME}"
             )
         except Exception as e:
             logger.error(f"Failed to initialize Gemini client: {e!s}")
@@ -68,7 +108,9 @@ class GeminiClient:
 
             # Format the conversation history for the model
             formatted_history = []
-            for msg in history[-10:]:  # Limit to last 10 messages for context window
+            for msg in history[
+                -CONVERSATION_HISTORY_LIMIT:
+            ]:  # Limit to last N messages for context window
                 formatted_history.append(
                     {"role": msg["role"], "parts": [msg["content"]]}
                 )
@@ -145,8 +187,8 @@ class GeminiClient:
                     f"Formatting {len(history)} previous messages for chat history"
                 )
                 for msg in history[
-                    -10:
-                ]:  # Limit to last 10 messages for context window
+                    -CONVERSATION_HISTORY_LIMIT:
+                ]:  # Limit to last N messages for context window
                     role = "user" if msg["role"] == "user" else "model"
                     formatted_history.append(
                         {"role": role, "parts": [{"text": msg["content"]}]}
@@ -211,8 +253,8 @@ class GeminiClient:
             Formatted prompt string
         """
         # Extract key portfolio metrics
-        positions = portfolio_data.get("positions", [])
-        summary = portfolio_data.get("summary", {})
+        positions = portfolio_data["positions"]
+        summary = portfolio_data["summary"]
 
         # Format positions data
         positions_text = "\n".join(
@@ -226,33 +268,25 @@ class GeminiClient:
         )
 
         # Format summary data
-        total_value = summary.get("total_value_net", 0)
-        portfolio_beta = summary.get("portfolio_beta", 0)
+        # Extract key metrics from the summary
+        total_value = summary["portfolio_value"]
+        net_exposure = summary["net_market_exposure"]
+        long_exposure = summary["long_exposure"]["total_exposure"]
+        short_exposure = summary["short_exposure"]["total_exposure"]
+        beta_adjusted_net_exposure = (
+            summary["long_exposure"]["total_beta_adjusted"]
+            + summary["short_exposure"]["total_beta_adjusted"]
+        )
 
-        # Construct the prompt
-        prompt = f"""
-        You are a professional financial advisor analyzing a stock portfolio.
-        Remember that you should ONLY answer questions related to finance, investments, and the client's portfolio.
-
-        Provide a comprehensive analysis of the following portfolio data:
-
-        PORTFOLIO SUMMARY:
-        - Total Value: ${total_value:.2f}
-        - Portfolio Beta: {portfolio_beta:.2f}
-
-        POSITIONS:
-        {positions_text}
-
-        Please analyze this portfolio and provide insights on:
-        1. Overall risk assessment (based on beta, diversification, and position sizes)
-        2. Sector concentration analysis
-        3. Diversification evaluation
-        4. Specific improvement recommendations
-
-        Format your response in clear sections with headers. Be specific and actionable in your recommendations.
-
-        If the user asks about topics unrelated to finance or investments, politely redirect them back to discussing their portfolio.
-        """
+        # Construct the prompt using the template
+        prompt = PORTFOLIO_ANALYSIS_PROMPT_TEMPLATE.format(
+            total_value=total_value,
+            net_exposure=net_exposure,
+            long_exposure=long_exposure,
+            short_exposure=short_exposure,
+            beta_adjusted_net_exposure=beta_adjusted_net_exposure,
+            positions_text=positions_text,
+        )
 
         return prompt
 
@@ -272,43 +306,61 @@ class GeminiClient:
             return ""
 
         # Extract key portfolio metrics
-        positions = portfolio_data.get("positions", [])
-        summary = portfolio_data.get("summary", {})
+        positions = portfolio_data["positions"]
+        summary = portfolio_data["summary"]
+        allocations = portfolio_data["allocations"]
 
-        # Format positions data (limit to top 10 by value for context size)
+        # Get values and percentages
+        values = allocations["values"]
+        percentages = allocations["percentages"]
+
+        # Format positions data (limit to top 10 by absolute value for context size)
+        # Note: We still use abs() here because we want to sort by magnitude, not sign
+        # This is appropriate for sorting to find the largest positions by impact
         sorted_positions = sorted(
-            positions, key=lambda p: abs(p.get("market_value", 0)), reverse=True
-        )
-        top_positions = sorted_positions[:10]
+            positions, key=lambda p: abs(p["market_value"]), reverse=True
+        )[:10]
 
-        positions_text = "\n".join(
-            [
-                f"- {pos['ticker']}: {pos['position_type'].upper()}, "
-                f"Value: ${pos['market_value']:.2f}, "
-                f"Beta: {pos['beta']:.2f}, "
-                f"Weight: {pos['weight']:.2%}"
-                for pos in top_positions
-            ]
-        )
+        # Build context using multi-line f-strings
+        context = f"""Portfolio Analysis Context:
 
-        # Format summary data
-        total_value = summary.get("total_value_net", 0)
-        portfolio_beta = summary.get("portfolio_beta", 0)
+Portfolio Summary:
+- Total Portfolio Value: ${summary["portfolio_value"]:,.2f}
+- Net Market Exposure: ${summary["net_market_exposure"]:,.2f}
+- Beta-Adjusted Net Exposure: ${summary["long_exposure"]["total_beta_adjusted"] + summary["short_exposure"]["total_beta_adjusted"]:,.2f}
 
-        # Construct the context
-        context = f"""
-        PORTFOLIO CONTEXT:
+Exposure Breakdown:
+- Long Exposure: ${summary["long_exposure"]["total_exposure"]:,.2f} ({percentages["long_stock"] + percentages["long_option"]:.1f}% of portfolio)
+- Short Exposure: ${summary["short_exposure"]["total_exposure"]:,.2f} ({percentages["short_stock"] + percentages["short_option"]:.1f}% of portfolio)
+- Options Exposure: ${summary["options_exposure"]["total_exposure"]:,.2f} ({percentages["long_option"] + percentages["short_option"]:.1f}% of portfolio)
+- Cash & Equivalents: ${summary["cash_like_value"]:,.2f} ({percentages["cash"]:.1f}% of portfolio)
 
-        Summary:
-        - Total Value: ${total_value:.2f}
-        - Portfolio Beta: {portfolio_beta:.2f}
-        - Number of Positions: {len(positions)}
+Portfolio Allocation:
+- Long Stocks: ${values["long_stock"]:,.2f} ({percentages["long_stock"]:.1f}%)
+- Long Options: ${values["long_option"]:,.2f} ({percentages["long_option"]:.1f}%)
+- Short Stocks: ${values["short_stock"]:,.2f} ({percentages["short_stock"]:.1f}%)
+- Short Options: ${values["short_option"]:,.2f} ({percentages["short_option"]:.1f}%)
+- Cash: ${values["cash"]:,.2f} ({percentages["cash"]:.1f}%)
+- Pending Activity: ${values["pending"]:,.2f} ({percentages["pending"]:.1f}%)
 
-        Top Positions:
-        {positions_text}
+Top Positions (by market value):
+"""
 
-        Use this information to provide relevant advice and analysis.
-        """
+        # Add top positions
+        for i, pos in enumerate(sorted_positions, 1):
+            ticker = pos["ticker"]
+            pos_type = pos["position_type"]
+            market_value = pos["market_value"]
+            weight = pos["weight"] * 100  # Convert to percentage
+
+            if pos_type == "option":
+                option_type = pos["option_type"]
+                strike = pos["strike"]
+                expiry = pos["expiry"]
+                delta = pos["delta"]
+                context += f"{i}. {ticker} {option_type.upper()} ${strike} {expiry} - ${market_value:,.2f} ({weight:.1f}% of portfolio, delta: {delta:.2f})\n"
+            else:
+                context += f"{i}. {ticker} - ${market_value:,.2f} ({weight:.1f}% of portfolio)\n"
 
         return context
 

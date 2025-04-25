@@ -14,6 +14,7 @@ from src.folio.data_model import (
     PortfolioSummary,
     StockPosition,
 )
+from src.folio.portfolio_value import get_portfolio_component_values
 
 
 class TestChartDataTransformations:
@@ -350,55 +351,58 @@ class TestChartDataTransformations:
         # Verify that chart data is correctly structured
         assert "data" in chart_data
         assert "layout" in chart_data
-        assert (
-            len(chart_data["data"]) == 6
-        )  # 6 bars: long stock, long option, short stock, short option, cash, pending
+        assert len(chart_data["data"]) == 4  # 4 bars: long, short, cash, pending
 
-        # Verify that long stock bar is correct
-        long_stock_bar = chart_data["data"][0]
-        assert long_stock_bar["name"] == "Long Stocks"
-        assert long_stock_bar["x"] == ["Long"]
-        assert long_stock_bar["y"][0] == 10000.0  # Value at "Long" position
+        # Get component values
+        component_values = get_portfolio_component_values(
+            mock_portfolio_summary_with_negative_shorts
+        )
+        long_total = component_values["long_stock"] + component_values["long_option"]
+        short_total = component_values["short_stock"] + component_values["short_option"]
 
-        # Verify that long option bar is correct
-        long_option_bar = chart_data["data"][1]
-        assert long_option_bar["name"] == "Long Options"
-        assert long_option_bar["x"] == ["Long"]
-        assert long_option_bar["y"][0] == 2000.0  # Value at "Long" position
+        # Verify that long bar is correct
+        long_bar = chart_data["data"][0]
+        assert long_bar["name"] == "Long"
+        assert long_bar["x"] == ["Long"]
+        assert long_bar["y"][0] == long_total  # Combined long value
 
-        # Verify that short stock bar is correct and uses absolute value for display
-        short_stock_bar = chart_data["data"][2]
-        assert short_stock_bar["name"] == "Short Stocks"
-        assert short_stock_bar["x"] == ["Short"]
-        assert (
-            short_stock_bar["y"][0] == 5000.0
-        )  # Value at "Short" position (absolute value of -5000.0)
-
-        # Verify that short option bar is correct and uses absolute value for display
-        short_option_bar = chart_data["data"][3]
-        assert short_option_bar["name"] == "Short Options"
-        assert short_option_bar["x"] == ["Short"]
-        assert (
-            short_option_bar["y"][0] == 1000.0
-        )  # Value at "Short" position (absolute value of -1000.0)
+        # Verify that short bar is correct and uses negative value for display
+        short_bar = chart_data["data"][1]
+        assert short_bar["name"] == "Short"
+        assert short_bar["x"] == ["Short"]
+        assert short_bar["y"][0] == short_total  # Combined short value (negative)
 
         # Verify that cash bar is correct
-        cash_bar = chart_data["data"][4]
+        cash_bar = chart_data["data"][2]
         assert cash_bar["name"] == "Cash"
         assert cash_bar["x"] == ["Cash"]
         assert cash_bar["y"][0] == 3000.0  # Value at "Cash" position
 
         # Verify that pending bar is correct
-        pending_bar = chart_data["data"][5]
+        pending_bar = chart_data["data"][3]
         assert pending_bar["name"] == "Pending"
         assert pending_bar["x"] == ["Pending"]
         assert pending_bar["y"][0] == 500.0  # Value at "Pending" position
 
         # Verify that layout is correctly configured
-        assert chart_data["layout"]["barmode"] == "stack"
+        assert chart_data["layout"]["barmode"] == "relative"
         assert chart_data["layout"]["yaxis"]["title"] == "Value ($)"
-        assert chart_data["layout"]["yaxis2"]["title"] == "Percentage (%)"
-        assert chart_data["layout"]["yaxis2"]["range"] == [0, 100]
+
+        # Verify text is displayed on bars (compact format)
+        assert "$" in long_bar["text"][0]  # Should contain dollar sign
+        assert long_bar["textposition"] == "inside"  # Text should be inside bars
+
+        assert "$" in short_bar["text"][0]  # Should contain dollar sign
+        assert short_bar["textposition"] == "inside"  # Text should be inside bars
+
+        # Verify hover template contains detailed breakdown information
+        assert "Long Total" in long_bar["hovertemplate"]
+        assert "Stocks" in long_bar["hovertemplate"]
+        assert "Options" in long_bar["hovertemplate"]
+
+        assert "Short Total" in short_bar["hovertemplate"]
+        assert "Stocks" in short_bar["hovertemplate"]
+        assert "Options" in short_bar["hovertemplate"]
 
     def test_allocations_chart_with_empty_portfolio(self, empty_portfolio_summary):
         """Test that the allocations chart handles empty portfolios correctly."""
@@ -526,21 +530,16 @@ class TestChartDataTransformations:
             chart_values[name] = value
 
         # Verify component values
-        assert chart_values["Long Stocks"] == 2000000.0
-        assert chart_values["Long Options"] == 500000.0
-        assert chart_values["Short Stocks"] == 300000.0  # Absolute value
-        assert chart_values["Short Options"] == 100000.0  # Absolute value
+        assert chart_values["Long"] == 2500000.0  # Combined long value
+        assert chart_values["Short"] == -400000.0  # Combined short value (negative)
         assert chart_values["Cash"] == 700000.0
         assert chart_values["Pending"] == 200000.0
 
         # Calculate total from chart values (using the correct formula)
+        # Since Short is now a negative value, we add it directly
         chart_total = (
-            (
-                chart_values["Long Stocks"] - chart_values["Short Stocks"]
-            )  # Net stock value
-            + (
-                chart_values["Long Options"] - chart_values["Short Options"]
-            )  # Net option value
+            chart_values["Long"]  # Long value
+            + chart_values["Short"]  # Short value (negative)
             + chart_values["Cash"]
             + chart_values["Pending"]
         )
@@ -550,27 +549,23 @@ class TestChartDataTransformations:
             portfolio_summary.portfolio_estimate_value, abs=0.01
         )
 
-        # Extract percentages from hover text
+        # Extract percentages from hover templates
         percentages = {}
         for trace in chart_data["data"]:
             name = trace["name"]
-            hover_text = trace["text"][0]
-            if "%" in hover_text:
-                percentage_str = hover_text.split("(")[1].split("%")[0]
+            hover_template = trace["hovertemplate"]
+            if "%" in hover_template:
+                # Extract percentage from the hover template
+                # Format is like: "$2.5M<br>Long Total: $2,500,000.00 (83.3%)<br>..."
+                percentage_str = hover_template.split("(")[1].split("%")[0]
                 percentages[name] = float(percentage_str)
 
         # Verify percentages
-        assert percentages["Long Stocks"] == pytest.approx(
-            2000000.0 / 3000000.0 * 100, abs=0.1
+        assert percentages["Long"] == pytest.approx(
+            2500000.0 / 3000000.0 * 100, abs=0.1
         )
-        assert percentages["Long Options"] == pytest.approx(
-            500000.0 / 3000000.0 * 100, abs=0.1
-        )
-        assert percentages["Short Stocks"] == pytest.approx(
-            300000.0 / 3000000.0 * 100, abs=0.1
-        )
-        assert percentages["Short Options"] == pytest.approx(
-            100000.0 / 3000000.0 * 100, abs=0.1
+        assert percentages["Short"] == pytest.approx(
+            -400000.0 / 3000000.0 * 100, abs=0.1
         )
         assert percentages["Cash"] == pytest.approx(700000.0 / 3000000.0 * 100, abs=0.1)
         assert percentages["Pending"] == pytest.approx(
@@ -578,13 +573,14 @@ class TestChartDataTransformations:
         )
 
         # Verify that the net percentage calculation is correct
-        long_percentage = percentages["Long Stocks"] + percentages["Long Options"]
-        short_percentage = percentages["Short Stocks"] + percentages["Short Options"]
+        # Since short percentages are now negative, we add them directly
+        long_percentage = percentages["Long"]
+        short_percentage = percentages["Short"]
         cash_percentage = percentages["Cash"]
         pending_percentage = percentages["Pending"]
 
         net_percentage = (
-            long_percentage - short_percentage + cash_percentage + pending_percentage
+            long_percentage + short_percentage + cash_percentage + pending_percentage
         )
         assert net_percentage == pytest.approx(100.0, abs=1.0)
 
@@ -680,21 +676,16 @@ class TestChartDataTransformations:
             chart_values[name] = value
 
         # Verify component values
-        assert chart_values["Long Stocks"] == 300000.0
-        assert chart_values["Long Options"] == 200000.0
-        assert chart_values["Short Stocks"] == 1000000.0  # Absolute value
-        assert chart_values["Short Options"] == 500000.0  # Absolute value
+        assert chart_values["Long"] == 500000.0  # Combined long value
+        assert chart_values["Short"] == -1500000.0  # Combined short value (negative)
         assert chart_values["Cash"] == 2000000.0
         assert chart_values["Pending"] == 100000.0
 
         # Calculate total from chart values (using the correct formula)
+        # Since Short is now a negative value, we add it directly
         chart_total = (
-            (
-                chart_values["Long Stocks"] - chart_values["Short Stocks"]
-            )  # Net stock value (negative)
-            + (
-                chart_values["Long Options"] - chart_values["Short Options"]
-            )  # Net option value (negative)
+            chart_values["Long"]  # Long value
+            + chart_values["Short"]  # Short value (negative)
             + chart_values["Cash"]
             + chart_values["Pending"]
         )
@@ -704,39 +695,32 @@ class TestChartDataTransformations:
             portfolio_summary.portfolio_estimate_value, abs=0.01
         )
 
-        # Extract percentages from hover text
+        # Extract percentages from hover templates
         percentages = {}
         for trace in chart_data["data"]:
             name = trace["name"]
-            hover_text = trace["text"][0]
-            if "%" in hover_text:
-                percentage_str = hover_text.split("(")[1].split("%")[0]
+            hover_template = trace["hovertemplate"]
+            if "%" in hover_template:
+                # Extract percentage from the hover template
+                # Format is like: "$500K<br>Long Total: $500,000.00 (45.5%)<br>..."
+                percentage_str = hover_template.split("(")[1].split("%")[0]
                 percentages[name] = float(percentage_str)
 
         # Verify that percentages are calculated correctly even in extreme cases
         total = portfolio_summary.portfolio_estimate_value
-        assert percentages["Long Stocks"] == pytest.approx(
-            300000.0 / total * 100, abs=0.1
-        )
-        assert percentages["Long Options"] == pytest.approx(
-            200000.0 / total * 100, abs=0.1
-        )
-        assert percentages["Short Stocks"] == pytest.approx(
-            1000000.0 / total * 100, abs=0.1
-        )
-        assert percentages["Short Options"] == pytest.approx(
-            500000.0 / total * 100, abs=0.1
-        )
+        assert percentages["Long"] == pytest.approx(500000.0 / total * 100, abs=0.1)
+        assert percentages["Short"] == pytest.approx(-1500000.0 / total * 100, abs=0.1)
         assert percentages["Cash"] == pytest.approx(2000000.0 / total * 100, abs=0.1)
         assert percentages["Pending"] == pytest.approx(100000.0 / total * 100, abs=0.1)
 
         # Verify that the net percentage calculation is correct
-        long_percentage = percentages["Long Stocks"] + percentages["Long Options"]
-        short_percentage = percentages["Short Stocks"] + percentages["Short Options"]
+        # Since short percentages are now negative, we add them directly
+        long_percentage = percentages["Long"]
+        short_percentage = percentages["Short"]
         cash_percentage = percentages["Cash"]
         pending_percentage = percentages["Pending"]
 
         net_percentage = (
-            long_percentage - short_percentage + cash_percentage + pending_percentage
+            long_percentage + short_percentage + cash_percentage + pending_percentage
         )
         assert net_percentage == pytest.approx(100.0, abs=1.0)

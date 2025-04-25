@@ -8,7 +8,7 @@ formatting the values.
 import dash_bootstrap_components as dbc
 from dash import html
 
-from .. import utils
+from ..formatting import format_currency
 from ..logger import logger
 from ..portfolio import calculate_beta_adjusted_net_exposure
 
@@ -155,24 +155,24 @@ def format_summary_card_values(summary_data):
     try:
         return (
             # Portfolio Value
-            utils.format_currency(portfolio_estimate_value),
+            format_currency(portfolio_estimate_value),
             # Net Exposure
-            utils.format_currency(net_market_exposure),
+            format_currency(net_market_exposure),
             net_exposure_percent_str,
             # Beta-Adjusted Net Exposure
-            utils.format_currency(beta_adjusted_net_exposure),
+            format_currency(beta_adjusted_net_exposure),
             beta_adjusted_percent_str,
             # Long Exposure
-            utils.format_currency(long_total_exposure),
+            format_currency(long_total_exposure),
             long_exposure_percent_str,
             # Short Exposure
-            utils.format_currency(short_total_exposure),
+            format_currency(short_total_exposure),
             short_exposure_percent_str,
             # Options Exposure
-            utils.format_currency(options_total_exposure),
+            format_currency(options_total_exposure),
             options_exposure_percent_str,
             # Cash & Equivalents
-            utils.format_currency(cash_like_value),
+            format_currency(cash_like_value),
             cash_percent_str,
         )
     except Exception as e:

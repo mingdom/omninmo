@@ -7,13 +7,13 @@ suitable for visualization with Plotly charts.
 from typing import Any
 
 from .data_model import PortfolioGroup, PortfolioSummary
+from .formatting import format_compact_currency, format_currency
 from .logger import logger
 from .portfolio import calculate_beta_adjusted_net_exposure
 from .portfolio_value import (
     calculate_component_percentages,
     get_portfolio_component_values,
 )
-from .utils import format_currency
 
 
 class ChartColors:
@@ -21,19 +21,18 @@ class ChartColors:
 
     This class defines the color palette used across all charts in the application.
     Use these constants instead of hardcoded hex values to ensure consistency.
+
+    IMPORTANT: These colors are used across all charts and should be kept consistent.
+    When adding a new chart, always use these constants instead of defining new colors.
     """
 
-    # Position colors
-    LONG = "#1A5D38"  # Dark green for long positions
-    SHORT = "#2F3136"  # Dark gray for short positions
-    OPTIONS = "#9B59B6"  # Purple for options
-    NET = "#3498DB"  # Blue for net values
-
-    # Allocations chart colors
-    LONG_OPTIONS = "#4CAF50"  # Light green for long options
-    SHORT_OPTIONS = "#607D8B"  # Light gray for short options
-    CASH = "#9E9E9E"  # Medium gray for cash
-    PENDING = "#BDBDBD"  # Light gray for pending activity
+    # Core color palette - used across all charts
+    LONG = "#1E8449"  # Green for long positions
+    SHORT = "#2F3136"  # Dark gray/black for short positions
+    OPTIONS = "#8E44AD"  # Purple for options
+    NET = "#2980B9"  # Blue for net values
+    CASH = "#8E44AD"  # Same purple as OPTIONS
+    PENDING = "#2980B9"  # Same blue as NET
 
 
 # transform_for_asset_allocation function has been removed in favor of the more accurate Exposure Chart
@@ -238,7 +237,9 @@ def transform_for_treemap(
         exposure = ticker_exposures[ticker]
         labels.append(ticker)
         parents.append("Portfolio")
-        values.append(abs(exposure))  # Use absolute exposure for sizing
+        # Note: We still use abs() here for sizing because treemap requires positive values
+        # But we maintain the sign information in the text and color
+        values.append(abs(exposure))
         texts.append(f"{ticker}: {format_currency(exposure)}")
 
         # Color based on long/short - using ChartColors constants
@@ -295,19 +296,19 @@ def transform_for_treemap(
 def transform_for_allocations_chart(
     portfolio_summary: PortfolioSummary,
 ) -> dict[str, Any]:
-    """Transform portfolio summary data for the allocations stacked bar chart.
+    """Transform portfolio summary data for the allocations chart.
 
     This function takes a portfolio summary and transforms it into a format
-    suitable for a stacked bar chart showing portfolio allocations. The chart
+    suitable for a bar chart showing portfolio allocations. The chart
     has four main categories:
-    - Long: Stacked with Long Stocks and Long Options
-    - Short: Stacked with Short Stocks and Short Options (negative values)
+    - Long: Total long exposure (stocks + options combined)
+    - Short: Total short exposure (stocks + options combined)
     - Cash: Cash-like positions
     - Pending: Pending activity
 
     IMPORTANT: Short values are stored as negative numbers in the portfolio summary.
-    For display purposes in the chart, we use the absolute values but maintain
-    separate bars for long and short positions.
+    We maintain these negative values in the chart to show short positions below
+    the x-axis, providing a more intuitive visualization of long vs short positions.
 
     Args:
         portfolio_summary: The portfolio summary to transform
@@ -323,7 +324,7 @@ def transform_for_allocations_chart(
         return {
             "data": [],
             "layout": {
-                "height": 300,
+                "height": 400,
                 "annotations": [
                     {
                         "text": "No portfolio data available",
@@ -340,64 +341,64 @@ def transform_for_allocations_chart(
     # Calculate percentages
     percentages = calculate_component_percentages(values)
 
-    # Format values for display
-    long_stock_text = f"Long Stocks: {format_currency(values['long_stock'])} ({abs(percentages['long_stock']):.1f}%)"
-    short_stock_text = f"Short Stocks: {format_currency(abs(values['short_stock']))} ({abs(percentages['short_stock']):.1f}%)"
-    long_option_text = f"Long Options: {format_currency(values['long_option'])} ({abs(percentages['long_option']):.1f}%)"
-    short_option_text = f"Short Options: {format_currency(abs(values['short_option']))} ({abs(percentages['short_option']):.1f}%)"
-    cash_text = (
-        f"Cash: {format_currency(values['cash'])} ({abs(percentages['cash']):.1f}%)"
-    )
-    pending_text = f"Pending: {format_currency(values['pending'])} ({abs(percentages['pending']):.1f}%)"
+    # Calculate combined values
+    long_total = values["long_stock"] + values["long_option"]
+    short_total = values["short_stock"] + values["short_option"]
 
-    # Create the stacked bar chart data with separate traces for each category
+    # Format detailed breakdown for hover text
+    long_text = (
+        f"Long Total: {format_currency(long_total)} ({percentages['long_total']:.1f}%)<br>"
+        f"• Stocks: {format_currency(values['long_stock'])} ({percentages['long_stock']:.1f}%)<br>"
+        f"• Options: {format_currency(values['long_option'])} ({percentages['long_option']:.1f}%)"
+    )
+
+    short_text = (
+        f"Short Total: {format_currency(short_total)} ({percentages['short_total']:.1f}%)<br>"
+        f"• Stocks: {format_currency(values['short_stock'])} ({percentages['short_stock']:.1f}%)<br>"
+        f"• Options: {format_currency(values['short_option'])} ({percentages['short_option']:.1f}%)"
+    )
+
+    cash_text = f"Cash: {format_currency(values['cash'])} ({percentages['cash']:.1f}%)"
+    pending_text = (
+        f"Pending: {format_currency(values['pending'])} ({percentages['pending']:.1f}%)"
+    )
+
+    # Create compact text labels for display on bars
+    long_display_text = format_compact_currency(long_total)
+    short_display_text = format_compact_currency(short_total)
+    cash_display_text = format_compact_currency(values["cash"])
+    pending_display_text = format_compact_currency(values["pending"])
+
+    # Create the bar chart data with a single bar for each category
     chart_data = {
         "data": [
-            # Long position group
-            # Long Stocks (bottom of "Long" stack)
+            # Long position (single bar with combined value)
             {
-                "name": "Long Stocks",
+                "name": "Long",
                 "x": ["Long"],
-                "y": [values["long_stock"]],
+                "y": [long_total],
                 "type": "bar",
                 "marker": {"color": ChartColors.LONG},
-                "text": [long_stock_text],
+                "text": [long_display_text],  # Compact text for display
+                "textposition": "inside",  # Show text inside bars
+                "insidetextanchor": "middle",  # Center text
                 "hoverinfo": "text",
-                "hovertemplate": "%{text}<extra></extra>",
+                "hovertemplate": "%{text}<br>" + long_text + "<extra></extra>",
+                "textfont": {"color": "white", "size": 12},  # Ensure text is visible
             },
-            # Long Options (top of "Long" stack)
+            # Short position (single bar with combined value)
             {
-                "name": "Long Options",
-                "x": ["Long"],
-                "y": [values["long_option"]],
-                "type": "bar",
-                "marker": {"color": ChartColors.LONG_OPTIONS},
-                "text": [long_option_text],
-                "hoverinfo": "text",
-                "hovertemplate": "%{text}<extra></extra>",
-            },
-            # Short position group
-            # Short Stocks (bottom of "Short" stack)
-            {
-                "name": "Short Stocks",
+                "name": "Short",
                 "x": ["Short"],
-                "y": [abs(values["short_stock"])],  # Use absolute value for display
+                "y": [short_total],  # Already negative
                 "type": "bar",
                 "marker": {"color": ChartColors.SHORT},
-                "text": [short_stock_text],
+                "text": [short_display_text],  # Compact text for display
+                "textposition": "inside",  # Show text inside bars
+                "insidetextanchor": "middle",  # Center text
                 "hoverinfo": "text",
-                "hovertemplate": "%{text}<extra></extra>",
-            },
-            # Short Options (top of "Short" stack)
-            {
-                "name": "Short Options",
-                "x": ["Short"],
-                "y": [abs(values["short_option"])],  # Use absolute value for display
-                "type": "bar",
-                "marker": {"color": ChartColors.SHORT_OPTIONS},
-                "text": [short_option_text],
-                "hoverinfo": "text",
-                "hovertemplate": "%{text}<extra></extra>",
+                "hovertemplate": "%{text}<br>" + short_text + "<extra></extra>",
+                "textfont": {"color": "white", "size": 12},  # Ensure text is visible
             },
             # Cash (single bar)
             {
@@ -406,9 +407,12 @@ def transform_for_allocations_chart(
                 "y": [values["cash"]],
                 "type": "bar",
                 "marker": {"color": ChartColors.CASH},
-                "text": [cash_text],
+                "text": [cash_display_text],  # Compact text for display
+                "textposition": "inside",  # Show text inside bars
+                "insidetextanchor": "middle",  # Center text
                 "hoverinfo": "text",
-                "hovertemplate": "%{text}<extra></extra>",
+                "hovertemplate": "%{text}<br>" + cash_text + "<extra></extra>",
+                "textfont": {"color": "white", "size": 12},  # Ensure text is visible
             },
             # Pending (single bar)
             {
@@ -417,9 +421,12 @@ def transform_for_allocations_chart(
                 "y": [values["pending"]],
                 "type": "bar",
                 "marker": {"color": ChartColors.PENDING},
-                "text": [pending_text],
+                "text": [pending_display_text],  # Compact text for display
+                "textposition": "inside",  # Show text inside bars
+                "insidetextanchor": "middle",  # Center text
                 "hoverinfo": "text",
-                "hovertemplate": "%{text}<extra></extra>",
+                "hovertemplate": "%{text}<br>" + pending_text + "<extra></extra>",
+                "textfont": {"color": "white", "size": 12},  # Ensure text is visible
             },
         ],
         "layout": {
@@ -429,7 +436,7 @@ def transform_for_allocations_chart(
                 "x": 0.5,  # Center the title
                 "xanchor": "center",
             },
-            "barmode": "stack",
+            "barmode": "relative",  # Use relative mode instead of stack
             "margin": {"l": 60, "r": 60, "t": 50, "b": 40, "pad": 4},
             "autosize": True,  # Allow the chart to resize with its container
             "paper_bgcolor": "white",
@@ -437,44 +444,77 @@ def transform_for_allocations_chart(
             "font": {
                 "family": "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
             },
-            "showlegend": True,
-            "legend": {
-                "orientation": "h",
-                "xanchor": "center",
-                "x": 0.5,
-                "y": -0.15,
-            },
+            "showlegend": False,  # Hide legend since bar labels are clear
             "yaxis": {
                 "title": "Value ($)",
-                "tickformat": "$,.0f",
+                "type": "linear",
+                "tickformat": "$,.1s",  # Use compact format (K, M, B)
                 "gridcolor": "#E5E5E5",
+                "exponentformat": "none",  # Hide exponent notation
+                "showticklabels": True,
+                "nticks": 10,  # More tick marks for better readability
+                "showgrid": True,
+                "zeroline": True,
+                "zerolinecolor": "#000000",
+                "zerolinewidth": 2,
+                "automargin": True,  # Ensure labels don't get cut off
+                "ticklen": 5,  # Longer tick marks
+                "tickwidth": 1,  # Slightly thicker ticks
+                "tickcolor": "#777777",  # Darker tick color
             },
-            "yaxis2": {
-                "title": "Percentage (%)",
-                "overlaying": "y",
-                "side": "right",
-                "tickformat": ".1f%",
-                "range": [0, 100],  # Fixed range for percentage
-                "tickmode": "array",
-                "tickvals": [0, 25, 50, 75, 100],
-                "ticktext": ["0%", "25%", "50%", "75%", "100%"],
-                "gridcolor": "#E5E5E5",
-            },
-            "height": 300,
+            "height": 400,  # Increased height for better visualization
         },
     }
 
-    # Calculate the maximum y-value for setting the y-axis range
+    # Calculate the maximum and minimum y-values for setting the y-axis range
     max_value = max(
-        values["long_stock"] + values["long_option"],
-        abs(values["short_stock"]) + abs(values["short_option"]),
+        long_total,
         values["cash"],
         values["pending"],
         1,  # Ensure we have a non-zero range
     )
 
-    # Set the y-axis range with some padding
-    chart_data["layout"]["yaxis"]["range"] = [0, max_value * 1.1]
+    min_value = min(
+        short_total,
+        0,  # Ensure we include zero in the range
+    )
+
+    # Add padding for better visualization
+    top_padding = 0.1  # 10% padding on top
+    bottom_padding = 0.2  # 20% padding on bottom (more space for negative values)
+
+    # Determine the appropriate y-axis range based on the data
+    if abs(min_value) < 0.001:
+        # No significant short positions, focus on positive values only
+        chart_data["layout"]["yaxis"]["range"] = [
+            -max_value * 0.05,  # Small negative space for zero line visibility
+            max_value * (1 + top_padding),
+        ]
+    elif abs(min_value) < max_value * 0.1:
+        # Short positions are small (less than 10% of long)
+        # Use asymmetric scale with just enough room for short positions
+        chart_data["layout"]["yaxis"]["range"] = [
+            min_value * (1 + bottom_padding),
+            max_value * (1 + top_padding),
+        ]
+    elif abs(min_value) < max_value * 0.3:
+        # Short positions are moderate (10-30% of long)
+        # Use moderately asymmetric scale
+        chart_data["layout"]["yaxis"]["range"] = [
+            min_value * (1 + bottom_padding),
+            max_value * (1 + top_padding),
+        ]
+    else:
+        # Short positions are significant (>30% of long)
+        # Use a more balanced scale, but still optimized for the actual data
+        max_abs = max(abs(max_value), abs(min_value))
+        chart_data["layout"]["yaxis"]["range"] = [
+            -max_abs * (1 + bottom_padding) if min_value < 0 else -max_value * 0.05,
+            max_abs * (1 + top_padding),
+        ]
+
+    # Add more tick marks for better readability
+    chart_data["layout"]["yaxis"]["nticks"] = 12
 
     return chart_data
 

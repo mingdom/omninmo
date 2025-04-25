@@ -78,7 +78,7 @@ class TestAllocationsChart:
         )
 
     def test_allocations_stacked_bar_chart(self, mock_portfolio_summary):
-        """Test that allocations chart correctly creates a stacked bar chart with four main categories."""
+        """Test that allocations chart correctly creates a bar chart with four main categories."""
         # Given a portfolio summary with known values
         # When we transform it for the allocations chart
         chart_data = transform_for_allocations_chart(mock_portfolio_summary)
@@ -86,61 +86,60 @@ class TestAllocationsChart:
         # Then the chart should have the correct structure
         assert "data" in chart_data
         assert "layout" in chart_data
-        assert chart_data["layout"]["barmode"] == "stack"
+        assert chart_data["layout"]["barmode"] == "relative"  # Using relative mode now
 
-        # And it should have six traces (Long Stocks, Long Options, Short Stocks, Short Options, Cash, Pending)
+        # And it should have four traces (Long, Short, Cash, Pending)
         traces = chart_data["data"]
-        assert len(traces) == 6
+        assert len(traces) == 4
 
         # And the traces should be correctly named
         trace_names = [trace["name"] for trace in traces]
-        assert "Long Stocks" in trace_names
-        assert "Long Options" in trace_names
-        assert "Short Stocks" in trace_names
-        assert "Short Options" in trace_names
+        assert "Long" in trace_names
+        assert "Short" in trace_names
         assert "Cash" in trace_names
         assert "Pending" in trace_names
 
         # And the x values should place the traces in the correct categories
-        long_stocks_trace = next(t for t in traces if t["name"] == "Long Stocks")
-        long_options_trace = next(t for t in traces if t["name"] == "Long Options")
-        short_stocks_trace = next(t for t in traces if t["name"] == "Short Stocks")
-        short_options_trace = next(t for t in traces if t["name"] == "Short Options")
+        long_trace = next(t for t in traces if t["name"] == "Long")
+        short_trace = next(t for t in traces if t["name"] == "Short")
         cash_trace = next(t for t in traces if t["name"] == "Cash")
         pending_trace = next(t for t in traces if t["name"] == "Pending")
 
-        assert long_stocks_trace["x"] == ["Long"]
-        assert long_options_trace["x"] == ["Long"]
-        assert short_stocks_trace["x"] == ["Short"]
-        assert short_options_trace["x"] == ["Short"]
+        assert long_trace["x"] == ["Long"]
+        assert short_trace["x"] == ["Short"]
         assert cash_trace["x"] == ["Cash"]
         assert pending_trace["x"] == ["Pending"]
 
         # And the y values should match the expected values from the get_portfolio_component_values function
         component_values = get_portfolio_component_values(mock_portfolio_summary)
 
-        assert long_stocks_trace["y"][0] == component_values["long_stock"]
-        assert long_options_trace["y"][0] == component_values["long_option"]
-        assert short_stocks_trace["y"][0] == abs(
-            component_values["short_stock"]
-        )  # Use absolute value for display
-        assert short_options_trace["y"][0] == abs(
-            component_values["short_option"]
-        )  # Use absolute value for display
+        # Check combined values
+        long_total = component_values["long_stock"] + component_values["long_option"]
+        short_total = component_values["short_stock"] + component_values["short_option"]
+
+        assert long_trace["y"][0] == long_total
+        assert short_trace["y"][0] == short_total  # Should be negative
         assert cash_trace["y"][0] == mock_portfolio_summary.cash_like_value
         assert pending_trace["y"][0] == mock_portfolio_summary.pending_activity_value
 
-        # And the layout should have dual y-axes
+        # And the layout should have the correct y-axis
         assert "yaxis" in chart_data["layout"]
-        assert "yaxis2" in chart_data["layout"]
-        assert chart_data["layout"]["yaxis2"]["overlaying"] == "y"
-        assert chart_data["layout"]["yaxis2"]["side"] == "right"
 
-        # And the percentages should be calculated correctly
+        # Verify text is displayed on bars (compact format)
+        assert "$" in long_trace["text"][0]  # Should contain dollar sign
+        assert long_trace["textposition"] == "inside"  # Text should be inside bars
 
-        # Check that the y2 axis shows percentages
-        assert chart_data["layout"]["yaxis2"]["tickformat"] == ".1f%"
-        assert chart_data["layout"]["yaxis2"]["range"] == [0, 100]
+        assert "$" in short_trace["text"][0]  # Should contain dollar sign
+        assert short_trace["textposition"] == "inside"  # Text should be inside bars
+
+        # Verify hover template contains detailed breakdown information
+        assert "Long Total" in long_trace["hovertemplate"]
+        assert "Stocks" in long_trace["hovertemplate"]
+        assert "Options" in long_trace["hovertemplate"]
+
+        assert "Short Total" in short_trace["hovertemplate"]
+        assert "Stocks" in short_trace["hovertemplate"]
+        assert "Options" in short_trace["hovertemplate"]
 
     def test_allocations_chart_with_empty_portfolio(self):
         """Test that allocations chart handles empty portfolios correctly."""

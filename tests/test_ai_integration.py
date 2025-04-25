@@ -76,6 +76,8 @@ class TestAIIntegration:
             cash_like_positions=[],
             cash_like_value=0.0,
             cash_like_count=0,
+            portfolio_estimate_value=20000.0,  # Add portfolio value for testing
+            pending_activity_value=500.0,  # Add pending activity for testing
         )
 
         # Test prepare_portfolio_data_for_analysis
@@ -84,6 +86,7 @@ class TestAIIntegration:
         # Verify the structure of the prepared data
         assert "positions" in ai_data
         assert "summary" in ai_data
+        assert "allocations" in ai_data
         assert len(ai_data["positions"]) == 2  # Stock and option position
 
         # Verify stock position data
@@ -107,9 +110,32 @@ class TestAIIntegration:
 
         # Verify summary data
         assert ai_data["summary"]["net_market_exposure"] == 16500.0
-        assert ai_data["summary"]["portfolio_beta"] == 1.2
         assert "long_exposure" in ai_data["summary"]
         assert "short_exposure" in ai_data["summary"]
+        assert "portfolio_value" in ai_data["summary"]
+        assert ai_data["summary"]["portfolio_value"] == 20000.0
+        assert "cash_like_value" in ai_data["summary"]
+
+        # Verify allocation data
+        allocations = ai_data["allocations"]
+        assert "values" in allocations
+        assert "percentages" in allocations
+
+        # Verify values and percentages contain expected keys
+        values = allocations["values"]
+        percentages = allocations["percentages"]
+        expected_keys = [
+            "long_stock",
+            "short_stock",
+            "long_option",
+            "short_option",
+            "cash",
+            "pending",
+            "total",
+        ]
+        for key in expected_keys:
+            assert key in values
+            assert key in percentages
 
     def test_portfolio_data_conversion_for_chat(self):
         """Test that portfolio data can be properly converted between dict and object formats for the chat feature."""
@@ -174,6 +200,8 @@ class TestAIIntegration:
             cash_like_positions=[],
             cash_like_value=0.0,
             cash_like_count=0,
+            portfolio_estimate_value=20000.0,  # Add portfolio value for testing
+            pending_activity_value=500.0,  # Add pending activity for testing
         )
 
         # Convert to dictionary format as would be stored in Dash
@@ -189,10 +217,16 @@ class TestAIIntegration:
         # Test that PortfolioSummary.from_dict works with this data
         restored_summary = PortfolioSummary.from_dict(summary_data)
         assert restored_summary.net_market_exposure == 16500.0
-        assert restored_summary.portfolio_beta == 1.2
+        assert restored_summary.portfolio_estimate_value == 20000.0
 
         # Test prepare_portfolio_data_for_analysis with the restored objects
         ai_data = prepare_portfolio_data_for_analysis(restored_groups, restored_summary)
         assert "positions" in ai_data
         assert "summary" in ai_data
+        assert "allocations" in ai_data
         assert len(ai_data["positions"]) == 2  # Stock and option position
+
+        # Verify allocation data is present
+        allocations = ai_data["allocations"]
+        assert "values" in allocations
+        assert "percentages" in allocations
