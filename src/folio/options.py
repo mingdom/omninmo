@@ -130,16 +130,17 @@ class OptionContract:
         whether the position is long or short. This is used for calculating the size
         of the position, not its directional exposure.
 
-        This requires the underlying_price to be passed to functions that use this property.
+        This requires the underlying_price to be set on the option contract.
+        If not set, it will raise a ValueError to fail fast.
         """
         # We need the underlying price to calculate notional value
-        # This will be provided when calculating option exposure
-        # For now, we'll use strike as a fallback, but this should never be used directly
-        logger.warning(
-            "notional_value property accessed directly without underlying price"
-        )
-        # Use the canonical implementation with strike price as fallback
-        return calculate_notional_value(self.quantity, self.strike)
+        if not hasattr(self, "underlying_price") or self.underlying_price is None:
+            raise ValueError(
+                f"Cannot calculate notional value for {self.underlying} {self.option_type} "
+                f"{self.strike} without underlying_price. Set underlying_price first."
+            )
+        # Use the canonical implementation with the underlying price
+        return calculate_notional_value(self.quantity, self.underlying_price)
 
     @property
     def signed_notional_value(self) -> float:
@@ -640,6 +641,9 @@ def calculate_option_exposure(
         - 'beta_adjusted_exposure': The beta-adjusted exposure (delta_exposure * beta)
         - 'notional_value': The notional value (100 * abs(quantity) * underlying_price)
     """
+    # Set the underlying price on the option object to ensure notional_value property works
+    option.underlying_price = underlying_price
+
     # Apply volatility skew if no implied volatility is provided
     if implied_volatility is None:
         implied_volatility = estimate_volatility_with_skew(option, underlying_price)

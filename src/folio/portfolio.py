@@ -463,6 +463,8 @@ def process_portfolio_data(
         set()
     )  # Keep track of options already assigned to a group
 
+    # Import the canonical function for calculating net exposure
+
     # Process stock positions first to form the basis of groups
     for symbol, stock_info in stock_positions.items():
         try:
@@ -999,6 +1001,23 @@ def calculate_portfolio_summary(
     if cash_like_positions is None:
         cash_like_positions = []
 
+    # Recalculate net exposure for each group using the canonical function
+    logger.debug(
+        "Recalculating net exposure for all groups using the canonical function"
+    )
+    for group in groups:
+        # Store the original net exposure for logging
+        original_net_exposure = group.net_exposure
+
+        # Recalculate net exposure using the canonical function
+        group.recalculate_net_exposure()
+
+        # Log the change if there's a significant difference
+        if abs(original_net_exposure - group.net_exposure) > 0.01:
+            logger.debug(
+                f"Group {group.ticker}: Net exposure recalculated from {format_currency(original_net_exposure)} to {format_currency(group.net_exposure)}"
+            )
+
     try:
         # Process positions using modular functions
         long_stocks, short_stocks = process_stock_positions(groups)
@@ -1152,6 +1171,21 @@ def update_portfolio_prices(
                 option.market_value = option.price * option.quantity
                 # We don't update market_exposure for options as it's based on notional value
 
+    # Recalculate net exposure for each group using the canonical function
+    logger.debug("Recalculating net exposure for all groups after price updates")
+    for group in portfolio_groups:
+        # Store the original net exposure for logging
+        original_net_exposure = group.net_exposure
+
+        # Recalculate net exposure using the canonical function
+        group.recalculate_net_exposure()
+
+        # Log the change if there's a significant difference
+        if abs(original_net_exposure - group.net_exposure) > 0.01:
+            logger.debug(
+                f"Group {group.ticker}: Net exposure recalculated from {format_currency(original_net_exposure)} to {format_currency(group.net_exposure)}"
+            )
+
     # Return the current timestamp
     current_time = datetime.now(UTC).isoformat()
     logger.info(f"Prices updated at {current_time}")
@@ -1221,6 +1255,22 @@ def update_zero_price_positions(
                 logger.warning(f"Could not fetch price data for {ticker}")
         except Exception as e:
             logger.error(f"Error fetching price for {ticker}: {e!s}")
+
+    # Recalculate net exposure for each group using the canonical function
+    logger.debug("Recalculating net exposure for groups with updated prices")
+    for group in portfolio_groups:
+        if group.ticker in zero_price_tickers:
+            # Store the original net exposure for logging
+            original_net_exposure = group.net_exposure
+
+            # Recalculate net exposure using the canonical function
+            group.recalculate_net_exposure()
+
+            # Log the change if there's a significant difference
+            if abs(original_net_exposure - group.net_exposure) > 0.01:
+                logger.debug(
+                    f"Group {group.ticker}: Net exposure recalculated from {format_currency(original_net_exposure)} to {format_currency(group.net_exposure)}"
+                )
 
     return portfolio_groups
 
@@ -1505,23 +1555,20 @@ def recalculate_portfolio_with_prices(
         # For option positions, delta_exposure is delta * notional_value * sign(quantity)
         # where notional_value is calculated using the canonical implementation in options.py
 
-        net_exposure = (
-            recalculated_stock.market_exposure if recalculated_stock else 0
-        ) + sum(opt.delta_exposure for opt in recalculated_options)
+        # Use the canonical functions to calculate net exposure and beta-adjusted exposure
+        from .portfolio_value import (
+            calculate_beta_adjusted_exposure,
+            calculate_net_exposure,
+        )
+
+        net_exposure = calculate_net_exposure(recalculated_stock, recalculated_options)
+        beta_adjusted_exposure = calculate_beta_adjusted_exposure(
+            recalculated_stock, recalculated_options
+        )
 
         beta = (
             recalculated_stock.beta if recalculated_stock else 0
         )  # Use stock beta as base
-
-        # Calculate beta-adjusted exposure (sum of stock and option beta-adjusted exposures)
-        # Each component already has its beta-adjusted exposure calculated correctly
-        stock_beta_adjusted = (
-            recalculated_stock.beta_adjusted_exposure if recalculated_stock else 0
-        )
-        options_beta_adjusted = sum(
-            opt.beta_adjusted_exposure for opt in recalculated_options
-        )
-        beta_adjusted_exposure = stock_beta_adjusted + options_beta_adjusted
 
         total_delta_exposure = sum(opt.delta_exposure for opt in recalculated_options)
         options_delta_exposure = sum(opt.delta_exposure for opt in recalculated_options)

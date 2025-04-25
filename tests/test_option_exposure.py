@@ -127,6 +127,9 @@ def calculate_exposure(option, underlying_price, iv=0.3):
     Returns:
         The calculated exposure (delta * notional value)
     """
+    # Set the underlying price on the option object to ensure notional_value property works
+    option.underlying_price = underlying_price
+
     # Calculate delta using Black-Scholes
     delta = calculate_option_delta(option, underlying_price, implied_volatility=iv)
 

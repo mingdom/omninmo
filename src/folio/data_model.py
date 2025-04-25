@@ -651,6 +651,21 @@ class PortfolioGroup:
             1 for opt in self.option_positions if opt.option_type == "PUT"
         )
 
+    def recalculate_net_exposure(self) -> None:
+        """Recalculate net exposure using the canonical function."""
+        from .portfolio_value import (
+            calculate_beta_adjusted_exposure,
+            calculate_net_exposure,
+        )
+
+        self.net_exposure = calculate_net_exposure(
+            self.stock_position, self.option_positions
+        )
+
+        self.beta_adjusted_exposure = calculate_beta_adjusted_exposure(
+            self.stock_position, self.option_positions
+        )
+
     def to_dict(self) -> PortfolioGroupDict:
         """Convert to a Dash-compatible dictionary"""
         return {
@@ -1218,21 +1233,56 @@ def create_portfolio_group(
     # For option positions, delta_exposure is delta * notional_value * sign(quantity)
     # where notional_value is calculated using the canonical implementation in options.py
 
-    net_exposure = (stock_position.market_exposure if stock_position else 0) + sum(
-        opt.delta_exposure for opt in option_positions
+    # Add debug logging
+    from .logger import logger
+
+    # Log stock position details
+    if stock_position:
+        logger.debug(f"Stock position for {stock_data['ticker']}:")
+        logger.debug(f"  Quantity: {stock_position.quantity}")
+        logger.debug(f"  Price: {stock_position.price}")
+        logger.debug(f"  Market Exposure: {stock_position.market_exposure}")
+        logger.debug(
+            f"  Beta-Adjusted Exposure: {stock_position.beta_adjusted_exposure}"
+        )
+
+    # Log option position details
+    for i, opt in enumerate(option_positions):
+        logger.debug(f"Option position {i + 1} for {opt.ticker}:")
+        logger.debug(
+            f"  Type: {opt.option_type}, Strike: {opt.strike}, Expiry: {opt.expiry}"
+        )
+        logger.debug(f"  Quantity: {opt.quantity}")
+        logger.debug(f"  Delta: {opt.delta}")
+        logger.debug(f"  Delta Exposure: {opt.delta_exposure}")
+        logger.debug(f"  Beta-Adjusted Exposure: {opt.beta_adjusted_exposure}")
+        logger.debug(f"  Notional Value: {opt.notional_value}")
+
+    # Use the canonical functions to calculate net exposure and beta-adjusted exposure
+    from .portfolio_value import (
+        calculate_beta_adjusted_exposure,
+        calculate_net_exposure,
+    )
+
+    net_exposure = calculate_net_exposure(stock_position, option_positions)
+    beta_adjusted_exposure = calculate_beta_adjusted_exposure(
+        stock_position, option_positions
     )
 
     beta = stock_position.beta if stock_position else 0  # Use stock beta as base
 
-    # Calculate beta-adjusted exposure (sum of stock and option beta-adjusted exposures)
-    # Each component already has its beta-adjusted exposure calculated correctly
-    stock_beta_adjusted = stock_position.beta_adjusted_exposure if stock_position else 0
-    options_beta_adjusted = sum(opt.beta_adjusted_exposure for opt in option_positions)
-    beta_adjusted_exposure = stock_beta_adjusted + options_beta_adjusted
-
     total_delta_exposure = sum(opt.delta_exposure for opt in option_positions)
 
     options_delta_exposure = sum(opt.delta_exposure for opt in option_positions)
+
+    # Log group metrics
+    logger.debug(
+        f"Group metrics for {stock_data['ticker'] if stock_data else option_data[0]['ticker']}:"
+    )
+    logger.debug(f"  Net Exposure: {net_exposure}")
+    logger.debug(f"  Beta-Adjusted Exposure: {beta_adjusted_exposure}")
+    logger.debug(f"  Total Delta Exposure: {total_delta_exposure}")
+    logger.debug(f"  Options Delta Exposure: {options_delta_exposure}")
 
     return PortfolioGroup(
         ticker=stock_data["ticker"] if stock_data else option_data[0]["ticker"],
