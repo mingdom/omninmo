@@ -309,7 +309,14 @@ class OptionPosition(Position):
             temp_contract, new_underlying_price, risk_free_rate, implied_volatility
         )
 
-        # Calculate new exposures
+        # Calculate new notional value using the canonical implementation
+        from .options import calculate_notional_value
+
+        new_notional_value = calculate_notional_value(
+            self.quantity, new_underlying_price
+        )
+
+        # Calculate new exposures using the canonical implementation
         exposures = calculate_option_exposure(
             temp_contract,
             new_underlying_price,
@@ -330,7 +337,7 @@ class OptionPosition(Position):
             option_type=self.option_type,
             delta=exposures["delta"],
             delta_exposure=exposures["delta_exposure"],
-            notional_value=self.notional_value,
+            notional_value=new_notional_value,  # Use the new notional value
             underlying_beta=self.underlying_beta,
             market_exposure=exposures["delta_exposure"],
             price=new_price,
@@ -479,6 +486,9 @@ class StockPosition:
         """
         # Calculate new market exposure and beta-adjusted exposure
         new_market_exposure = self.quantity * new_price
+
+        # Calculate beta-adjusted exposure consistently
+        # For stocks, beta-adjusted exposure is simply market_exposure * beta
         new_beta_adjusted_exposure = new_market_exposure * self.beta
 
         # Create a new instance with updated values
@@ -1204,15 +1214,21 @@ def create_portfolio_group(
             )
 
     # Calculate group metrics
+    # For stock positions, market_exposure is quantity * price
+    # For option positions, delta_exposure is delta * notional_value * sign(quantity)
+    # where notional_value is calculated using the canonical implementation in options.py
+
     net_exposure = (stock_position.market_exposure if stock_position else 0) + sum(
         opt.delta_exposure for opt in option_positions
     )
 
     beta = stock_position.beta if stock_position else 0  # Use stock beta as base
 
-    beta_adjusted_exposure = (
-        stock_position.beta_adjusted_exposure if stock_position else 0
-    ) + sum(opt.beta_adjusted_exposure for opt in option_positions)
+    # Calculate beta-adjusted exposure (sum of stock and option beta-adjusted exposures)
+    # Each component already has its beta-adjusted exposure calculated correctly
+    stock_beta_adjusted = stock_position.beta_adjusted_exposure if stock_position else 0
+    options_beta_adjusted = sum(opt.beta_adjusted_exposure for opt in option_positions)
+    beta_adjusted_exposure = stock_beta_adjusted + options_beta_adjusted
 
     total_delta_exposure = sum(opt.delta_exposure for opt in option_positions)
 

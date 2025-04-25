@@ -73,6 +73,8 @@ def process_option_positions(groups: list[PortfolioGroup]) -> tuple[dict, dict]:
         - 'beta_adjusted': Beta-adjusted value
         - 'delta_exposure': Delta exposure
     """
+    # Import the canonical notional value calculation function
+
     long_options = {"value": 0.0, "beta_adjusted": 0.0, "delta_exposure": 0.0}
     short_options = {
         "value": 0.0,

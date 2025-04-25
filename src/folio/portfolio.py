@@ -49,6 +49,7 @@ data_fetcher = get_data_fetcher(config=config)
 
 def process_portfolio_data(
     df: pd.DataFrame,
+    update_prices: bool = True,
 ) -> tuple[list[PortfolioGroup], PortfolioSummary, list[dict]]:
     """Process portfolio data from a DataFrame into structured groups and summary.
 
@@ -316,8 +317,24 @@ def process_portfolio_data(
                         f"Row {index}: Cash-like position {symbol} missing price. Using defaults."
                     )
                 else:
-                    logger.debug(f"Row {index}: {symbol} has missing price. Skipping.")
-                    continue
+                    # Try to fetch the current price for non-cash positions with missing price
+                    try:
+                        df = data_fetcher.fetch_data(symbol, period="1d")
+                        if not df.empty:
+                            price = df.iloc[-1]["Close"]
+                            logger.info(
+                                f"Row {index}: Updated price for {symbol}: {price}"
+                            )
+                        else:
+                            logger.warning(
+                                f"Row {index}: Could not fetch price for {symbol}. Skipping."
+                            )
+                            continue
+                    except Exception as e:
+                        logger.warning(
+                            f"Row {index}: Error fetching price for {symbol}: {e}. Skipping."
+                        )
+                        continue
             else:
                 price = clean_currency_value(row["Last Price"])
                 if price < 0:
@@ -326,9 +343,25 @@ def process_portfolio_data(
                     )
                     continue
                 elif price == 0:
-                    logger.debug(
-                        f"Row {index}: {symbol} has zero price. Calculations may be affected."
-                    )
+                    # Try to fetch the current price if the price is zero
+                    try:
+                        logger.debug(
+                            f"Row {index}: {symbol} has zero price. Attempting to fetch current price."
+                        )
+                        df = data_fetcher.fetch_data(symbol, period="1d")
+                        if not df.empty:
+                            price = df.iloc[-1]["Close"]
+                            logger.info(
+                                f"Row {index}: Updated price for {symbol}: {price}"
+                            )
+                        else:
+                            logger.warning(
+                                f"Row {index}: Could not fetch price for {symbol}. Calculations may be affected."
+                            )
+                    except Exception as e:
+                        logger.warning(
+                            f"Row {index}: Error fetching price for {symbol}: {e}. Calculations may be affected."
+                        )
 
             # Calculate position value
             cleaned_current_value = clean_currency_value(row["Current Value"])
@@ -854,6 +887,11 @@ def process_portfolio_data(
             )
             return [], empty_summary, []
 
+    # Update prices if requested
+    if update_prices:
+        logger.debug("Updating prices in portfolio groups...")
+        groups = update_all_prices(groups)
+
     # Calculate portfolio summary using the final list of groups
     logger.debug("Calculating final portfolio summary...")
     try:
@@ -1120,6 +1158,138 @@ def update_portfolio_prices(
     return current_time
 
 
+def update_zero_price_positions(
+    portfolio_groups: list[PortfolioGroup], data_fetcher=None
+) -> list[PortfolioGroup]:
+    """Update positions with zero prices by fetching current market prices.
+
+    Args:
+        portfolio_groups: List of portfolio groups to update
+        data_fetcher: Optional data fetcher to use for price updates
+
+    Returns:
+        Updated list of portfolio groups
+    """
+    logger.debug("Updating positions with zero prices...")
+
+    # Use the default data fetcher if none is provided
+    if data_fetcher is None:
+        data_fetcher = get_data_fetcher()
+
+    # Find positions with zero prices
+    zero_price_tickers = []
+    for group in portfolio_groups:
+        if group.stock_position and group.stock_position.price == 0:
+            zero_price_tickers.append(group.ticker)
+
+    if not zero_price_tickers:
+        logger.debug("No positions with zero prices found.")
+        return portfolio_groups
+
+    logger.info(
+        f"Found {len(zero_price_tickers)} positions with zero prices: {', '.join(zero_price_tickers)}"
+    )
+
+    # Fetch prices for tickers with zero prices
+    for ticker in zero_price_tickers:
+        try:
+            # Fetch data for the last day
+            df = data_fetcher.fetch_data(ticker, period="1d")
+            if not df.empty:
+                # Get the latest close price
+                new_price = df.iloc[-1]["Close"]
+                logger.info(f"Fetched price for {ticker}: {new_price}")
+
+                # Update the price in all matching groups
+                for group in portfolio_groups:
+                    if group.ticker == ticker and group.stock_position:
+                        # Update the stock position
+                        group.stock_position.price = new_price
+                        group.stock_position.market_exposure = (
+                            new_price * group.stock_position.quantity
+                        )
+                        group.stock_position.market_value = (
+                            new_price * group.stock_position.quantity
+                        )
+                        group.stock_position.beta_adjusted_exposure = (
+                            group.stock_position.market_exposure
+                            * group.stock_position.beta
+                        )
+
+                        logger.info(f"Updated price for {ticker} to {new_price}")
+            else:
+                logger.warning(f"Could not fetch price data for {ticker}")
+        except Exception as e:
+            logger.error(f"Error fetching price for {ticker}: {e!s}")
+
+    return portfolio_groups
+
+
+def update_all_prices(
+    portfolio_groups: list[PortfolioGroup], data_fetcher=None
+) -> list[PortfolioGroup]:
+    """Update prices for all positions by fetching current market prices.
+
+    Args:
+        portfolio_groups: List of portfolio groups to update
+        data_fetcher: Optional data fetcher to use for price updates
+
+    Returns:
+        Updated list of portfolio groups
+    """
+    logger.debug("Updating prices for all positions...")
+
+    # Use the default data fetcher if none is provided
+    if data_fetcher is None:
+        data_fetcher = get_data_fetcher()
+
+    # Get all tickers that need price updates
+    tickers_to_update = []
+    for group in portfolio_groups:
+        if group.stock_position:
+            tickers_to_update.append(group.ticker)
+
+    if not tickers_to_update:
+        logger.debug("No positions to update prices for.")
+        return portfolio_groups
+
+    logger.info(f"Updating prices for {len(tickers_to_update)} positions")
+
+    # Fetch prices for all tickers
+    for ticker in tickers_to_update:
+        try:
+            # Fetch data for the last day
+            df = data_fetcher.fetch_data(ticker, period="1d")
+            if not df.empty:
+                # Get the latest close price
+                new_price = df.iloc[-1]["Close"]
+                logger.debug(f"Fetched price for {ticker}: {new_price}")
+
+                # Update the price in all matching groups
+                for group in portfolio_groups:
+                    if group.ticker == ticker and group.stock_position:
+                        # Update the stock position
+                        group.stock_position.price = new_price
+                        group.stock_position.market_exposure = (
+                            new_price * group.stock_position.quantity
+                        )
+                        group.stock_position.market_value = (
+                            new_price * group.stock_position.quantity
+                        )
+                        group.stock_position.beta_adjusted_exposure = (
+                            group.stock_position.market_exposure
+                            * group.stock_position.beta
+                        )
+
+                        logger.debug(f"Updated price for {ticker} to {new_price}")
+            else:
+                logger.warning(f"Could not fetch price data for {ticker}")
+        except Exception as e:
+            logger.error(f"Error fetching price for {ticker}: {e!s}")
+
+    return portfolio_groups
+
+
 def update_portfolio_summary_with_prices(
     portfolio_groups: list[PortfolioGroup], summary: PortfolioSummary, data_fetcher=None
 ) -> PortfolioSummary:
@@ -1331,6 +1501,10 @@ def recalculate_portfolio_with_prices(
             recalculated_options.append(recalculated_option)
 
         # Calculate group metrics
+        # For stock positions, market_exposure is quantity * price
+        # For option positions, delta_exposure is delta * notional_value * sign(quantity)
+        # where notional_value is calculated using the canonical implementation in options.py
+
         net_exposure = (
             recalculated_stock.market_exposure if recalculated_stock else 0
         ) + sum(opt.delta_exposure for opt in recalculated_options)
@@ -1339,9 +1513,15 @@ def recalculate_portfolio_with_prices(
             recalculated_stock.beta if recalculated_stock else 0
         )  # Use stock beta as base
 
-        beta_adjusted_exposure = (
+        # Calculate beta-adjusted exposure (sum of stock and option beta-adjusted exposures)
+        # Each component already has its beta-adjusted exposure calculated correctly
+        stock_beta_adjusted = (
             recalculated_stock.beta_adjusted_exposure if recalculated_stock else 0
-        ) + sum(opt.beta_adjusted_exposure for opt in recalculated_options)
+        )
+        options_beta_adjusted = sum(
+            opt.beta_adjusted_exposure for opt in recalculated_options
+        )
+        beta_adjusted_exposure = stock_beta_adjusted + options_beta_adjusted
 
         total_delta_exposure = sum(opt.delta_exposure for opt in recalculated_options)
         options_delta_exposure = sum(opt.delta_exposure for opt in recalculated_options)

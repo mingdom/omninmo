@@ -2,6 +2,10 @@
 Options calculation module.
 Uses QuantLib for option pricing and Greeks calculations.
 Uses American-style options for US stocks.
+
+This module contains the canonical implementations of option-related calculations,
+including notional value, delta, and price calculations. All other parts of the
+codebase should use these functions rather than implementing their own calculations.
 """
 
 import datetime
@@ -31,6 +35,56 @@ from dataclasses import dataclass
 
 # Configure module logger
 logger = logging.getLogger(__name__)
+
+
+def calculate_notional_value(quantity: float, underlying_price: float) -> float:
+    """Calculate the notional value of an option position.
+
+    This is the canonical implementation that should be used throughout the codebase.
+    Notional value represents the total value controlled by the option contracts.
+
+    Args:
+        quantity: Number of contracts (can be negative for short positions)
+        underlying_price: Price of the underlying asset
+
+    Returns:
+        The absolute notional value (always positive)
+    """
+    return 100 * abs(quantity) * underlying_price
+
+
+def calculate_beta_adjusted_option_exposure(
+    delta: float, notional_value: float, beta: float
+) -> float:
+    """Calculate the beta-adjusted exposure for an option position.
+
+    This is the canonical implementation that should be used throughout the codebase.
+    Beta-adjusted exposure represents the market risk of the option position.
+
+    Args:
+        delta: Option delta (between -1.0 and 1.0)
+        notional_value: Notional value of the option position (always positive)
+        beta: Beta of the underlying asset
+
+    Returns:
+        The beta-adjusted exposure (can be positive or negative)
+    """
+    return delta * notional_value * beta
+
+
+def calculate_signed_notional_value(quantity: float, underlying_price: float) -> float:
+    """Calculate the signed notional value of an option position.
+
+    This returns a signed value (positive for long, negative for short).
+
+    Args:
+        quantity: Number of contracts (can be negative for short positions)
+        underlying_price: Price of the underlying asset
+
+    Returns:
+        The signed notional value (positive for long, negative for short)
+    """
+    return 100 * quantity * underlying_price
 
 
 @dataclass
@@ -70,14 +124,22 @@ class OptionContract:
 
     @property
     def notional_value(self) -> float:
-        """Calculate notional value (strike * 100 * abs(quantity)).
+        """Calculate notional value (underlying_price * 100 * abs(quantity)).
 
         Note: This returns the absolute notional value (always positive) regardless of
         whether the position is long or short. This is used for calculating the size
         of the position, not its directional exposure.
+
+        This requires the underlying_price to be passed to functions that use this property.
         """
-        # Contract size is typically 100 shares per option contract
-        return self.strike * 100 * abs(self.quantity)
+        # We need the underlying price to calculate notional value
+        # This will be provided when calculating option exposure
+        # For now, we'll use strike as a fallback, but this should never be used directly
+        logger.warning(
+            "notional_value property accessed directly without underlying price"
+        )
+        # Use the canonical implementation with strike price as fallback
+        return calculate_notional_value(self.quantity, self.strike)
 
     @property
     def signed_notional_value(self) -> float:
@@ -86,9 +148,12 @@ class OptionContract:
         Note: This returns a signed notional value that is positive for long positions
         and negative for short positions. This is useful for calculating directional
         exposure directly.
+
+        This property still uses strike price for backward compatibility.
+        For exposure calculations, use the underlying price directly.
         """
-        # Contract size is typically 100 shares per option contract
-        return self.strike * 100 * self.quantity
+        # Use the canonical implementation with strike price as fallback
+        return calculate_signed_notional_value(self.quantity, self.strike)
 
     @property
     def market_value(self) -> float:
@@ -573,7 +638,12 @@ def calculate_option_exposure(
         - 'delta': The option's delta
         - 'delta_exposure': The delta-adjusted exposure (delta * notional_value)
         - 'beta_adjusted_exposure': The beta-adjusted exposure (delta_exposure * beta)
+        - 'notional_value': The notional value (100 * abs(quantity) * underlying_price)
     """
+    # Apply volatility skew if no implied volatility is provided
+    if implied_volatility is None:
+        implied_volatility = estimate_volatility_with_skew(option, underlying_price)
+
     # Calculate delta using QuantLib
     delta = calculate_option_delta(
         option,
@@ -582,16 +652,22 @@ def calculate_option_exposure(
         implied_volatility=implied_volatility,
     )
 
-    # Calculate delta exposure
-    delta_exposure = delta * option.notional_value
+    # Calculate notional value using the canonical implementation
+    notional_value = calculate_notional_value(option.quantity, underlying_price)
 
-    # Calculate beta-adjusted exposure
-    beta_adjusted_exposure = delta_exposure * beta
+    # Calculate delta exposure
+    delta_exposure = delta * notional_value
+
+    # Calculate beta-adjusted exposure using the canonical implementation
+    beta_adjusted_exposure = calculate_beta_adjusted_option_exposure(
+        delta, notional_value, beta
+    )
 
     return {
         "delta": delta,
         "delta_exposure": delta_exposure,
         "beta_adjusted_exposure": beta_adjusted_exposure,
+        "notional_value": notional_value,  # Include notional value in the return value
     }
 
 
@@ -735,7 +811,9 @@ def process_options(
             # Calculate exposures
             exposures = calculate_option_exposure(parsed_option, underlying_price, beta)
 
-            # Combine original data with calculated metrics
+            # Use the notional value calculated in calculate_option_exposure
+            # This ensures consistency in the calculations
+
             processed_opt = {
                 "ticker": underlying,
                 "option_symbol": opt_data.get("symbol", ""),
@@ -752,7 +830,7 @@ def process_options(
                 "delta": exposures["delta"],
                 "delta_exposure": exposures["delta_exposure"],
                 "beta_adjusted_exposure": exposures["beta_adjusted_exposure"],
-                "notional_value": parsed_option.notional_value,
+                "notional_value": exposures["notional_value"],
             }
 
             processed_options.append(processed_opt)

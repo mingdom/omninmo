@@ -595,11 +595,14 @@ def create_app(portfolio_file: str | None = None, _debug: bool = False) -> dash.
                     None,
                 )
 
-            # Process portfolio data
-            groups, summary, cash_like_positions = portfolio.process_portfolio_data(df)
+            # Process portfolio data with automatic price updates
+            groups, summary, cash_like_positions = portfolio.process_portfolio_data(
+                df, update_prices=True
+            )
             logger.debug(
                 f"Successfully processed {len(groups)} portfolio groups and {len(cash_like_positions)} cash-like positions"
             )
+            # Continue with the original summary if price update fails
 
             # Convert to Dash-compatible format
             groups_data = [g.to_dict() for g in groups]
