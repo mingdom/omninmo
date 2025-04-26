@@ -79,3 +79,6 @@ src/lab/portfolio.csv
 # Personal notes file
 .executive.md
 private-data/*
+
+# Documentation folder (temporary exclusion)
+docs/
