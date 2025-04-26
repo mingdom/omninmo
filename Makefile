@@ -25,6 +25,11 @@ help:
 	@echo "                        log=LEVEL (set logging level: DEBUG, INFO, WARNING, ERROR)"
 	@echo "  portfolio   - Start the portfolio dashboard with sample portfolio and debug mode"
 	@echo "               Options: log=LEVEL (set logging level: DEBUG, INFO, WARNING, ERROR)"
+	@echo "  simulator   - Run the SPY simulator to analyze portfolio behavior under different market conditions"
+	@echo "               Options: range=VALUE (SPY change range, default: 20.0)"
+	@echo "                        steps=VALUE (number of steps, default: 41)"
+	@echo "                        focus=TICKER (focus on specific ticker(s), comma-separated)"
+	@echo "                        detailed=1 (show detailed analysis for all positions)"
 	@echo "  clean       - Clean up generated files and caches"
 	@echo "               Options: --cache (also clear data cache)"
 	@echo "  lint        - Run type checker and linter"
@@ -133,7 +138,7 @@ lint:
 --fix:
 
 # Lab Projects
-.PHONY: portfolio folio stop-folio port
+.PHONY: portfolio folio stop-folio port simulator
 
 # Docker targets
 .PHONY: docker-build docker-run docker-up docker-down docker-logs docker-compose-up docker-compose-down docker-test deploy-hf
@@ -180,6 +185,15 @@ stop-folio:
 	else \
 		echo "No running folio processes found."; \
 	fi
+
+simulator:
+	@echo "Running SPY simulator..."
+	@if [ ! -d "$(VENV_DIR)" ]; then \
+		echo "Virtual environment not found. Please run 'make env' first."; \
+		exit 1; \
+	fi
+	@source $(VENV_DIR)/bin/activate && \
+	PYTHONPATH=. ./scripts/folio-simulator.py $(if $(range),--range $(range),) $(if $(steps),--steps $(steps),) $(if $(focus),--focus $(focus),) $(if $(detailed),--detailed,)
 
 # Test targets
 .PHONY: test test-e2e

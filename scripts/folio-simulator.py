@@ -1,53 +1,74 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
+# pylint: disable=print-statement,print-used
+# ruff: noqa: E402, F401
 """
-Test script for the Portfolio SPY Simulator.
+Portfolio SPY Simulator
 
-This script loads a portfolio from a CSV file, updates any zero prices,
-and then simulates how the portfolio value changes as SPY moves up or down.
-It provides detailed analysis of portfolio behavior across different market scenarios,
-including position-level contributions and beta calculations.
+This script simulates how a portfolio would respond to changes in SPY (S&P 500 ETF).
+It provides detailed analysis of the portfolio's behavior under different SPY price
+scenarios, helping investors understand their market exposure and risk profile.
+
+The script uses the Rich library to create beautiful, interactive terminal output
+with colorful tables and charts for better data visualization.
+
+Configuration:
+    The default parameters can be adjusted by modifying the constants at the top of this file.
+    - DEFAULT_SPY_RANGE: The default range of SPY changes to simulate (e.g., 20.0 for ±20%)
+    - DEFAULT_STEPS: The default number of steps in the simulation
+    - CHART_WIDTH: Width of the chart visualization
+    - CHART_HEIGHT: Height of the chart visualization
+    - PORTFOLIO_PATH: Path to the portfolio CSV file
 
 Usage:
-    python scripts/test_spy_simulator.py [options]
+    # Recommended: Use the make target (activates virtual environment automatically)
+    make simulator [range=5] [steps=11] [focus=SPY,QQQ] [detailed=1]
+
+    # Alternative: Activate virtual environment first, then run the script
+    source venv/bin/activate
+    python scripts/folio-simulator.py [options]
+
+    # Show help
+    python scripts/folio-simulator.py --help
 
 Options:
-    --focus TICKERS    Comma-separated list of tickers to focus on (e.g., "AAPL,MSFT,GOOGL")
-    --range RANGE      SPY change range in percent (default: 20.0)
-    --steps STEPS      Number of steps in the simulation (default: 41)
-    --detailed         Show detailed analysis for all positions with inverse correlation
+    --focus TICKERS    Comma-separated list of tickers to focus on (e.g., "SPY,QQQ,AAPL")
+    --range PERCENT    SPY change range in percent (default: 20.0)
+    --steps N          Number of steps in the simulation (default: 13)
+    --detailed         Show detailed analysis for all positions
 
 Examples:
-    # Run with default settings (±20% SPY range with 41 steps - 1% increments)
-    python scripts/test_spy_simulator.py
+    # Run with default settings (±20% SPY range with 13 steps)
+    make simulator
 
-    # Run with a narrower range of ±10% SPY with 21 steps (1% increments)
-    python scripts/test_spy_simulator.py --range 10 --steps 21
+    # Run with a narrower range of ±5% SPY with 11 steps (1% increments)
+    make simulator range=5 steps=11
 
     # Focus on a specific ticker with default range
-    python scripts/test_spy_simulator.py --focus AMZN
+    make simulator focus=SPY
 
     # Focus on multiple tickers with a custom range
-    python scripts/test_spy_simulator.py --focus AAPL,MSFT,GOOGL --range 15 --steps 31
+    make simulator focus=SPY,QQQ,AAPL range=15 steps=31
 
-    # Show detailed analysis for all positions that have inverse correlation with SPY
-    python scripts/test_spy_simulator.py --detailed
+    # Show detailed analysis for all positions
+    make simulator detailed=1
 
 Output:
     The script provides several sections of output:
 
-    1. Portfolio values at different SPY changes - A table showing portfolio values,
+    1. Portfolio Summary - A table showing current, minimum, and maximum portfolio values.
+
+    2. Portfolio Values Table - A detailed table showing portfolio values,
        absolute changes, and percentage changes at each SPY change point.
 
-    2. Portfolio Value Visualization - A simple text-based chart showing how the
+    3. Portfolio Value Chart - A visual chart showing how the
        portfolio value changes across the SPY range.
 
-    3. Portfolio Summary Analysis - Key metrics including current value, minimum and
-       maximum values, and corresponding changes.
+    4. Portfolio Value Summary - Key metrics including worst and best case scenarios.
 
-    4. Position-level Analysis - Tables showing the largest contributors to downside
-       and upside moves, including expected changes based on beta.
+    5. Correlation Analysis - Tables showing positions with negative correlation to SPY
+       (lose value when SPY goes up) and inverse correlation (gain value when SPY goes down).
 
-    5. Portfolio Beta Analysis - The portfolio's beta for up and down moves, average
+    6. Portfolio Beta Analysis - The portfolio's beta for up and down moves, average
        beta, and a note about non-linear behavior if applicable.
 
 Notes:
@@ -62,8 +83,48 @@ import os
 import sys
 from pathlib import Path
 
+
+# Check if running in the correct environment
+# pylint: disable=import-outside-toplevel,unused-import
+def check_environment():
+    """Check if the script is running in the correct environment with all dependencies."""
+    try:
+        # Try to import pandas to check if dependencies are installed
+        import pandas
+
+        return True
+    except ImportError:
+        # If pandas is not found, provide helpful error message
+        # pylint: disable=multiple-statements
+        return False
+
+
+# Exit if not in the correct environment
+if not check_environment():
+    sys.exit(1)
+
 # Add the src directory to the Python path
 sys.path.append(str(Path(__file__).parent.parent))
+
+# pylint: disable=wrong-import-position
+import pandas as pd
+from rich import box
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
+
+from src.folio.formatting import format_currency
+from src.folio.portfolio import process_portfolio_data
+from src.folio.simulator import simulate_portfolio_with_spy_changes
+
+console = Console()
+
+# Configurable constants
+DEFAULT_SPY_RANGE = 20.0  # Default range of SPY changes to simulate (±20%)
+DEFAULT_STEPS = 13  # Default number of steps (gives 1% increments for default range)
+CHART_WIDTH = 50  # Width of the ASCII chart visualization
+CHART_HEIGHT = 10  # Height of the ASCII chart visualization
+PORTFOLIO_PATH = "private-data/portfolio-private.csv"  # Path to the portfolio CSV file
 
 # Configure logging
 logging.basicConfig(
@@ -77,12 +138,6 @@ logging.basicConfig(
 # Set specific loggers to INFO to reduce noise
 logging.getLogger("matplotlib").setLevel(logging.INFO)
 logging.getLogger("PIL").setLevel(logging.INFO)
-
-import pandas as pd
-
-from src.folio.formatting import format_currency
-from src.folio.portfolio import process_portfolio_data
-from src.folio.simulator import simulate_portfolio_with_spy_changes
 
 
 def debug_simulate_portfolio(
@@ -325,29 +380,62 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(
-        description="Test the SPY simulator with detailed analysis"
+        description="Portfolio SPY Simulator - Analyze portfolio behavior under different SPY price scenarios",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Run with default settings (±20% SPY range with 13 steps)
+  python scripts/folio-simulator.py
+
+  # Run with a narrower range of ±5% SPY with 11 steps (1% increments)
+  python scripts/folio-simulator.py --range 5 --steps 11
+
+  # Focus on a specific ticker with default range
+  python scripts/folio-simulator.py --focus SPY
+
+  # Focus on multiple tickers with a custom range
+  python scripts/folio-simulator.py --focus SPY,QQQ,AAPL --range 15 --steps 31
+
+  # Show detailed analysis for all positions
+  python scripts/folio-simulator.py --detailed
+        """,
     )
-    parser.add_argument(
-        "--focus", type=str, help="Comma-separated list of tickers to focus on"
+
+    # Add a group for simulation parameters
+    sim_group = parser.add_argument_group("Simulation Parameters")
+    sim_group.add_argument(
+        "--range",
+        type=float,
+        default=DEFAULT_SPY_RANGE,
+        help=f"SPY change range in percent (default: ±{DEFAULT_SPY_RANGE}%%)",
+        metavar="PERCENT",
     )
-    parser.add_argument(
-        "--range", type=float, default=20.0, help="SPY change range (default: 20.0)"
-    )
-    parser.add_argument(
+    sim_group.add_argument(
         "--steps",
         type=int,
-        default=41,
-        help="Number of steps in the simulation (default: 41 - gives 1% increments for default range)",
+        default=DEFAULT_STEPS,
+        help=f"Number of steps in the simulation (default: {DEFAULT_STEPS}, which gives {DEFAULT_SPY_RANGE / (DEFAULT_STEPS - 1) * 2:.1f}%% increments for default range)",
+        metavar="N",
     )
-    parser.add_argument(
+
+    # Add a group for filtering and display options
+    filter_group = parser.add_argument_group("Filtering and Display Options")
+    filter_group.add_argument(
+        "--focus",
+        type=str,
+        help="Comma-separated list of tickers to focus on (e.g., 'SPY,QQQ,AAPL')",
+        metavar="TICKERS",
+    )
+    filter_group.add_argument(
         "--detailed",
         action="store_true",
         help="Show detailed analysis for all positions",
     )
+
     args = parser.parse_args()
 
     # Path to the portfolio CSV file
-    csv_path = Path(os.getcwd()) / "private-data" / "portfolio-private.csv"
+    csv_path = Path(os.getcwd()) / PORTFOLIO_PATH
 
     if not csv_path.exists():
         sys.exit(1)
@@ -395,78 +483,157 @@ def main():
         )
 
         # Print the results
-
         # Get the current value (at 0% SPY change)
         current_value = results["current_value"]
 
-        # Print each data point
-        print("\nPortfolio values at different SPY changes:")
-        print(
-            f"{'SPY Change':>12} | {'Portfolio Value':>18} | {'Change':>12} | {'% Change':>10}"
-        )
-        print("-" * 60)
-        for i, spy_change in enumerate(results["spy_changes"]):
-            portfolio_value = results["portfolio_values"][i]
-            value_change = portfolio_value - current_value
-            pct_change = (
-                (value_change / current_value) * 100 if current_value != 0 else 0
+        # Get min and max values
+        min_value = min(results["portfolio_values"])
+        max_value = max(results["portfolio_values"])
+        min_index = results["portfolio_values"].index(min_value)
+        max_index = results["portfolio_values"].index(max_value)
+        min_spy_change = (
+            results["spy_changes"][min_index] * 100
+        )  # Convert to percentage
+        max_spy_change = (
+            results["spy_changes"][max_index] * 100
+        )  # Convert to percentage
+
+        # Create a table of all SPY changes and portfolio values
+        if True:
+            console.print("\n[bold cyan]Portfolio Simulation Results[/bold cyan]")
+
+            # Create a summary table
+            summary_table = Table(title="Portfolio Summary", box=box.ROUNDED)
+            summary_table.add_column("Metric", style="cyan")
+            summary_table.add_column("Value", style="green")
+            summary_table.add_column("SPY Change", style="yellow")
+
+            summary_table.add_row("Current Value", f"${current_value:,.2f}", "0.0%")
+            summary_table.add_row(
+                "Minimum Value", f"${min_value:,.2f}", f"{min_spy_change:.1f}%"
             )
-            print(
-                f"{spy_change:>11.1%} | {portfolio_value:>18,.2f} | {value_change:>+12,.2f} | {pct_change:>+9.2f}%"
+            summary_table.add_row(
+                "Maximum Value", f"${max_value:,.2f}", f"{max_spy_change:.1f}%"
             )
 
-        # Create a simple text-based visualization
+            console.print(summary_table)
+
+            # Create a detailed table with all values
+            value_table = Table(
+                title="Portfolio Values at Different SPY Changes", box=box.ROUNDED
+            )
+            value_table.add_column("SPY Change", style="yellow")
+            value_table.add_column("Portfolio Value", style="green")
+            value_table.add_column("Change", style="cyan")
+            value_table.add_column("% Change", style="magenta")
+
+            for i, spy_change in enumerate(results["spy_changes"]):
+                portfolio_value = results["portfolio_values"][i]
+                value_change = portfolio_value - current_value
+                pct_change = (
+                    (value_change / current_value) * 100 if current_value != 0 else 0
+                )
+
+                # Format the change with color based on positive/negative
+                change_str = f"${value_change:+,.2f}"
+                pct_change_str = f"{pct_change:+.2f}%"
+
+                value_table.add_row(
+                    f"{spy_change * 100:.1f}%",
+                    f"${portfolio_value:,.2f}",
+                    change_str,
+                    pct_change_str,
+                )
+
+            console.print(value_table)
+
+        # Create a visualization of the portfolio value curve
 
         # Find min and max values for scaling
         min_value = min(results["portfolio_values"])
         max_value = max(results["portfolio_values"])
         value_range = max_value - min_value
 
-        # Create the visualization
-        chart_width = 50
-        chart_height = 10
-        chart = [" " * chart_width for _ in range(chart_height)]
+        if True:
+            # Create a panel for the chart
+            chart_title = f"Portfolio Value vs SPY Change (Min: ${min_value:,.2f}, Max: ${max_value:,.2f})"
 
-        # Map SPY changes to x positions
-        x_positions = []
-        for spy_change in results["spy_changes"]:
-            # Map from -10% to +10% to 0 to chart_width-1
-            x_pos = int((spy_change + 0.1) / 0.2 * (chart_width - 1))
-            x_positions.append(max(0, min(chart_width - 1, x_pos)))
+            # Create the visualization using Unicode block characters for a smoother chart
+            chart = [" " * CHART_WIDTH for _ in range(CHART_HEIGHT)]
 
-        # Map portfolio values to y positions
-        y_positions = []
-        for value in results["portfolio_values"]:
-            if value_range > 0:
-                # Map from min_value to max_value to 0 to chart_height-1
-                y_pos = int((value - min_value) / value_range * (chart_height - 1))
-                y_positions.append(max(0, min(chart_height - 1, y_pos)))
-            else:
-                y_positions.append(chart_height // 2)
+            # Map SPY changes to x positions
+            x_positions = []
+            for spy_change in results["spy_changes"]:
+                # Map from min to max SPY change to 0 to CHART_WIDTH-1
+                min_spy = results["spy_changes"][0]
+                max_spy = results["spy_changes"][-1]
+                spy_range = max_spy - min_spy
+                x_pos = int((spy_change - min_spy) / spy_range * (CHART_WIDTH - 1))
+                x_positions.append(max(0, min(CHART_WIDTH - 1, x_pos)))
 
-        # Plot the points
-        for x, y in zip(x_positions, y_positions, strict=False):
-            row = chart[y]
-            chart[y] = row[:x] + "*" + row[x + 1 :]
+            # Map portfolio values to y positions
+            y_positions = []
+            for value in results["portfolio_values"]:
+                if value_range > 0:
+                    # Map from min_value to max_value to 0 to CHART_HEIGHT-1
+                    y_pos = int((value - min_value) / value_range * (CHART_HEIGHT - 1))
+                    y_positions.append(max(0, min(CHART_HEIGHT - 1, y_pos)))
+                else:
+                    y_positions.append(CHART_HEIGHT // 2)
 
-        # Print the chart (bottom to top)
-        print("\nPortfolio Value Visualization:")
-        print(
-            f"Min Value: {format_currency(min_value)} | Max Value: {format_currency(max_value)}"
-        )
-        print(
-            f"SPY Range: {results['spy_changes'][0]:.1%} to {results['spy_changes'][-1]:.1%}"
-        )
-        print("-" * chart_width)
-        for i in range(chart_height - 1, -1, -1):
-            print(chart[i])
-        print("-" * chart_width)
+            # Plot the points with different characters based on position
+            for x, y in zip(x_positions, y_positions, strict=False):
+                row = chart[y]
+                # Use different characters for different parts of the curve
+                if y == 0:  # Top of chart
+                    char = "▲"
+                elif y == CHART_HEIGHT - 1:  # Bottom of chart
+                    char = "▼"
+                else:
+                    char = "●"
+                chart[y] = row[:x] + char + row[x + 1 :]
+
+            # Create the chart string
+            chart_str = "\n".join(
+                ["|" + row + "|" for row in chart[::-1]]
+            )  # Reverse to show bottom to top
+
+            # Add a border
+            border = "+" + "-" * CHART_WIDTH + "+"
+            chart_str = border + "\n" + chart_str + "\n" + border
+
+            # Add axis labels
+            min_spy_label = f"{results['spy_changes'][0] * 100:.1f}%"
+            max_spy_label = f"{results['spy_changes'][-1] * 100:.1f}%"
+            zero_spy_index = next(
+                (
+                    i
+                    for i, change in enumerate(results["spy_changes"])
+                    if abs(change) < 0.001
+                ),
+                None,
+            )
+            zero_spy_label = "0.0%" if zero_spy_index is not None else ""
+
+            axis_labels = f"{min_spy_label}{' ' * (CHART_WIDTH - len(min_spy_label) - len(max_spy_label))}{max_spy_label}"
+            if zero_spy_index is not None:
+                zero_pos = int(
+                    zero_spy_index / (len(results["spy_changes"]) - 1) * CHART_WIDTH
+                )
+                axis_labels = (
+                    axis_labels[:zero_pos]
+                    + zero_spy_label
+                    + axis_labels[zero_pos + len(zero_spy_label) :]
+                )
+
+            chart_str += "\n" + axis_labels
+
+            # Create a panel with the chart
+            chart_panel = Panel(chart_str, title=chart_title, border_style="cyan")
+            console.print(chart_panel)
 
         # Add value scale
-        value_step = value_range / 4 if value_range > 0 else 0
-        print(
-            f"Value Scale: {min_value:.2f} to {max_value:.2f}, step: {value_step:.2f}"
-        )
+        value_range / 4 if value_range > 0 else 0
 
         # Print summary analysis
         min_value = min(results["portfolio_values"])
@@ -478,20 +645,35 @@ def main():
 
         min_index = results["portfolio_values"].index(min_value)
         max_index = results["portfolio_values"].index(max_value)
-        min_spy_change = results["spy_changes"][min_index]
-        max_spy_change = results["spy_changes"][max_index]
+        min_spy_change = (
+            results["spy_changes"][min_index] * 100
+        )  # Convert to percentage
+        max_spy_change = (
+            results["spy_changes"][max_index] * 100
+        )  # Convert to percentage
 
         # Print summary analysis
-        print("\nPortfolio Summary Analysis:")
-        print(f"Current Portfolio Value: {format_currency(current_value)}")
-        print(
-            f"Min Portfolio Value: {format_currency(min_value)} at {min_spy_change:.1%} SPY change"
-        )
-        print(
-            f"Max Portfolio Value: {format_currency(max_value)} at {max_spy_change:.1%} SPY change"
-        )
-        print(f"Min Change: {format_currency(min_change)} ({min_pct_change:.2f}%)")
-        print(f"Max Change: {format_currency(max_change)} ({max_pct_change:.2f}%)")
+        if True:
+            summary_table = Table(title="Portfolio Value Summary", box=box.ROUNDED)
+            summary_table.add_column("Scenario", style="cyan")
+            summary_table.add_column("Value", style="green")
+            summary_table.add_column("Change", style="magenta")
+            summary_table.add_column("SPY Change", style="yellow")
+
+            summary_table.add_row(
+                "Worst Case",
+                f"${min_value:,.2f}",
+                f"{min_pct_change:+.2f}%",
+                f"{min_spy_change:.1f}%",
+            )
+            summary_table.add_row(
+                "Best Case",
+                f"${max_value:,.2f}",
+                f"{max_pct_change:+.2f}%",
+                f"{max_spy_change:.1f}%",
+            )
+
+            console.print(summary_table)
 
         # Print position-level analysis
         if "position_values" in results:
@@ -562,11 +744,6 @@ def main():
                 )
 
                 # Print positions with largest downside contributions
-                print("\nLargest contributors to downside moves:")
-                print(
-                    f"{'Ticker':>8} | {'Change':>12} | {'% Change':>10} | {'Expected':>12} | {'Diff %':>8}"
-                )
-                print("-" * 60)
                 for ticker, data in sorted_down[:5]:
                     # Calculate expected change based on beta
                     beta = position_details.get(ticker, {}).get("beta", 0)
@@ -576,22 +753,13 @@ def main():
                     )  # Expected change at min SPY
                     actual_change = data["down_change"]
                     difference = actual_change - expected_change
-                    diff_pct = (
+                    (
                         (difference / abs(expected_change)) * 100
                         if expected_change != 0
                         else 0
                     )
 
-                    print(
-                        f"{ticker:>8} | {actual_change:>+12,.2f} | {data['down_pct']:>+9.2f}% | {expected_change:>+12,.2f} | {diff_pct:>+7.2f}%"
-                    )
-
                 # Print positions with largest upside contributions
-                print("\nLargest contributors to upside moves:")
-                print(
-                    f"{'Ticker':>8} | {'Change':>12} | {'% Change':>10} | {'Expected':>12} | {'Diff %':>8}"
-                )
-                print("-" * 60)
                 for ticker, data in sorted_up[:5]:
                     # Calculate expected change based on beta
                     beta = position_details.get(ticker, {}).get("beta", 0)
@@ -601,14 +769,10 @@ def main():
                     )  # Expected change at max SPY
                     actual_change = data["up_change"]
                     difference = actual_change - expected_change
-                    diff_pct = (
+                    (
                         (difference / abs(expected_change)) * 100
                         if expected_change != 0
                         else 0
-                    )
-
-                    print(
-                        f"{ticker:>8} | {actual_change:>+12,.2f} | {data['up_pct']:>+9.2f}% | {expected_change:>+12,.2f} | {diff_pct:>+7.2f}%"
                     )
 
                 # Find positions that lose value when SPY goes up (negative correlation)
@@ -617,124 +781,35 @@ def main():
                     # If position value decreases when SPY increases
                     if data["up_change"] < 0:
                         # For any ticker, provide detailed position analysis when requested
-                        if ticker == "SPY" or args.detailed:
-                            print(f"\nDetailed {ticker} Position Analysis:")
-                            print(
-                                f"{ticker} position value at 0% change: ${data['base_value']:.2f}"
-                            )
-                            print(
-                                f"{ticker} position value at {max_spy_change:.1%} change: ${data['max_spy_value']:.2f}"
-                            )
-                            print(
-                                f"Change: ${data['up_change']:.2f} ({data['up_pct']:.2f}%)"
-                            )
-
-                            # Find the SPY group to analyze components
-                            spy_group = None
-                            for group in results.get("portfolio_groups", []):
-                                if hasattr(group, "ticker") and group.ticker == "SPY":
-                                    spy_group = group
-                                    break
-
-                            if spy_group:
-                                # Analyze stock component
-                                if (
-                                    hasattr(spy_group, "stock_position")
-                                    and spy_group.stock_position
-                                ):
-                                    stock = spy_group.stock_position
-                                    print("\nSPY Stock Component:")
-                                    print(f"  Quantity: {stock.quantity}")
-                                    print(f"  Current Price: ${stock.price:.2f}")
-                                    print(f"  Market Value: ${stock.market_value:.2f}")
-                                    print(f"  Beta: {stock.beta:.2f}")
-
-                                # Analyze option components
-                                if (
-                                    hasattr(spy_group, "option_positions")
-                                    and spy_group.option_positions
-                                ):
-                                    print("\nSPY Option Components:")
-                                    for i, option in enumerate(
-                                        spy_group.option_positions
-                                    ):
-                                        print(f"  Option {i + 1}:")
-                                        print(
-                                            f"    Description: {option.description if hasattr(option, 'description') else 'N/A'}"
-                                        )
-                                        print(f"    Quantity: {option.quantity}")
-                                        print(f"    Price: ${option.price:.2f}")
-                                        print(
-                                            f"    Market Value: ${option.market_value:.2f}"
-                                        )
-                                        print(f"    Delta: {option.delta:.4f}")
-                                        print(
-                                            f"    Delta Exposure: ${option.delta_exposure:.2f}"
-                                        )
-
-                                # Print net exposure
-                                print(
-                                    f"\nSPY Net Exposure: ${spy_group.net_exposure:.2f}"
-                                )
-                                print(
-                                    f"SPY Beta-Adjusted Exposure: ${spy_group.beta_adjusted_exposure:.2f}"
-                                )
-
-                            # Analyze how position components change with SPY price
-                            if ticker == "SPY":
-                                print(
-                                    "\nNote: SPY position shows inverse correlation with SPY price changes"
-                                )
-                                print(
-                                    "This is expected behavior due to the negative delta from options positions"
-                                )
-                                print(
-                                    "outweighing the positive delta from stock positions."
-                                )
+                        if args.detailed:
+                            pass
                         negative_correlation.append((ticker, data))
 
                 if negative_correlation:
                     # Sort by the magnitude of negative impact
                     negative_correlation.sort(key=lambda x: x[1]["up_change"])
 
-                    print(
-                        "\nPositions that LOSE value when SPY goes UP (negative correlation):"
-                    )
-                    print(
-                        f"{'Ticker':>8} | {'Change':>12} | {'% Change':>10} | {'Beta':>6} | {'Type':>8}"
-                    )
-                    print("-" * 60)
-
-                    for ticker, data in negative_correlation:
-                        beta = position_details.get(ticker, {}).get("beta", 0)
-                        position_type = "Unknown"
-
-                        # Try to determine position type
-                        # Get the portfolio groups from the original function arguments
-                        for group in results.get("portfolio_groups", []):
-                            if hasattr(group, "ticker") and group.ticker == ticker:
-                                if (
-                                    hasattr(group, "stock_position")
-                                    and group.stock_position
-                                    and group.stock_position.quantity < 0
-                                ):
-                                    position_type = "Short"
-                                elif (
-                                    hasattr(group, "stock_position")
-                                    and group.stock_position
-                                ):
-                                    position_type = "Long"
-                                elif (
-                                    hasattr(group, "option_positions")
-                                    and group.option_positions
-                                ):
-                                    # Simplified - could be more complex based on option types
-                                    position_type = "Options"
-                                break
-
-                        print(
-                            f"{ticker:>8} | {data['up_change']:>+12,.2f} | {data['up_pct']:>+9.2f}% | {beta:>+6.2f} | {position_type:>8}"
+                    if True:
+                        # Create a table for positions that lose value when SPY goes up
+                        neg_corr_table = Table(
+                            title="Positions that LOSE value when SPY goes UP (negative correlation)",
+                            box=box.ROUNDED,
                         )
+                        neg_corr_table.add_column("Ticker", style="cyan")
+                        neg_corr_table.add_column("Change", style="red")
+                        neg_corr_table.add_column("% Change", style="red")
+                        neg_corr_table.add_column("Beta", style="yellow")
+
+                        for ticker, data in negative_correlation:
+                            beta = position_details.get(ticker, {}).get("beta", 0)
+                            neg_corr_table.add_row(
+                                ticker,
+                                f"${data['up_change']:+,.2f}",
+                                f"{data['up_pct']:+.2f}%",
+                                f"{beta:+.2f}",
+                            )
+
+                        console.print(neg_corr_table)
 
                 # Find positions that gain value when SPY goes down (inverse correlation)
                 inverse_correlation = []
@@ -749,44 +824,27 @@ def main():
                         key=lambda x: x[1]["down_change"], reverse=True
                     )
 
-                    print(
-                        "\nPositions that GAIN value when SPY goes DOWN (inverse correlation):"
-                    )
-                    print(
-                        f"{'Ticker':>8} | {'Change':>12} | {'% Change':>10} | {'Beta':>6} | {'Type':>8}"
-                    )
-                    print("-" * 60)
-
-                    for ticker, data in inverse_correlation:
-                        beta = position_details.get(ticker, {}).get("beta", 0)
-                        position_type = "Unknown"
-
-                        # Try to determine position type
-                        # Get the portfolio groups from the original function arguments
-                        for group in results.get("portfolio_groups", []):
-                            if hasattr(group, "ticker") and group.ticker == ticker:
-                                if (
-                                    hasattr(group, "stock_position")
-                                    and group.stock_position
-                                    and group.stock_position.quantity < 0
-                                ):
-                                    position_type = "Short"
-                                elif (
-                                    hasattr(group, "stock_position")
-                                    and group.stock_position
-                                ):
-                                    position_type = "Long"
-                                elif (
-                                    hasattr(group, "option_positions")
-                                    and group.option_positions
-                                ):
-                                    # Simplified - could be more complex based on option types
-                                    position_type = "Options"
-                                break
-
-                        print(
-                            f"{ticker:>8} | {data['down_change']:>+12,.2f} | {data['down_pct']:>+9.2f}% | {beta:>+6.2f} | {position_type:>8}"
+                    if True:
+                        # Create a table for positions that gain value when SPY goes down
+                        inv_corr_table = Table(
+                            title="Positions that GAIN value when SPY goes DOWN (inverse correlation)",
+                            box=box.ROUNDED,
                         )
+                        inv_corr_table.add_column("Ticker", style="cyan")
+                        inv_corr_table.add_column("Change", style="green")
+                        inv_corr_table.add_column("% Change", style="green")
+                        inv_corr_table.add_column("Beta", style="yellow")
+
+                        for ticker, data in inverse_correlation:
+                            beta = position_details.get(ticker, {}).get("beta", 0)
+                            inv_corr_table.add_row(
+                                ticker,
+                                f"${data['down_change']:+,.2f}",
+                                f"{data['down_pct']:+.2f}%",
+                                f"{beta:+.2f}",
+                            )
+
+                        console.print(inv_corr_table)
 
             except (StopIteration, IndexError):
                 pass
@@ -813,18 +871,24 @@ def main():
             beta_down = min_pct_change / (
                 min_spy_change * 100
             )  # How much portfolio changes per 1% SPY down move
-            avg_beta = (beta_up + beta_down) / 2
+            (beta_up + beta_down) / 2
 
             # Print beta analysis
-            print("\nPortfolio Beta Analysis:")
-            print(f"Beta (up moves): {beta_up:.2f}")
-            print(f"Beta (down moves): {beta_down:.2f}")
-            print(f"Average Beta: {avg_beta:.2f}")
+            if True:
+                beta_table = Table(title="Portfolio Beta Analysis", box=box.ROUNDED)
+                beta_table.add_column("Direction", style="cyan")
+                beta_table.add_column("Beta", style="yellow")
 
-            if abs(beta_up - beta_down) > 0.5:
-                print(
-                    f"Note: Large difference between up and down betas ({abs(beta_up - beta_down):.2f}) indicates non-linear behavior"
-                )
+                beta_table.add_row("Up Moves", f"{beta_up:.2f}")
+                beta_table.add_row("Down Moves", f"{beta_down:.2f}")
+                beta_table.add_row("Average", f"{(beta_up + beta_down) / 2:.2f}")
+
+                console.print(beta_table)
+
+                if abs(beta_up - beta_down) > 0.5:
+                    console.print(
+                        f"[bold yellow]Note:[/bold yellow] Beta difference of {abs(beta_up - beta_down):.2f} indicates non-linear behavior"
+                    )
         except (StopIteration, IndexError):
             pass
 

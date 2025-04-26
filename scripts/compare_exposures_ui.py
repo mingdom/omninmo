@@ -57,24 +57,27 @@ def compare_exposures():
             # Possible alternative: (groups, cash_like_positions)
             groups, cash_like_positions = result
             from src.folio.portfolio import calculate_portfolio_summary
+
             summary = calculate_portfolio_summary(groups, cash_like_positions, 0.0)
     else:
         # If result is not a tuple, it's likely just the groups
         groups = result
         from src.folio.portfolio import calculate_portfolio_summary
+
         summary = calculate_portfolio_summary(groups, [], 0.0)
 
     # Ensure we have a valid summary object
-    if not hasattr(summary, 'to_dict'):
+    if not hasattr(summary, "to_dict"):
         # Create a minimal summary for testing
         from src.folio.data_model import ExposureBreakdown, PortfolioSummary
+
         empty_exposure = ExposureBreakdown()
         summary = PortfolioSummary(
             net_market_exposure=0.0,
             portfolio_beta=0.0,
             long_exposure=empty_exposure,
             short_exposure=empty_exposure,
-            options_exposure=empty_exposure
+            options_exposure=empty_exposure,
         )
 
     # Get the summary card values
@@ -91,7 +94,6 @@ def compare_exposures():
     options_exposure = formatted_values[9]
     formatted_values[11]
 
-
     # Calculate the sum of exposures from the position details as they would appear in the UI
 
     # Initialize counters for UI exposures
@@ -102,11 +104,16 @@ def compare_exposures():
     # Process each group as it would be displayed in the UI
 
     for group in groups:
-
         # Get values as they would be displayed in the UI
-        market_value = group.net_exposure  # This is what's shown as "Total Value" in the UI
-        beta_adjusted = group.beta_adjusted_exposure  # This is what's shown as "Beta-Adjusted Exposure" in the UI
-        delta_exposure = group.total_delta_exposure  # This is what's shown as "Total Delta Exposure" in the UI
+        market_value = (
+            group.net_exposure
+        )  # This is what's shown as "Total Value" in the UI
+        beta_adjusted = (
+            group.beta_adjusted_exposure
+        )  # This is what's shown as "Beta-Adjusted Exposure" in the UI
+        delta_exposure = (
+            group.total_delta_exposure
+        )  # This is what's shown as "Total Delta Exposure" in the UI
 
         # Print the values for this group
 
@@ -114,7 +121,6 @@ def compare_exposures():
         total_ui_market_value += market_value
         total_ui_beta_adjusted_exposure += beta_adjusted
         total_ui_delta_exposure += delta_exposure
-
 
     # Extract numeric values from formatted strings
     def extract_numeric(value):
@@ -127,7 +133,6 @@ def compare_exposures():
     summary_options_exposure = extract_numeric(options_exposure)
 
     # Compare with summary card values
-
 
     # Calculate long and short exposures from UI values
     ui_long_exposure = 0.0
@@ -147,9 +152,6 @@ def compare_exposures():
                 ui_long_exposure += opt.delta_exposure
             else:  # Short position
                 ui_short_exposure += opt.delta_exposure  # Already negative
-
-
-
 
     # Determine if the summary card values match the UI values
     if abs(summary_net_exposure - total_ui_market_value) < 0.01:

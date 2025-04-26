@@ -82,29 +82,15 @@ class TestExposures:
                     ui_short_exposure += opt.delta_exposure  # Already negative
 
         # Print detailed debug information
-        print("\n=== DEBUG: Summary Dictionary ===")
-        for key, value in summary_dict.items():
+        for _key, value in summary_dict.items():
             if isinstance(value, dict):
-                print(f"{key}:")
-                for subkey, subvalue in value.items():
-                    print(f"  {subkey}: {subvalue}")
+                for _subkey, _subvalue in value.items():
+                    pass
             else:
-                print(f"{key}: {value}")
+                pass
 
-        print("\n=== DEBUG: Pending Activity Value ===")
-        pending_activity_value = summary_dict.get("pending_activity_value", 0.0)
-        print(f"Pending Activity Value: {format_currency(pending_activity_value)}")
+        summary_dict.get("pending_activity_value", 0.0)
 
-        print("\n=== DEBUG: Difference Analysis ===")
-        print(f"Summary Net Exposure: {format_currency(summary_net_exposure)}")
-        print(f"UI Total Market Value: {format_currency(total_ui_market_value)}")
-        print(
-            f"Difference: {format_currency(summary_net_exposure - total_ui_market_value)}"
-        )
-        print(f"Pending Activity Value: {format_currency(pending_activity_value)}")
-        print(
-            f"Difference - Pending Activity: {format_currency((summary_net_exposure - total_ui_market_value) - pending_activity_value)}"
-        )
 
         # Test that summary card values match position details
         assert abs(summary_net_exposure - total_ui_market_value) < 0.01, (
