@@ -81,6 +81,17 @@ class TestExposures:
                 else:  # Short position
                     ui_short_exposure += opt.delta_exposure  # Already negative
 
+        # Print detailed debug information
+        for _key, value in summary_dict.items():
+            if isinstance(value, dict):
+                for _subkey, _subvalue in value.items():
+                    pass
+            else:
+                pass
+
+        summary_dict.get("pending_activity_value", 0.0)
+
+
         # Test that summary card values match position details
         assert abs(summary_net_exposure - total_ui_market_value) < 0.01, (
             f"Net Exposure in summary cards ({format_currency(summary_net_exposure)}) does not match the total market value shown in the UI ({format_currency(total_ui_market_value)})"

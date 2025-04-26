@@ -19,3 +19,12 @@ ruff
 # Used in: make test, CI/CD pipeline
 # Configuration: pytest.ini (implicit)
 pytest
+
+# Terminal UI Tools
+# ----------------
+
+# rich - Library for rich text and beautiful formatting in the terminal
+# Used for creating beautiful, interactive terminal output in scripts
+# Used in: scripts/folio-simulator.py
+# Configuration: None (used directly in code)
+rich>=13.9.0

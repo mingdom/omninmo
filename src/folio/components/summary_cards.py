@@ -117,6 +117,7 @@ def format_summary_card_values(summary_data):
 
     # Calculate beta-adjusted net exposure using the utility function
     # Note: options_total_beta_adjusted is already included in long/short, so we don't add it separately
+    # Note: Cash-like positions have beta of 0, so they don't contribute to beta-adjusted exposure
     beta_adjusted_net_exposure = calculate_beta_adjusted_net_exposure(
         long_total_beta_adjusted, short_total_beta_adjusted
     )
